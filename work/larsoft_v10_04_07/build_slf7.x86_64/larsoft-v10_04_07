@@ -1,0 +1,94 @@
+# Add '-B' to UPS_OVERRIDE for safety.
+tnotnull UPS_OVERRIDE || setenv UPS_OVERRIDE ''
+expr "x $UPS_OVERRIDE" : '.* -[^- 	]*B' >/dev/null || setenv UPS_OVERRIDE "$UPS_OVERRIDE -B"
+
+####################################
+# Use-time dependencies.
+####################################
+# > larsim <
+setup -B larsim v10_02_02 -q e26:+prof; test "$?" != 0 && \
+  echo ERROR\:\ setup\ \-B\ larsim\ v10_02_02\ \-q\ e26\:\+prof\ failed && \
+  return 1 || true
+# > rstartree <
+setup -B rstartree v2016_07; test "$?" != 0 && \
+  echo ERROR\:\ setup\ \-B\ rstartree\ v2016_07\ failed && \
+  return 1 || true
+# > eigen <
+setup -B eigen v23_08_01_66e8f; test "$?" != 0 && \
+  echo ERROR\:\ setup\ \-B\ eigen\ v23_08_01_66e8f\ failed && \
+  return 1 || true
+
+##################
+tnotnull SETUP_CETMODULES && unsetup cetmodules
+tnotnull SETUP_CETBUILDTOOLS && unsetup -j cetbuildtools
+
+# Save and clear UPS_OVERRIDE to avoid trouble.
+tdefined UPS_OVERRIDE_SAFE && unsetenv_ UPS_OVERRIDE_SAFE
+tdefined UPS_OVERRIDE && setenv UPS_OVERRIDE_SAFE "$UPS_OVERRIDE"
+tdefined UPS_OVERRIDE && unsetenv_ UPS_OVERRIDE
+# > cetmodules <
+setup -B cetmodules v3_24_01; test "$?" != 0 && \
+  echo ERROR\:\ setup\ \-B\ cetmodules\ v3_24_01\ failed && \
+  return 1 || true
+
+# Restore any previous value for UPS_OVERRIDE.
+tdefined UPS_OVERRIDE_SAFE && setenv UPS_OVERRIDE "$UPS_OVERRIDE_SAFE"
+tdefined UPS_OVERRIDE_SAFE && unsetenv_ UPS_OVERRIDE_SAFE
+##################
+
+##################
+# >> larreco <<
+##################
+
+tdefined SETUP_LARRECO && unsetup -j larreco
+setenv LARRECO_VERSION "v10_01_09"
+setenv LARRECO_DIR "${MRB_SOURCE}/larreco"
+setenv CETPKG_BUILD "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco"
+setenv CETPKG_SOURCE "$LARRECO_DIR"
+
+####################################
+# Development environment.
+####################################
+# LD_LIBRARY_PATH
+setenv LD_LIBRARY_PATH "`dropit -p \"${LD_LIBRARY_PATH}\" -sfe \"${CETPKG_BUILD}/slf7.x86_64.e26.prof/lib\"`"; test "$?" != 0 && \
+  echo ERROR\:\ failure\ to\ prepend\ to\ LD_LIBRARY_PATH && \
+  return 1 || true
+# CET_PLUGIN_PATH
+test -z "${CET_PLUGIN_PATH}" || \
+  setenv CET_PLUGIN_PATH "`dropit -p \"${CET_PLUGIN_PATH}\" -sfe \"${CETPKG_BUILD}/slf7.x86_64.e26.prof/lib\"`"; test "$?" != 0 && \
+  echo ERROR\:\ failure\ to\ prepend\ to\ CET_PLUGIN_PATH && \
+  return 1 || true
+# ROOT_INCLUDE_PATH
+setenv ROOT_INCLUDE_PATH "`dropit -p \"${ROOT_INCLUDE_PATH}\" -sfe \"${CETPKG_SOURCE}\" \"${CETPKG_BUILD}\"`"; test "$?" != 0 && \
+  echo ERROR\:\ failure\ to\ prepend\ to\ ROOT_INCLUDE_PATH && \
+  return 1 || true
+# CMAKE_PREFIX_PATH
+setenv CMAKE_PREFIX_PATH "`dropit -p \"${CMAKE_PREFIX_PATH}\" -sfe \"${CETPKG_BUILD}\"`"
+# FHICL_FILE_PATH
+setenv FHICL_FILE_PATH "`dropit -p \"${FHICL_FILE_PATH}\" -sfe \"${CETPKG_BUILD}/job\"`"; test "$?" != 0 && \
+  echo ERROR\:\ failure\ to\ prepend\ to\ FHICL_FILE_PATH && \
+  return 1 || true
+# FW_SEARCH_PATH
+setenv FW_SEARCH_PATH "`dropit -p \"${FW_SEARCH_PATH}\" -sfe \"${CETPKG_BUILD}/gdml\" \"${CETPKG_BUILD}/config_data\"`"; test "$?" != 0 && \
+  echo ERROR\:\ failure\ to\ prepend\ to\ FW_SEARCH_PATH && \
+  return 1 || true
+# PATH
+setenv PATH "`dropit -p \"${PATH}\" -sfe \"${CETPKG_BUILD}/slf7.x86_64.e26.prof/bin\" \"${CETPKG_SOURCE}/slf7.x86_64.e26.prof/bin\"`"; test "$?" != 0 && \
+  echo ERROR\:\ failure\ to\ prepend\ to\ PATH && \
+  return 1 || true
+
+########################################################################
+# Postamble
+
+# Required environment.
+setenv CETPKG_SOURCE "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs"
+setenv CETPKG_BUILD  "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64"
+
+# Ensure top-level CMakeLists.txt is current.
+mrb uc >/dev/null; test "$?" != 0 && 
+  echo ERROR: failure to freshen /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/CMakeLists.txt && 
+  return 1 || true
+
+# Ensure . is at the front of FHICL_FILE_PATH.
+tdefined FHICL_FILE_PATH || set_ FHICL_FILE_PATH=''
+setenv FHICL_FILE_PATH `dropit -esf -p "${FHICL_FILE_PATH}" '.'`

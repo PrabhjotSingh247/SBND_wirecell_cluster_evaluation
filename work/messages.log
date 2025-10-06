@@ -1,0 +1,62 @@
+%MSG-i MF_INIT_OK:  Early 01-Jul-2025 07:31:17 CDT JobSetup
+Messagelogger initialization complete.
+%MSG
+%MSG-i AuxDetGeometryCore:  Early 01-Jul-2025 07:32:12 CDT JobSetup
+New detector geometry loaded from
+	/cvmfs/sbnd.opensciencegrid.org/products/sbnd/sbndcode/v10_04_07/gdml/sbnd_v02_04.gdml
+%MSG
+%MSG-i GeometryCore:  Early 01-Jul-2025 07:32:12 CDT JobSetup
+Sorting volumes...
+%MSG
+%MSG-i GeometryCore:  Early 01-Jul-2025 07:32:12 CDT JobSetup
+New detector geometry loaded from
+	/cvmfs/sbnd.opensciencegrid.org/products/sbnd/sbndcode/v10_04_07/gdml/sbnd_v02_04.gdml
+%MSG
+%MSG-i WireReadoutStandardGeom:  Early 01-Jul-2025 07:32:14 CDT JobSetup
+Initializing standard wire-readout geometry...
+%MSG
+%MSG-i StandardWireReadout:  Early 01-Jul-2025 07:32:14 CDT JobSetup
+Loading wire readout: WireReadoutStandardGeom
+%MSG
+01-Jul-2025 07:32:14 CDT  Initiating request to open input file "/pnfs/sbnd/scratch/users/prabhjot/calibration_MC_sample/events_200k_files_20k/v10_06_00/g4/20688839_3689/prodcosmics_corsika_cmc_muon_filter_sbnd_CosmicsGen-20250513T211414_770d6f75-f5a5-4c1a-9f5c-1dd81b2a6adf_G4-20250514T050835.root"
+%MSG-i Root_Information:  CellTree:wirecell@Construction TClass::Init()  01-Jul-2025 07:32:15 CDT ModuleConstruction
+no dictionary for class sim::IDE is available
+ROOT severity: 2000
+%MSG
+01-Jul-2025 07:32:15 CDT  Opened input file "/pnfs/sbnd/scratch/users/prabhjot/calibration_MC_sample/events_200k_files_20k/v10_06_00/g4/20688839_3689/prodcosmics_corsika_cmc_muon_filter_sbnd_CosmicsGen-20250513T211414_770d6f75-f5a5-4c1a-9f5c-1dd81b2a6adf_G4-20250514T050835.root"
+%MSG-i CellTree:  CellTree:wirecell@BeginRun 01-Jul-2025 07:32:15 CDT run: 1
+begin run
+%MSG
+Begin processing the 1st record. run: 1 subRun: 4319 event: 1 at 01-Jul-2025 07:32:15 CDT
+01-Jul-2025 07:32:15 CDT  Closed input file "/pnfs/sbnd/scratch/users/prabhjot/calibration_MC_sample/events_200k_files_20k/v10_06_00/g4/20688839_3689/prodcosmics_corsika_cmc_muon_filter_sbnd_CosmicsGen-20250513T211414_770d6f75-f5a5-4c1a-9f5c-1dd81b2a6adf_G4-20250514T050835.root"
+
+====================================================================================================================
+TimeTracker printout (sec)            Min           Avg           Max         Median          RMS         nEvts   
+====================================================================================================================
+Full event                         0.311181      0.311181      0.311181      0.311181          0            1     
+--------------------------------------------------------------------------------------------------------------------
+source:RootInput(read)             0.0100254     0.0100254     0.0100254     0.0100254         0            1     
+end_path:wirecell:CellTree         0.300869      0.300869      0.300869      0.300869          0            1     
+====================================================================================================================
+
+====================================================================================================
+MemoryTracker summary (base-10 MB units used)
+
+  Peak virtual memory usage (VmPeak)  : 1720.71 MB
+  Peak resident set size usage (VmHWM): 888.144 MB
+  Details saved in: 'memory.db'
+====================================================================================================
+
+TrigReport ---------- Event summary -------------
+TrigReport Events total = 1 passed = 1 failed = 0
+
+TrigReport ---------- Modules in End-path ----------
+TrigReport        Run    Success      Error Name
+TrigReport          1          1          0 wirecell
+
+TimeReport ---------- Time summary [sec] -------
+TimeReport CPU = 0.260015 Real = 2.882502
+
+MemReport  ---------- Memory summary [base-10 MB] ------
+MemReport  VmPeak = 1720.71 VmHWM = 888.144
+

@@ -1,0 +1,43 @@
+#include "spacepointsolverhitreadingtools.fcl"
+
+BEGIN_PROLOG
+
+standard_spacepointsolver:
+{
+  module_type: "SpacePointSolver"
+
+  HitLabel: "gaushit"
+
+  Fit: true
+
+  # How close the intersections of three wire pairs need to be to form a
+  # triplet (cm)
+  WireIntersectThreshold: 0.7
+  # How close intersections need to be in the drift direction
+  WireIntersectThresholdDriftDir: 0.4
+
+  Alpha: .05 # Regularization strength
+
+  # Form triplets out of two hits and one bad induction wire
+  AllowBadInductionHit: true
+  # Form triplets out of two induction hits and a bad collection wire
+  AllowBadCollectionHit: true
+
+  MaxIterationsNoReg: 100
+  MaxIterationsReg:   100
+
+  XHitOffset:         0
+
+  # Experiment specific tool for reading hits
+  HitReaderTool: @local::standard_Hits
+
+  # Minimum number of hits required in an event to run the spacepoint solver
+  MinNHits: 20
+
+  # Maximum number of triplets allowed in the spacepoint solver (bail out if exceeded).
+  # Zero (default) means that no maximum is set.
+  MaxNTriplets: 0
+}
+
+END_PROLOG
+

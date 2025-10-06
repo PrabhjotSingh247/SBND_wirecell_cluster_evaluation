@@ -1,0 +1,227 @@
+#include "dataprovider.fcl"
+
+BEGIN_PROLOG
+
+standard_spacepointalg:
+{
+  MaxDT:      2.0
+  MaxS:       0.3
+  MinViews:   2
+  EnableU:    true
+  EnableV:    true
+  EnableW:    false
+  Filter:     true
+  Merge:      false
+  PreferColl: false
+}
+
+standard_seedfinderalgorithm:
+{
+  SpacePointAlg:          @local::standard_spacepointalg
+  InitSeedLength:         2
+  MinPointsInSeed:        4
+  Refits:                 5
+  HitResolution:          1
+  OccupancyCut:           0.8
+  MaxViewRMS:             [2,2,2]
+  ExtendSeeds:            true
+  LengthCut:              0
+}
+standard_seedfinderalgorithm.SpacePointAlg.Filter: false
+
+standard_projectionmatchingalg:
+{
+  OptimizationEps:        0.01    # relative change of the obj.fn which stops optimization after adding a node
+  FineTuningEps:          0.0001  # relative change of the obj.fn which stops fine-tuning of optimized track
+  TrkValidationDist2D:    1.0     # max. distance [cm] used in the track validation in the "third" plane
+  HitTestingDist2D:       0.5     # max. distance [cm] used in testing compatibility of hits with the track
+  MinTwoViewFraction:     0.4     # min. fraction of track length covered with hits from many 2D views intertwinted with each other
+  NodeMargin3D:           3.0     # margin in [cm] around TPC for allowed track node positions
+  HitWeightZ:             1.0     # weights used for hits in U, V, Z planes:
+  HitWeightV:             1.0     #    - use lower values for planes where hit position is less reliable (e.g. due to S/N)
+  HitWeightU:             1.0     #    - relative ratios matter, sum does not need to be 1.0
+}
+
+standard_pmalgtracker:
+{
+  MinSeedSize1stPass:     20      # min. cluster size used to start building a track in the 1st pass
+  MinSeedSize2ndPass:     4       # ..and in the 2nd pass: differentiate to speed up finding long tracks
+                                  # w/o checking large number of possibilities, then use as small size
+                                  # as reasonnable for used clustering algorithm to complete the search
+                                  # in the second pass
+  TrackLikeThreshold:     0.0     # CNN output threshold for track-like recognition; ClusterModuleLabel
+                                  # needs to be associated to CNN outputs in case of threshold > 0; will
+                                  # exclude obvious EM from tracking and tag clean electron tracks as PDG=11
+                                  #
+  RunVertexing:           false   # find vertices, join with tracks, reoptimize track-vertex structure
+                                  #
+  FlipToBeam:             false   # set the track direction to increasing Z values
+  FlipDownward:           false   # set the track direction to decreasing Y values (like cosmic rays)
+  FlipToX:             	  false   # set the track direction to decreasing X values (like cosmic rays in dual phase)
+  AutoFlip_dQdx:          false   # set the track direction to increasing dQ/dx (overrides FlipToBeam,
+                                  # FlipDownward and FlipToX if significant rise of dQ/dx at the track end)
+                                  #
+  MergeWithinTPC:         false   # merge witnin single TPC; finds tracks best matching by angle, with limits:
+  MergeTransverseShift:   2.0     #    - max. transverse displacement [cm] between tracks
+  MergeAngle:             2.0     #    - max. angle [degree] between tracks (nearest segments)
+                                  #
+  StitchBetweenTPCs:      true    # stitch between TPCs; finds tracks best matching by angle, with limits:
+  StitchDistToWall:       3.0     #    - max. track endpoint distance [cm] to TPC boundary
+  StitchTransverseShift:  3.0     #    - max. transverse displacement [cm] between tracks
+  StitchAngle:           10.0     #    - max. angle [degree] between tracks (nearest segments)
+                                  #
+  MatchT0inAPACrossing:   false   # match T0 of APA-crossing tracks using PMAlgStitcher
+  MatchT0inCPACrossing:   false   # match T0 of CPA-crossing tracks using PMAlgStitcher
+
+  Validation:             "hits"  # "hits":   uses hits to validate track
+                                  # "adc":   uses adc image to validate tracks
+                                  # "calib": uses hits to validate tracks and produce histograms to find adc thresholds
+                                  #          which should be used in "adc" mode
+  AdcValidationThr:       [1.0, 1.0, 1.0]    # threshold for not-empty pixel in the ADC image used for the track validation, per plane
+  AdcImageAlg:            @local::standard_dataprovideralg
+}
+
+standard_pmalgfitter:
+{
+  TrackingOnlyPdg:        [0]     # PDG list to select which PFParticles should be reconstructed;
+                                  # all PFP's are used if the list is empty or starts with 0
+  TrackingSkipPdg:        [0]    # PDG list to select which PFParticles should NOT be reconstructed,
+                                  # e.g. skip EM showers; no skipping if the list is empty or starts with 0
+                                  #
+  RunVertexing:           false   # find vertices, join with tracks, reoptimize track-vertex structure
+}
+
+standard_beziertrackeralgorithm:
+{	
+  OverlapCut:            0.2
+  DirectJoinDistance:    10.0
+  TrackJoinAngle:        0.5          
+  VertexImpactThreshold: 2.0
+  VertexExtrapDistance:  5.0
+  OccupancyThresh:       0.8
+  TrackResolution:       2.0
+  SeedFinder:            @local::standard_seedfinderalgorithm
+
+}
+standard_beziertrackeralgorithm.SeedFinder.LengthCut: 2
+
+standard_trackstitcheralg:
+{
+  CosAngTolerance: 0.98
+  SpptSepTolerance: 30.0 # cm
+  CommonComponentStitch: true
+}
+
+standard_kalmanfilteralg:
+{
+  Trace: false
+  MaxPErr: 0.25      # Maximum pointing error for free propagation.
+  GoodPErr: 0.1      # Pointing error threshold for switching from linearized to free propataion.
+  MaxIncChisq: 10.   # Incremental chisquare cut.
+  MaxSeedIncChisq: 1000.  # Incremental chisquare cut in seed phase.
+  MaxSmoothIncChisq: 100. # Incremental chisquare cut in smooth phase.
+  MaxEndChisq: 10.   # Maximum incremental chisquare for endpoint hit.
+  MinLHits: 20       # Minimum number of measurements for linearized propagation.
+  MaxLDist: 10.      # Maximum distance to use linearized propagation using starting guess.
+  MaxPredDist: 5.    # Maximum prediction distance to accept a hit.
+  MaxSeedPredDist: 50. # Maximum prediction distance to accept a hit in seed phase.
+  MaxPropDist: 50.   # Maximum propagation distance to candidate surface.
+  MinSortDist: 0.    # Low threshold to resort hits.
+  MaxSortDist: 2.    # High threshold to resort hits.
+  MaxSamePlane: 3    # Maximum consecutive hits in same plane.
+  GapDist: 3.        # Minimum gap distance.
+  MaxNoiseHits: 3    # Maximum number of hits in noise cluster.
+  MinSampleDist: 20. # Minimum sample distance (for momentum measurement).
+  FitMomRange: true  # Fit momentum using range.
+  FitMomMS: false    # Fit momentum using multiple scattering.
+
+  # Graphical trace options.
+  # For any kine of graphical tracing to work, you need to configure
+  # the event display service to initialize the graphics system.
+
+  GTrace: false      # Graphical trace flag.
+  GTraceWW: 1200     # Window width (pixels).
+  GTraceWH: 800      # Window height (pixels).
+  GTraceXMin: -256.  # Graphical trace minimum x (same for each view).
+  GTraceXMax: 512.   # Graphical trace maximum x (same for each view).
+  GTraceZMin: [    0.,    0.,    0.]  # Graphical trace minimum z for each view.
+  GTraceZMax: [ 1040., 1040., 1040.]  # Graphical trace maximum z for each view
+}
+
+standard_track3Dkalmanhitalg:
+{
+  MaxTcut:            10.           # Maximum delta ray energy in MeV for restricted dE/dx
+  DoDedx:             false         # dE/dx enable flag.
+  SelfSeed:           false         # Generate seeds internally.
+  LineSurface:        false         # Store hits on line surfaces.
+  MinSeedHits:        12            # Minimum number of hits per track seed.
+  MinSeedChopHits:    50            # Potentially chop seeds that exceed this length.
+  MaxChopHits:        20            # Maximum number of hits to chop from each end of seed.
+  MaxSeedChiDF:       20.           # Maximum seed track chisquare/dof.
+  MinSeedSlope:       0.0           # Minimum seed slope (dx/dz).
+  InitialMomentum:    0.5           # Initial momentum (GeV/c).
+  KalmanFilterAlg:    @local::standard_kalmanfilteralg
+  SeedFinderAlg:      @local::standard_seedfinderalgorithm
+}
+
+standard_cosmictrackeralg:
+{
+    SPTAlg:   0
+    TrajOnly: false
+    TMatch:   2.5
+    SMatch:   1
+}
+
+argoneut_spacepointalg:      @local::standard_spacepointalg
+argoneut_kalmanfilteralg:    @local::standard_kalmanfilteralg
+argoneut_cosmictrackeralg:   @local::standard_cosmictrackeralg
+argoneut_cosmictrackeralg.SPTAlg:   1
+argoneut_cosmictrackeralg.TrajOnly: true
+
+bo_spacepointalg: @local::standard_spacepointalg
+bo_spacepointalg.MinViews: 2
+bo_spacepointalg.EnableW:  true
+bo_kalmanfilteralg:          @local::standard_kalmanfilteralg
+bo_seedfinderalgorithm:                          @local::standard_seedfinderalgorithm
+bo_seedfinderalgorithm.SpacePointAlg :           @local::bo_spacepointalg
+bo_seedfinderalgorithm.SpacePointAlg.PreferColl: true
+bo_seedfinderalgorithm.SpacePointAlg.Filter:     false
+bo_beziertrackeralgorithm:                       @local::standard_beziertrackeralgorithm
+bo_beziertrackeralgorithm.SeedFinder:            @local::bo_seedfinderalgorithm
+
+microboone_spacepointalg:                                @local::standard_spacepointalg
+microboone_spacepointalg.MinViews:                       3
+microboone_spacepointalg.EnableW:                        true
+microboone_kalmanfilteralg:                              @local::standard_kalmanfilteralg
+microboone_seedfinderalgorithm:                          @local::standard_seedfinderalgorithm
+microboone_seedfinderalgorithm.SpacePointAlg : {
+  @table::microboone_spacepointalg
+  PreferColl: true
+  Filter:     false
+}
+microboone_track3Dkalmanhitalg: {
+  @table::standard_track3Dkalmanhitalg
+  KalmanFilterAlg: @local::microboone_kalmanfilteralg
+  SeedFinderAlg:   @local::microboone_seedfinderalgorithm
+}
+microboone_beziertrackeralgorithm:                       @local::standard_beziertrackeralgorithm
+microboone_beziertrackeralgorithm.SeedFinder:            @local::microboone_seedfinderalgorithm
+microboone_trackstitcheralg:  @local::standard_trackstitcheralg
+
+dune10kt_spacepointalg:          @local::standard_spacepointalg
+dune10kt_spacepointalg.MinViews: 3
+dune10kt_spacepointalg.EnableW:  true
+dune10kt_kalmanfilteralg:        @local::standard_kalmanfilteralg
+dune34kt_spacepointalg:          @local::dune10kt_spacepointalg
+dune34kt_kalmanfilteralg:        @local::dune10kt_kalmanfilteralg
+dune35t_spacepointalg: @local::standard_spacepointalg
+dune35t_spacepointalg.MinViews:  3
+dune35t_spacepointalg.EnableW:   true
+dune35t_kalmanfilteralg:         @local::standard_kalmanfilteralg
+dune35t_seedfinderalgorithm:                          @local::standard_seedfinderalgorithm
+dune35t_seedfinderalgorithm.SpacePointAlg :           @local::dune35t_spacepointalg
+dune35t_seedfinderalgorithm.SpacePointAlg.PreferColl: true
+dune35t_seedfinderalgorithm.SpacePointAlg.Filter:     false
+
+
+END_PROLOG

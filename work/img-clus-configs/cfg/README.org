@@ -1,0 +1,91 @@
+#+title: Wire Cell Toolkit Configuration
+#+include: ../docs/include-readme.org
+
+* What is here
+
+This repository holds a reference set of Wire Cell Toolkit (WCT)
+configuration files.  These are largely in the form of Jsonnet but
+some in FHiCL format are as examples to integrate with applications
+based on the /art/ event processing framework.
+
+The goal of any /main/ Jsonnet file is to produce an *ordered array of
+component configuration objects*.  Each object names a WCT C++
+component type and an optional instance name and may also include
+additional attributes which are passed to the C++ object instance to
+configure it.  A special configuration object, typically the last in
+the sequence, names the WCT "app" which is usually a ~Pgrapher~ or
+~TbbFlow~ component that provide *data flow processing* (DFP) graph
+execution.  The main configuration element of this component is a list
+of "edges" connecting two data flow graph nodes by stating their
+~type:instance~ name pairs.
+
+Configuration is complex and more so as it spans multiple detectors
+and for each detector variations in term of detector model, job
+intention and other factors.  To manage this complexity a number of
+structural conventions are observed at the directory, file and content
+level.  The Jsonnet files at top ~cfg/~ directory provide general
+utilities.  Sub-directories ~cfg/*~ define some scope for conventions,
+some of which are described in the next section.
+
+For more information on configuration see the [[https://github.com/WireCell/wire-cell-docs/tree/master/manuals/configuration.org][WCT configuration manual]]
+as well as [[https://wirecell.github.io/news/categories/config/][news posts tagged with config]].
+
+* Contents overview
+
+This describes what is available.  Be wary is may not always be up to
+date with the reality on the ground.
+
+** General support files
+
+Files at top level provide general support and utilities.  Primarily
+there is the file:
+
+- [[file:wirecell.jsonnet]] 
+
+This holds a Jsonnet version of the WCT /system of units/ (which is
+essentially identical to CLHEP's).  It also includes a number of
+Jsonnet functions to form some common configuration data structures.
+
+- [[file:vector.jsonnet]] 
+
+This holds some functions to assist in doing vector arithmetic in Jsonnet.
+
+- [[file:pgraph.jsonnet]]
+
+This holds functions to support building a processing graph for use by
+the ~Pgrapher~ WCT app component.  Some details are [[https://wirecell.github.io/news/posts/pgrapher-configuration-improvements/][here]].
+
+** Structure layers
+
+Across all types of *detectors* and *jobs* which are supported by WCT we
+define a layered configuration structure.  The top layer is most
+generic and the bottom most specific.  An Jsonnet API is defined for
+each layer.  Users defining new "main" Jsonnet files, or improving
+legacy forms, should read the document [[file:layers/README.org]].
+
+** Legacy forms
+
+The original configuration structure which does not allow for
+detector-independent job configuration definition is held under
+[[file:pgrapher/]].  See [[file:pgrapher/README.org][it's README]] for more info on the conventions it
+follows.  New detector configuration should follow the *structured
+layers* form introduced above.  In some cases, legacy detector
+configuration may used in an adapter that provides *structured layers*
+forms.
+
+* Tests
+
+As with other WCT subpackages, this provides a ~/test/~ sub-directory with various tests that used through the [[file:../test/README.org][WCT testing framework]].  In particular the ~cfg~ sub-package has many tests written in Jsonnet and the [[file:../test/docs/jsonnet.org][Jsonnet test support]] is particularly relevant.
+
+
+* JQ tricks
+
+The ~jq~ tool is like ~grep~ for JSON.  Here are some useful tricks to operate on a mongo big JSON file.
+
+** WCT JSON Config Files
+
+Find an element in the /configuration sequence/ by type
+
+#+BEGIN_EXAMPLE
+  $ jq '.[]| select(.type|contains("Drifter"))' wct.json 
+#+END_EXAMPLE

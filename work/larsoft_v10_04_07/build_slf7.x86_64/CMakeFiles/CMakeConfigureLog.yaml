@@ -1,0 +1,896 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineSystem.cmake:211 (message)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      The system is: Linux - 5.14.0-503.35.1.el9_5.x86_64 - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineCXXCompiler.cmake:126 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "larreco/CMakeLists.txt:12 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler: /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "a.out"
+      
+      The CXX compiler identification is GNU, found in:
+        /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/3.27.4/CompilerIdCXX/a.out
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "larreco/CMakeLists.txt:12 (project)"
+    checks:
+      - "Detecting CXX compiler ABI info"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-7X097E"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-7X097E"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_CXX_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-7X097E'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_26a77
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -std=c++17   -v -o CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o -c /cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp
+        Using built-in specs.
+        COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++
+        Target: x86_64-pc-linux-gnu
+        Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c,c++,fortran,go,objc,obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15
+        Thread model: posix
+        Supported LTO compression algorithms: zlib zstd
+        gcc version 12.1.0 (GCC) 
+        COLLECT_GCC_OPTIONS='-std=c++17' '-v' '-o' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_26a77.dir/'
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/cc1plus -quiet -v -iprefix /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/ -D_GNU_SOURCE /cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_26a77.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -std=c++17 -version -o /tmp/cc5bU5jJ.s
+        GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)
+        	compiled by GNU C version 12.1.0, GMP version 6.2.1, MPFR version 4.1.0-p13, MPC version 1.2.1, isl version isl-0.24-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed"
+        ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed
+         /usr/local/include
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../include
+         /usr/include
+        End of search list.
+        GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)
+        	compiled by GNU C version 12.1.0, GMP version 6.2.1, MPFR version 4.1.0-p13, MPC version 1.2.1, isl version isl-0.24-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: e9dba2130524ec85cea982823dc61c57
+        COLLECT_GCC_OPTIONS='-std=c++17' '-v' '-o' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_26a77.dir/'
+         as -v --64 -o CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc5bU5jJ.s
+        GNU assembler version 2.27 (x86_64-redhat-linux) using BFD version version 2.27-44.base.el7
+        COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/
+        LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/
+        COLLECT_GCC_OPTIONS='-std=c++17' '-v' '-o' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.'
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++  -v CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_26a77   && :
+        Using built-in specs.
+        COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++
+        COLLECT_LTO_WRAPPER=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper
+        Target: x86_64-pc-linux-gnu
+        Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c,c++,fortran,go,objc,obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15
+        Thread model: posix
+        Supported LTO compression algorithms: zlib zstd
+        gcc version 12.1.0 (GCC) 
+        COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/
+        LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_26a77' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_26a77.'
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/collect2 -plugin /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/liblto_plugin.so -plugin-opt=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccZYkENN.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_26a77 /lib/../lib64/crt1.o /lib/../lib64/crti.o /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0 -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../.. CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o /lib/../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_26a77' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_26a77.'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineCompilerABI.cmake:127 (message)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "larreco/CMakeLists.txt:12 (project)"
+    message: |
+      Parsed CXX implicit include dir info: rv=done
+        found start of include info
+        found start of implicit include info
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include]
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0]
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu]
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward]
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include]
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed]
+          add: [/usr/local/include]
+          add: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../include]
+          add: [/usr/include]
+        end of search list found
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include] ==> [/cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include]
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include/c++/12.1.0]
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include/c++/12.1.0/x86_64-pc-linux-gnu]
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include/c++/12.1.0/backward]
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/include]
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed]
+        collapse include dir [/usr/local/include] ==> [/usr/local/include]
+        collapse include dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../include] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include]
+        collapse include dir [/usr/include] ==> [/usr/include]
+        implicit include dirs: [/cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include/c++/12.1.0;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include/c++/12.1.0/x86_64-pc-linux-gnu;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include/c++/12.1.0/backward;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/include;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed;/usr/local/include;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/include;/usr/include]
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeDetermineCompilerABI.cmake:152 (message)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "larreco/CMakeLists.txt:12 (project)"
+    message: |
+      Parsed CXX implicit link information:
+        link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-7X097E']
+        ignore line: []
+        ignore line: [Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_26a77]
+        ignore line: [[1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -std=c++17   -v -o CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o -c /cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++]
+        ignore line: [Target: x86_64-pc-linux-gnu]
+        ignore line: [Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c c++ fortran go objc obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib zstd]
+        ignore line: [gcc version 12.1.0 (GCC) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-std=c++17' '-v' '-o' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_26a77.dir/']
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/cc1plus -quiet -v -iprefix /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/ -D_GNU_SOURCE /cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_26a77.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -std=c++17 -version -o /tmp/cc5bU5jJ.s]
+        ignore line: [GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)]
+        ignore line: [	compiled by GNU C version 12.1.0  GMP version 6.2.1  MPFR version 4.1.0-p13  MPC version 1.2.1  isl version isl-0.24-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed"]
+        ignore line: [ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed]
+        ignore line: [ /usr/local/include]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../include]
+        ignore line: [ /usr/include]
+        ignore line: [End of search list.]
+        ignore line: [GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)]
+        ignore line: [	compiled by GNU C version 12.1.0  GMP version 6.2.1  MPFR version 4.1.0-p13  MPC version 1.2.1  isl version isl-0.24-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [Compiler executable checksum: e9dba2130524ec85cea982823dc61c57]
+        ignore line: [COLLECT_GCC_OPTIONS='-std=c++17' '-v' '-o' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_26a77.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc5bU5jJ.s]
+        ignore line: [GNU assembler version 2.27 (x86_64-redhat-linux) using BFD version version 2.27-44.base.el7]
+        ignore line: [COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/]
+        ignore line: [LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-std=c++17' '-v' '-o' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.']
+        ignore line: [[2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++  -v CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_26a77   && :]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++]
+        ignore line: [COLLECT_LTO_WRAPPER=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper]
+        ignore line: [Target: x86_64-pc-linux-gnu]
+        ignore line: [Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c c++ fortran go objc obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib zstd]
+        ignore line: [gcc version 12.1.0 (GCC) ]
+        ignore line: [COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/]
+        ignore line: [LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_26a77' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_26a77.']
+        link line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/collect2 -plugin /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/liblto_plugin.so -plugin-opt=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccZYkENN.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_26a77 /lib/../lib64/crt1.o /lib/../lib64/crti.o /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0 -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../.. CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o /lib/../lib64/crtn.o]
+          arg [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/collect2] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/liblto_plugin.so] ==> ignore
+          arg [-plugin-opt=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccZYkENN.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf_x86_64] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_26a77] ==> ignore
+          arg [/lib/../lib64/crt1.o] ==> obj [/lib/../lib64/crt1.o]
+          arg [/lib/../lib64/crti.o] ==> obj [/lib/../lib64/crti.o]
+          arg [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o] ==> obj [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64]
+          arg [-L/lib/../lib64] ==> dir [/lib/../lib64]
+          arg [-L/usr/lib/../lib64] ==> dir [/usr/lib/../lib64]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../..] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../..]
+          arg [CMakeFiles/cmTC_26a77.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+          arg [-lstdc++] ==> lib [stdc++]
+          arg [-lm] ==> lib [m]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lc] ==> lib [c]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o] ==> obj [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o]
+          arg [/lib/../lib64/crtn.o] ==> obj [/lib/../lib64/crtn.o]
+        collapse obj [/lib/../lib64/crt1.o] ==> [/lib64/crt1.o]
+        collapse obj [/lib/../lib64/crti.o] ==> [/lib64/crti.o]
+        collapse obj [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o]
+        collapse obj [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o]
+        collapse obj [/lib/../lib64/crtn.o] ==> [/lib64/crtn.o]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib64]
+        collapse library dir [/lib/../lib64] ==> [/lib64]
+        collapse library dir [/usr/lib/../lib64] ==> [/usr/lib64]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib] ==> [/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../..] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib]
+        implicit libs: [stdc++;m;gcc_s;gcc;c;gcc_s;gcc]
+        implicit objs: [/lib64/crt1.o;/lib64/crti.o;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o;/lib64/crtn.o]
+        implicit dirs: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib64;/lib64;/usr/lib64;/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindThreads.cmake:99 (CHECK_CXX_SOURCE_COMPILES)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindThreads.cmake:163 (_threads_check_libc)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/hep_concurrency/v1_09_02/slf7.x86_64.e26.prof/lib/hep_concurrency/cmake/hep_concurrencyConfig.cmake:113 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/slf7.x86_64.e26.prof/lib/art/cmake/artConfig.cmake:135 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/slf7.x86_64.e26.prof/lib/larcore/cmake/larcoreConfig.cmake:136 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:27 (find_package)"
+    checks:
+      - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-YyFlsw"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-YyFlsw"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_LIBC_PTHREAD"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-YyFlsw'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_74e1d
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCMAKE_HAVE_LIBC_PTHREAD  -std=c++17 -o CMakeFiles/cmTC_74e1d.dir/src.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-YyFlsw/src.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   CMakeFiles/cmTC_74e1d.dir/src.cxx.o -o cmTC_74e1d   && :
+        FAILED: cmTC_74e1d 
+        : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   CMakeFiles/cmTC_74e1d.dir/src.cxx.o -o cmTC_74e1d   && :
+        CMakeFiles/cmTC_74e1d.dir/src.cxx.o: In function `main':
+        src.cxx:(.text+0x2d): undefined reference to `pthread_create'
+        src.cxx:(.text+0x39): undefined reference to `pthread_detach'
+        src.cxx:(.text+0x45): undefined reference to `pthread_cancel'
+        src.cxx:(.text+0x56): undefined reference to `pthread_join'
+        src.cxx:(.text+0x6a): undefined reference to `pthread_atfork'
+        collect2: error: ld returned 1 exit status
+        ninja: build stopped: subcommand failed.
+        
+      exitCode: 1
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckLibraryExists.cmake:69 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindThreads.cmake:112 (CHECK_LIBRARY_EXISTS)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindThreads.cmake:175 (_threads_check_lib)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/hep_concurrency/v1_09_02/slf7.x86_64.e26.prof/lib/hep_concurrency/cmake/hep_concurrencyConfig.cmake:113 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/slf7.x86_64.e26.prof/lib/art/cmake/artConfig.cmake:135 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/slf7.x86_64.e26.prof/lib/larcore/cmake/larcoreConfig.cmake:136 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:27 (find_package)"
+    checks:
+      - "Looking for pthread_create in pthreads"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-dW0Pso"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-dW0Pso"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_PTHREADS_CREATE"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-dW0Pso'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_61f71
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=pthread_create -std=c++17 -o CMakeFiles/cmTC_61f71.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-dW0Pso/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=pthread_create  CMakeFiles/cmTC_61f71.dir/CheckFunctionExists.cxx.o -o cmTC_61f71  -lpthreads && :
+        FAILED: cmTC_61f71 
+        : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=pthread_create  CMakeFiles/cmTC_61f71.dir/CheckFunctionExists.cxx.o -o cmTC_61f71  -lpthreads && :
+        /usr/bin/ld: cannot find -lpthreads
+        collect2: error: ld returned 1 exit status
+        ninja: build stopped: subcommand failed.
+        
+      exitCode: 1
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckLibraryExists.cmake:69 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindThreads.cmake:112 (CHECK_LIBRARY_EXISTS)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindThreads.cmake:176 (_threads_check_lib)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/hep_concurrency/v1_09_02/slf7.x86_64.e26.prof/lib/hep_concurrency/cmake/hep_concurrencyConfig.cmake:113 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/slf7.x86_64.e26.prof/lib/art/cmake/artConfig.cmake:135 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/slf7.x86_64.e26.prof/lib/larcore/cmake/larcoreConfig.cmake:136 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:27 (find_package)"
+    checks:
+      - "Looking for pthread_create in pthread"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-WmTWYg"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-WmTWYg"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_PTHREAD_CREATE"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-WmTWYg'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_d6c79
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=pthread_create -std=c++17 -o CMakeFiles/cmTC_d6c79.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-WmTWYg/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=pthread_create  CMakeFiles/cmTC_d6c79.dir/CheckFunctionExists.cxx.o -o cmTC_d6c79  -lpthread && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindOpenMP.cmake:219 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindOpenMP.cmake:483 (_OPENMP_GET_FLAGS)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larvecutils/v09_04_02/slf7.x86_64.e26.prof/lib/larvecutils/cmake/larvecutilsConfig.cmake:120 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/slf7.x86_64.e26.prof/lib/lardata/cmake/lardataConfig.cmake:143 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:30 (find_package)"
+    description: "Detecting CXX OpenMP compiler info"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "OpenMP_COMPILE_RESULT_CXX_fopenmp"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_380f2
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -fopenmp -v -std=c++17 -o CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek/OpenMPTryFlag.cpp
+        Using built-in specs.
+        COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++
+        Target: x86_64-pc-linux-gnu
+        Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c,c++,fortran,go,objc,obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15
+        Thread model: posix
+        Supported LTO compression algorithms: zlib zstd
+        gcc version 12.1.0 (GCC) 
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-std=c++17' '-o' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_380f2.dir/'
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/cc1plus -quiet -v -iprefix /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/ -D_GNU_SOURCE -D_REENTRANT /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek/OpenMPTryFlag.cpp -quiet -dumpdir CMakeFiles/cmTC_380f2.dir/ -dumpbase OpenMPTryFlag.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -std=c++17 -version -fopenmp -o /tmp/ccXyCznc.s
+        GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)
+        	compiled by GNU C version 12.1.0, GMP version 6.2.1, MPFR version 4.1.0-p13, MPC version 1.2.1, isl version isl-0.24-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include"
+        ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed"
+        ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed
+         /usr/local/include
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../include
+         /usr/include
+        End of search list.
+        GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)
+        	compiled by GNU C version 12.1.0, GMP version 6.2.1, MPFR version 4.1.0-p13, MPC version 1.2.1, isl version isl-0.24-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: e9dba2130524ec85cea982823dc61c57
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-std=c++17' '-o' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_380f2.dir/'
+         as -v --64 -o CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o /tmp/ccXyCznc.s
+        GNU assembler version 2.27 (x86_64-redhat-linux) using BFD version version 2.27-44.base.el7
+        COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/
+        LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-std=c++17' '-o' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.'
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -fopenmp -v  CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o -o cmTC_380f2  -v && :
+        Using built-in specs.
+        COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++
+        COLLECT_LTO_WRAPPER=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper
+        Target: x86_64-pc-linux-gnu
+        Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c,c++,fortran,go,objc,obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15
+        Thread model: posix
+        Supported LTO compression algorithms: zlib zstd
+        gcc version 12.1.0 (GCC) 
+        COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/
+        LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/
+        Reading specs from /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/libgomp.spec
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'cmTC_380f2' '-v' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'cmTC_380f2.'
+         /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/collect2 -plugin /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/liblto_plugin.so -plugin-opt=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccTWo6lf.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_380f2 /lib/../lib64/crt1.o /lib/../lib64/crti.o /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0 -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../.. CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o -lstdc++ -lm -lgomp -lgcc_s -lgcc -lpthread -lc -lgcc_s -lgcc /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o /lib/../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'cmTC_380f2' '-v' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'cmTC_380f2.'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindOpenMP.cmake:262 (message)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindOpenMP.cmake:483 (_OPENMP_GET_FLAGS)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larvecutils/v09_04_02/slf7.x86_64.e26.prof/lib/larvecutils/cmake/larvecutilsConfig.cmake:120 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/slf7.x86_64.e26.prof/lib/lardata/cmake/lardataConfig.cmake:143 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:30 (find_package)"
+    message: |
+      Parsed CXX OpenMP implicit link information from above output:
+        link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek']
+        ignore line: []
+        ignore line: [Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_380f2]
+        ignore line: [[1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -fopenmp -v -std=c++17 -o CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek/OpenMPTryFlag.cpp]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++]
+        ignore line: [Target: x86_64-pc-linux-gnu]
+        ignore line: [Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c c++ fortran go objc obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib zstd]
+        ignore line: [gcc version 12.1.0 (GCC) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-std=c++17' '-o' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_380f2.dir/']
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/cc1plus -quiet -v -iprefix /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/ -D_GNU_SOURCE -D_REENTRANT /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-HMepek/OpenMPTryFlag.cpp -quiet -dumpdir CMakeFiles/cmTC_380f2.dir/ -dumpbase OpenMPTryFlag.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -std=c++17 -version -fopenmp -o /tmp/ccXyCznc.s]
+        ignore line: [GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)]
+        ignore line: [	compiled by GNU C version 12.1.0  GMP version 6.2.1  MPFR version 4.1.0-p13  MPC version 1.2.1  isl version isl-0.24-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include"]
+        ignore line: [ignoring duplicate directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed"]
+        ignore line: [ignoring nonexistent directory "/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../x86_64-pc-linux-gnu/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/tbb/v2021_9_0/Linux64bit+3.10-2.17-e26/include]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/x86_64-pc-linux-gnu]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../include/c++/12.1.0/backward]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/include-fixed]
+        ignore line: [ /usr/local/include]
+        ignore line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/../../include]
+        ignore line: [ /usr/include]
+        ignore line: [End of search list.]
+        ignore line: [GNU C++17 (GCC) version 12.1.0 (x86_64-pc-linux-gnu)]
+        ignore line: [	compiled by GNU C version 12.1.0  GMP version 6.2.1  MPFR version 4.1.0-p13  MPC version 1.2.1  isl version isl-0.24-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [Compiler executable checksum: e9dba2130524ec85cea982823dc61c57]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-std=c++17' '-o' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_380f2.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o /tmp/ccXyCznc.s]
+        ignore line: [GNU assembler version 2.27 (x86_64-redhat-linux) using BFD version version 2.27-44.base.el7]
+        ignore line: [COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/]
+        ignore line: [LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-std=c++17' '-o' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.']
+        ignore line: [[2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -fopenmp -v  CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o -o cmTC_380f2  -v && :]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++]
+        ignore line: [COLLECT_LTO_WRAPPER=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper]
+        ignore line: [Target: x86_64-pc-linux-gnu]
+        ignore line: [Configured with: /scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/src/gcc-12.1.0/configure --enable-__cxa_atexit --enable-checking=release --enable-compressed-debug-sections=all --enable-languages=c c++ fortran go objc obj-c++ --enable-libstdcxx-time=rt --enable-plugin --enable-stage1-checking=all --enable-threads=posix --prefix=/scratch/workspace/art-build-base/v12_00_00-e26/SLF7/build/gcc/v12_1_0/Linux64bit+3.10-2.17 --with-system-zlib --enable-lto --with-zstd --enable-link-serialization=15]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib zstd]
+        ignore line: [gcc version 12.1.0 (GCC) ]
+        ignore line: [COMPILER_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/]
+        ignore line: [LIBRARY_PATH=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib/:/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../:/lib/:/usr/lib/]
+        ignore line: [Reading specs from /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64/libgomp.spec]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'cmTC_380f2' '-v' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'cmTC_380f2.']
+        link line: [ /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/collect2 -plugin /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/liblto_plugin.so -plugin-opt=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccTWo6lf.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_380f2 /lib/../lib64/crt1.o /lib/../lib64/crti.o /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtbegin.o -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0 -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib -L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../.. CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o -lstdc++ -lm -lgomp -lgcc_s -lgcc -lpthread -lc -lgcc_s -lgcc /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/crtend.o /lib/../lib64/crtn.o]
+          arg [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/collect2] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/liblto_plugin.so] ==> ignore
+          arg [-plugin-opt=/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../libexec/gcc/x86_64-pc-linux-gnu/12.1.0/lto-wrapper] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccTWo6lf.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lpthread] ==> ignore
+          arg [-plugin-opt=-pass-through=-lc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf_x86_64] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_380f2] ==> ignore
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64]
+          arg [-L/lib/../lib64] ==> dir [/lib/../lib64]
+          arg [-L/usr/lib/../lib64] ==> dir [/usr/lib/../lib64]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib]
+          arg [-L/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../..] ==> dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../..]
+          arg [CMakeFiles/cmTC_380f2.dir/OpenMPTryFlag.cpp.o] ==> ignore
+          arg [-lstdc++] ==> lib [stdc++]
+          arg [-lm] ==> lib [m]
+          arg [-lgomp] ==> lib [gomp]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lpthread] ==> lib [pthread]
+          arg [-lc] ==> lib [c]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../../../lib64] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib64]
+        collapse library dir [/lib/../lib64] ==> [/lib64]
+        collapse library dir [/usr/lib/../lib64] ==> [/usr/lib64]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib] ==> [/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib]
+        collapse library dir [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/../lib/gcc/x86_64-pc-linux-gnu/12.1.0/../../..] ==> [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib]
+        implicit libs: [stdc++;m;gomp;gcc_s;gcc;pthread;c;gcc_s;gcc]
+        implicit objs: []
+        implicit dirs: [/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc/x86_64-pc-linux-gnu/12.1.0;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib/gcc;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib64;/lib64;/usr/lib64;/cvmfs/larsoft.opensciencegrid.org/products/libwda/v2_30_0a/Linux64bit+3.10-2.17/lib;/cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindOpenMP.cmake:419 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindOpenMP.cmake:557 (_OPENMP_GET_SPEC_DATE)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larvecutils/v09_04_02/slf7.x86_64.e26.prof/lib/larvecutils/cmake/larvecutilsConfig.cmake:120 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/slf7.x86_64.e26.prof/lib/lardata/cmake/lardataConfig.cmake:143 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:30 (find_package)"
+    description: "Detecting CXX OpenMP version"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-A4DWgo"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-A4DWgo"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "OpenMP_SPECTEST_CXX_"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-A4DWgo'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_6257f
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -fopenmp -std=c++17 -o CMakeFiles/cmTC_6257f.dir/OpenMPCheckVersion.cpp.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-A4DWgo/OpenMPCheckVersion.cpp
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -fopenmp  CMakeFiles/cmTC_6257f.dir/OpenMPCheckVersion.cpp.o -o cmTC_6257f   && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckLibraryExists.cmake:69 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindX11.cmake:682 (check_library_exists)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Geant4Config.cmake:478 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/FindGeant4.cmake:16 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/slf7.x86_64.e26.prof/lib/artg4tk/cmake/artg4tkConfig.cmake:127 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/slf7.x86_64.e26.prof/lib/larsim/cmake/larsimConfig.cmake:142 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:34 (find_package)"
+    checks:
+      - "Looking for XOpenDisplay in /usr/lib64/libX11.so;/usr/lib64/libXext.so"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-1JQsRy"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-1JQsRy"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Modules;/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larevt/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "X11_LIB_X11_SOLO"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-1JQsRy'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_bbb37
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=XOpenDisplay -std=c++17 -o CMakeFiles/cmTC_bbb37.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-1JQsRy/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=XOpenDisplay  CMakeFiles/cmTC_bbb37.dir/CheckFunctionExists.cxx.o -o cmTC_bbb37  /usr/lib64/libX11.so  /usr/lib64/libXext.so && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckFunctionExists.cmake:86 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindX11.cmake:697 (check_function_exists)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Geant4Config.cmake:478 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/FindGeant4.cmake:16 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/slf7.x86_64.e26.prof/lib/artg4tk/cmake/artg4tkConfig.cmake:127 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/slf7.x86_64.e26.prof/lib/larsim/cmake/larsimConfig.cmake:142 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:34 (find_package)"
+    checks:
+      - "Looking for gethostbyname"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Su86bK"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Su86bK"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Modules;/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larevt/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_GETHOSTBYNAME"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Su86bK'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_d9e67
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=gethostbyname -std=c++17 -o CMakeFiles/cmTC_d9e67.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Su86bK/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=gethostbyname  CMakeFiles/cmTC_d9e67.dir/CheckFunctionExists.cxx.o -o cmTC_d9e67   && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckFunctionExists.cmake:86 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindX11.cmake:711 (check_function_exists)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Geant4Config.cmake:478 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/FindGeant4.cmake:16 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/slf7.x86_64.e26.prof/lib/artg4tk/cmake/artg4tkConfig.cmake:127 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/slf7.x86_64.e26.prof/lib/larsim/cmake/larsimConfig.cmake:142 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:34 (find_package)"
+    checks:
+      - "Looking for connect"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Deq79V"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Deq79V"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Modules;/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larevt/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_CONNECT"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Deq79V'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_5bfbf
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=connect -std=c++17 -o CMakeFiles/cmTC_5bfbf.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Deq79V/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=connect  CMakeFiles/cmTC_5bfbf.dir/CheckFunctionExists.cxx.o -o cmTC_5bfbf   && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckFunctionExists.cmake:86 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindX11.cmake:720 (check_function_exists)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Geant4Config.cmake:478 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/FindGeant4.cmake:16 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/slf7.x86_64.e26.prof/lib/artg4tk/cmake/artg4tkConfig.cmake:127 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/slf7.x86_64.e26.prof/lib/larsim/cmake/larsimConfig.cmake:142 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:34 (find_package)"
+    checks:
+      - "Looking for remove"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-8pcPK8"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-8pcPK8"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Modules;/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larevt/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_REMOVE"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-8pcPK8'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_887de
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=remove -std=c++17 -o CMakeFiles/cmTC_887de.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-8pcPK8/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=remove  CMakeFiles/cmTC_887de.dir/CheckFunctionExists.cxx.o -o cmTC_887de   && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckFunctionExists.cmake:86 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindX11.cmake:729 (check_function_exists)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Geant4Config.cmake:478 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/FindGeant4.cmake:16 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/slf7.x86_64.e26.prof/lib/artg4tk/cmake/artg4tkConfig.cmake:127 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/slf7.x86_64.e26.prof/lib/larsim/cmake/larsimConfig.cmake:142 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:34 (find_package)"
+    checks:
+      - "Looking for shmat"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-763tWl"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-763tWl"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Modules;/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larevt/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_HAVE_SHMAT"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-763tWl'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_48579
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=shmat -std=c++17 -o CMakeFiles/cmTC_48579.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-763tWl/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=shmat  CMakeFiles/cmTC_48579.dir/CheckFunctionExists.cxx.o -o cmTC_48579   && :
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CheckLibraryExists.cmake:69 (try_compile)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/FindX11.cmake:739 (check_library_exists)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Geant4Config.cmake:478 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/FindGeant4.cmake:16 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/slf7.x86_64.e26.prof/lib/artg4tk/cmake/artg4tkConfig.cmake:127 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cmake/v3_27_4/Linux64bit+3.10-2.17/share/cmake-3.27/Modules/CMakeFindDependencyMacro.cmake:76 (find_package)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/slf7.x86_64.e26.prof/lib/larsim/cmake/larsimConfig.cmake:142 (find_dependency)"
+      - "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetOverrideFindPackage.cmake:177 (_find_package)"
+      - "larreco/CMakeLists.txt:34 (find_package)"
+    checks:
+      - "Looking for IceConnectionNumber in ICE"
+    directories:
+      source: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Ux63Jz"
+      binary: "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Ux63Jz"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_MODULE_PATH: "/cvmfs/larsoft.opensciencegrid.org/products/geant4/v4_10_6_p01g/Linux64bit+3.10-2.17-e26-prof/lib64/Geant4-10.6.1/Modules;/cvmfs/larsoft.opensciencegrid.org/products/artg4tk/v12_00_03/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larsim/v10_02_02/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larevt/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nufinder/v1_02_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/nusimdata/v1_28_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/lardata/v10_00_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/art/v3_14_04/Modules;/cvmfs/larsoft.opensciencegrid.org/products/messagefacility/v2_10_05/Modules;/cvmfs/larsoft.opensciencegrid.org/products/canvas_root_io/v1_13_06/Modules;/cvmfs/larsoft.opensciencegrid.org/products/larcore/v10_00_02/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/Modules;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/compat-aux;/cvmfs/larsoft.opensciencegrid.org/products/mrb/v6_09_11/Modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/catch/v3_3_2/Linux64bit+3.10-2.17-e26/lib/cmake/Catch2;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules;/cvmfs/larsoft.opensciencegrid.org/products/root/v6_28_12/Linux64bit+3.10-2.17-e26-p3915-prof/cmake/modules"
+      CMAKE_USER_MAKE_RULES_OVERRIDE: "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/private/CetToolchainOverrides.cmake"
+    buildResult:
+      variable: "CMAKE_LIB_ICE_HAS_ICECONNECTIONNUMBER"
+      cached: true
+      stdout: |
+        Change Dir: '/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Ux63Jz'
+        
+        Run Build Command(s): /cvmfs/larsoft.opensciencegrid.org/products/ninja/v1_11_1/Linux64bit+3.10-2.17/bin/ninja -v cmTC_b532e
+        [1/2] /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++   -DCHECK_FUNCTION_EXISTS=IceConnectionNumber -std=c++17 -o CMakeFiles/cmTC_b532e.dir/CheckFunctionExists.cxx.o -c /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/CMakeFiles/CMakeScratch/TryCompile-Ux63Jz/CheckFunctionExists.cxx
+        [2/2] : && /cvmfs/larsoft.opensciencegrid.org/products/gcc/v12_1_0/Linux64bit+3.10-2.17/bin/g++ -DCHECK_FUNCTION_EXISTS=IceConnectionNumber  CMakeFiles/cmTC_b532e.dir/CheckFunctionExists.cxx.o -o cmTC_b532e  -lICE && :
+        
+      exitCode: 0
+...

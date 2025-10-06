@@ -1,0 +1,3 @@
+setupRequired(eigen v23_08_01_66e8f)
+setupRequired(larsim v10_02_02 -q +e26:+prof)
+setupRequired(rstartree v2016_07)

@@ -1,0 +1,8 @@
+# CMake generated Testfile for 
+# Source directory: /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/larreco/ShowerFinder
+# Build directory: /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/larreco/ShowerFinder
+# 
+# This file includes the relevant testing commands required for 
+# testing this directory and lists subdirectories to be tested as well.
+subdirs("ShowerReco3D")
+subdirs("job")

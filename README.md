@@ -1,5 +1,6 @@
-# Tool for evaluation of Wire-Cell clustering
+# Contact: Prabhjot Singh (prabhjot@fnal.gov)
 
+# Tool for evaluation of Wire-Cell clustering
 
 ## Goal
 
@@ -7,7 +8,7 @@ A tool for evaluating the performance of WireCell clustering algorithm. Make a f
 
 ## How to get the code:
 
-git clone https://github.com/ebelchio12/wirecell-clustering.git
+git clone https://github.com/PrabhjotSingh247/Wirecell_Clustering.git
 
 ## Requirements:
 
@@ -27,7 +28,7 @@ This tool requires python, matplotlib, sklearn and jupyter-notebook.
 - **main_cluster_eval.ipynb**
   - Driver notebook to run the evaluation of Wire-Cell clustering with the help of an external notebook (clustering_eval.ipynb).
     - Log in to your sbndgpvm02 area and download the code:<br>
-      *git clone https://github.com/ebelchio12/wirecell-clustering.git*
+      *git clone https://github.com/PrabhjotSingh247/Wirecell_Clustering.git*
       - Setup any version of sbndcode:
         - *source /cvmfs/sbnd.opensciencegrid.org/products/sbnd/setup_sbnd.sh*
         - *setup sbndcode v09_91_02 -q e26:prof*

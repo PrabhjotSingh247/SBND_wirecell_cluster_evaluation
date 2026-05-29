@@ -1,8 +1,0 @@
-# CMake generated Testfile for 
-# Source directory: /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/test/HitFinder
-# Build directory: /exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/test/HitFinder
-# 
-# This file includes the relevant testing commands required for 
-# testing this directory and lists subdirectories to be tested as well.
-add_test([=[HitAnaAlg_test]=] "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/libexec/cet_exec_test" "--wd" "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/test/HitFinder/HitAnaAlg_test.d" "--remove-on-failure" "" "--required-files" "" "--datafiles" "" "--skip-return-code" "247" "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/slf7.x86_64.e26.prof/bin/HitAnaAlg_test")
-set_tests_properties([=[HitAnaAlg_test]=] PROPERTIES  LABELS "DEFAULT;RELEASE" SKIP_RETURN_CODE "247" WORKING_DIRECTORY "/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/build_slf7.x86_64/larreco/test/HitFinder/HitAnaAlg_test.d" _BACKTRACE_TRIPLES "/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/CetTest.cmake;981;add_test;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/CetTest.cmake;954;_cet_add_test_detail;/cvmfs/larsoft.opensciencegrid.org/products/cetmodules/v3_24_01/Modules/CetTest.cmake;624;_cet_add_test;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/test/HitFinder/CMakeLists.txt;10;cet_test;/exp/sbnd/data/users/prabhjot/Wirecell_Clustering/work/larsoft_v10_04_07/srcs/larreco/test/HitFinder/CMakeLists.txt;0;")

@@ -1,4 +1,0 @@
-# DO NOT DELETE 
-# larreco
-mrb_add_subdirectory(larreco)
-mrb_process_checkpoints()

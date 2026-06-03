@@ -79,14 +79,38 @@ This repository contains scripts and notebooks for evaluating the clustering per
 ---
 
 ### WirecellFiducialVolume.ipynb
-**Description:** Defines and analyzes the Wirecell fiducial volume boundaries by examining coordinate distributions of all true and reco points across events.
+**Description:** Analyzes the effects of applying fiducial volume cuts on particle clustering data. Compares true vs reconstructed clusters before and after fiducial boundaries are applied, showing spatial and coordinate distribution changes.
 
 **How to run:**
 1. Open the notebook in Jupyter: `jupyter notebook WirecellFiducialVolume.ipynb`
-2. Set the event range (first_event and last_event)
-3. Run all cells to generate coordinate distribution histograms for x, y, and z axes
+2. Set the event number (evt variable) to analyze
+3. Run all cells to generate comparison visualizations
 
-**Output:** Histograms showing true vs reco point distributions for each coordinate axis, establishing the active detector volume boundaries.
+**Fiducial Volume Boundaries:**
+- X: [-250.0, 250.0] cm
+- Y: [-203.3, 200.5] cm
+- Z: [4.7, 500.6] cm
+
+**Output:** Three figures per cluster pair showing:
+- **Figure 1:** Spatial before/after comparison (XZ view with 20% zoom padding around clusters)
+- **Figure 2:** X, Y, Z coordinate distributions BEFORE cuts (all points with boundary lines marked)
+- **Figure 3:** X, Y, Z coordinate distributions AFTER cuts (only kept points inside fiducial volume)
+
+Statistics include total points, kept points, and removal percentage for both true and reco clusters.
+
+**Current Focus:** True cluster 74 and its matching reco cluster (can be modified to analyze other clusters).
+
+---
+
+### ReadDrawWirecellBoundary.ipynb
+**Description:** Reads and visualizes the Wirecell detector boundary geometry to understand the active detector volume and physical constraints of the SBND TPC.
+
+**How to run:**
+1. Open the notebook in Jupyter: `jupyter notebook ReadDrawWirecellBoundary.ipynb`
+2. Set the event number and APA selection
+3. Run all cells to display boundary visualizations
+
+**Output:** Visualization of the TPC boundaries and detector geometry showing the physical limits of the active volume for reference when analyzing fiducial cuts.
 
 ---
 

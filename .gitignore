@@ -1,6 +1,7 @@
 # Data directories - local only
 24308437_0/
 out/
+runcode/
 
 # Output files
 *.root

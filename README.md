@@ -54,6 +54,40 @@ This repository contains scripts and notebooks for evaluating the clustering per
 
 ---
 
+### HighStatsEvaluation_Neutrinos.ipynb
+**Description:** Specialized version of HighStatsEvaluation that analyzes clustering performance exclusively on neutrino interaction events. Applies fiducial volume cuts to filter for events within the active detector region and calculates efficiency/purity metrics specific to neutrino-induced clusters.
+
+**How to run:**
+1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation_Neutrinos.ipynb`
+2. Configure the event range and fiducial volume parameters (X, Y, Z boundaries)
+3. Run all cells to process neutrino events and generate neutrino-specific statistics
+
+**Features:**
+- Applies SBND fiducial volume cuts (X: [-250, 250], Y: [-203.3, 200.5], Z: [4.7, 500.6] cm)
+- Filters clusters based on vertex location within active volume
+- Generates efficiency and purity metrics for neutrino event topology
+
+**Output:** Efficiency vs purity plots for neutrino events, statistics tables showing performance within fiducial volume, and event-by-event diagnostics for neutrino interactions.
+
+---
+
+### HighStatsEvaluation_Cosmics.ipynb
+**Description:** Specialized version of HighStatsEvaluation that analyzes clustering performance exclusively on cosmic ray events. Provides cosmic-specific analysis with fiducial volume cuts to understand reconstruction quality for through-going muon and cosmic shower events.
+
+**How to run:**
+1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation_Cosmics.ipynb`
+2. Configure the event range and cosmic-specific analysis parameters
+3. Run all cells to process cosmic events and generate cosmic-specific statistics
+
+**Features:**
+- Applies SBND fiducial volume cuts for cosmic track analysis
+- Distinguishes between cosmic through-going muons and shower events
+- Evaluates clustering performance on extended cosmic tracks
+
+**Output:** Efficiency vs purity plots for cosmic events, summary statistics for different cosmic event types, and comparison plots showing cosmic vs neutrino reconstruction performance.
+
+---
+
 ### TrueClusterPointSelection.ipynb
 **Description:** Tests and visualizes true cluster point selection by applying minimum point count cutoffs to filter out small/noise clusters.
 

@@ -10,14 +10,14 @@
 
 #!/bin/bash
 
-OUTDIR=/exp/sbnd/data/users/${USER}/wirecell_clustering/cluster_evaluation/out
-FILEDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation/24308437_0                       # TODO: we need to find a way to loop over all
+OUTDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation/runcode
+FILEDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/Results_MC_2viewactive_2viewdead_newXin                       # TODO: we need to find a way to loop over all
                                                                                                               # sub-directories and still need to know the
                                                                                                               # information from where events came
 
 #TODO: we should loop over both APAs in single loop
 TRUTHDEPOS_SAVEAPA=${1}
-NEVT=17 # Number of events to process
+NEVT=12 # Number of events to process
 SBNDCODE_VERSION="v10_06_00"
 PROCESS="nu_spill"
 
@@ -116,7 +116,7 @@ do
   fi
 
   EVTDIR=${NEWOUTDIR}/$i
-  JSONFILE_Reco=${FILEDIR}/data/${i}/${i}-clustering-$apa-$face.json
+  JSONFILE_Reco=${FILEDIR}/data/${i}/${i}-clustering-apa$apa-face$face.json
   OUTFILE_Reco_X=${EVTDIR}/x_clustering_apa$apa.txt
   OUTFILE_Reco_Y=${EVTDIR}/y_clustering_apa$apa.txt
   OUTFILE_Reco_Z=${EVTDIR}/z_clustering_apa$apa.txt
@@ -124,9 +124,9 @@ do
   OUTFILE_Reco_Charge=${EVTDIR}/charge_clustering_apa$apa.txt
 
   # read json file and extract xyz coordinates along with other information
-  awk -F'[][]' '{if (NF>6) print $6}'   $JSONFILE_Reco    | tr ',' '\n' > $OUTFILE_Reco_X
-  awk -F'[][]' '{if (NF>8) print $8}'   $JSONFILE_Reco    | tr ',' '\n' > $OUTFILE_Reco_Y
-  awk -F'[][]' '{if (NF>10) print $10}' $JSONFILE_Reco    | tr ',' '\n' > $OUTFILE_Reco_Z
-  awk -F'[][]' '{if (NF>2) print $2}'   $JSONFILE_Reco    | tr ',' '\n' > $OUTFILE_Reco_ClusterID
-  awk -F'[][]' '{if (NF>4) print $4}'   $JSONFILE_Reco    | tr ',' '\n' > $OUTFILE_Reco_Charge
+  jq '.x[]' $JSONFILE_Reco > $OUTFILE_Reco_X
+  jq '.y[]' $JSONFILE_Reco > $OUTFILE_Reco_Y
+  jq '.z[]' $JSONFILE_Reco > $OUTFILE_Reco_Z
+  jq '.cluster_id[]' $JSONFILE_Reco > $OUTFILE_Reco_ClusterID
+  jq '.q[]' $JSONFILE_Reco > $OUTFILE_Reco_Charge
 done

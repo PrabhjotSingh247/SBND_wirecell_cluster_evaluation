@@ -71,7 +71,7 @@ CHARGE=12           # Index of charge in json file
 E=13                # Index of energy in json file
 
 # loop over events
-for ((i=0; i<$NEVT; i++))
+for ((i=0; i<$NEVT+1; i++))
 do
   echo "Processing event $i"
 
@@ -103,7 +103,7 @@ done # end loop over events
 
 # clustering info
 # loop over events
-for ((i=0; i<$NEVT; i++))
+for ((i=0; i<$NEVT+1; i++))
 do
   echo "Processing event $i for clustering info"
 

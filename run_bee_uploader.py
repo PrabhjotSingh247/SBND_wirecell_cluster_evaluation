@@ -14,7 +14,7 @@ from printbeelink import upload_bee_files_and_save
 def main():
     # Configuration
     parent_dir = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/batch_results/2view")
-    bee_script = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/bee-upload-with-truth-3viewdeadarea.sh")
+    bee_script = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation/bee-upload-with-truth.sh")
     output_dir = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation")
     output_file = output_dir / "bee_links_final.txt"
 

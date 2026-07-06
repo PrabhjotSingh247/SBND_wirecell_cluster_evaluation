@@ -103,6 +103,56 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
    # plt.show(block=False)
     plt.close()
 
+def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
+    """Draw true and reco clusters in XY projection for comparison."""
+    marker_size = 1
+    view = "XY"
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    # First subplot - True clusters
+    axes[0].set_xlim(-250, 250)
+    axes[0].set_ylim(-250, 250)
+    axes[0].set_xlabel("x [cm]")
+    axes[0].set_ylabel("y [cm]")
+    title = "True clusters: Event " + str(event) + ", " + apa + ", " + view
+    if file_name:
+        title += f" ({file_name})"
+    axes[0].set_title(title)
+
+    for cluster_id, points in true_clusters.items():
+        points = np.array(points)
+        true_x_cluster = points[:, 0]
+        true_y_cluster = points[:, 1]
+        scatter = axes[0].scatter(true_x_cluster, true_y_cluster, s=marker_size, alpha=0.5)
+        color = scatter.get_facecolor()[0]
+        axes[0].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
+    axes[0].legend()
+
+    # Second subplot - Reco clusters
+    axes[1].set_xlim(axes[0].get_xlim())
+    axes[1].set_ylim(axes[0].get_ylim())
+    axes[1].set_xlabel("x [cm]")
+    axes[1].set_ylabel("y [cm]")
+    title = "Reco clusters: Event " + str(event) + ", " + apa + ", " + view
+    if file_name:
+        title += f" ({file_name})"
+    axes[1].set_title(title)
+
+    for cluster_id, points in predicted_clusters.items():
+        points = np.array(points)
+        reco_x_cluster = points[:, 0]
+        reco_y_cluster = points[:, 1]
+        scatter = axes[1].scatter(reco_x_cluster, reco_y_cluster, s=1, alpha=0.5)
+        color = scatter.get_facecolor()[0]
+        axes[1].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.savefig(PLOTDIR_EVT / f"all_clusters_reco_true_event{event}_apa_{apa}_{view}.png")
+   # plt.show(block=False)
+    plt.close()
+
 def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, output_dir, event, apa, file_name=None):
     """
     Draw a single true cluster with all its matched reco clusters (1-to-many).

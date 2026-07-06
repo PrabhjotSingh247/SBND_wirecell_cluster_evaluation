@@ -6,17 +6,6 @@ This repository contains scripts and notebooks for evaluating the clustering per
 
 ## Scripts Description and Usage
 
-### jsontotext.sh
-**Description:** Converts JSON files from image clustering jobs into separate text files containing xyz coordinates, cluster IDs, charge, and energy information.
-
-**How to run:**
-```bash
-./jsontotext.sh apa0
-./jsontotext.sh apa1
-```
-**Notes:** Extracts truth deposition and clustering information for all events (17 by default) and saves them as text files in the output directory structure.
-
----
 
 ### single_cluster_eval.ipynb
 **Description:** Evaluates clustering performance metrics (efficiency and purity) for a single event by matching true and reconstructed clusters.
@@ -42,49 +31,21 @@ This repository contains scripts and notebooks for evaluating the clustering per
 
 ---
 
-### HighStatsEvaluation.ipynb
-**Description:** Performs comprehensive clustering evaluation across multiple events, calculating efficiency and purity statistics, and generating summary reports.
+### HighStatsEvaluation_MultiFile.ipynb
+**Description:** Comprehensive clustering evaluation framework that processes multiple data files simultaneously, calculating efficiency and purity statistics across events, and generating detailed 2D histograms alongside scatter plots for performance analysis.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation.ipynb`
-2. Configure the event range (event_low and event_high) and analysis parameters
+1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation_MultiFile.ipynb`
+2. Configure the file list, event ranges, and analysis parameters
 3. Run all cells to process all events and generate aggregate statistics
 
-**Output:** Generates efficiency vs purity scatter plots, summary tables with performance statistics (% of clusters above threshold), and event-by-event analysis plots.
-
----
-
-### HighStatsEvaluation_Neutrinos.ipynb
-**Description:** Specialized version of HighStatsEvaluation that analyzes clustering performance exclusively on neutrino interaction events. Applies fiducial volume cuts to filter for events within the active detector region and calculates efficiency/purity metrics specific to neutrino-induced clusters.
-
-**How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation_Neutrinos.ipynb`
-2. Configure the event range and fiducial volume parameters (X, Y, Z boundaries)
-3. Run all cells to process neutrino events and generate neutrino-specific statistics
-
 **Features:**
-- Applies SBND fiducial volume cuts (X: [-250, 250], Y: [-203.3, 200.5], Z: [4.7, 500.6] cm)
-- Filters clusters based on vertex location within active volume
-- Generates efficiency and purity metrics for neutrino event topology
+- Processes multiple data files in batch
+- Applies fiducial volume cuts for neutrino and cosmic event filtering
+- Generates 2D colz histograms (efficiency vs purity distributions)
+- Produces scatter plots showing individual cluster pair performance
 
-**Output:** Efficiency vs purity plots for neutrino events, statistics tables showing performance within fiducial volume, and event-by-event diagnostics for neutrino interactions.
-
----
-
-### HighStatsEvaluation_Cosmics.ipynb
-**Description:** Specialized version of HighStatsEvaluation that analyzes clustering performance exclusively on cosmic ray events. Provides cosmic-specific analysis with fiducial volume cuts to understand reconstruction quality for through-going muon and cosmic shower events.
-
-**How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation_Cosmics.ipynb`
-2. Configure the event range and cosmic-specific analysis parameters
-3. Run all cells to process cosmic events and generate cosmic-specific statistics
-
-**Features:**
-- Applies SBND fiducial volume cuts for cosmic track analysis
-- Distinguishes between cosmic through-going muons and shower events
-- Evaluates clustering performance on extended cosmic tracks
-
-**Output:** Efficiency vs purity plots for cosmic events, summary statistics for different cosmic event types, and comparison plots showing cosmic vs neutrino reconstruction performance.
+**Output:** Efficiency vs purity scatter plots, 2D histograms, summary tables with performance statistics, and event-by-event analysis plots.
 
 ---
 
@@ -112,29 +73,6 @@ This repository contains scripts and notebooks for evaluating the clustering per
 
 ---
 
-### WirecellFiducialVolume.ipynb
-**Description:** Analyzes the effects of applying fiducial volume cuts on particle clustering data. Compares true vs reconstructed clusters before and after fiducial boundaries are applied, showing spatial and coordinate distribution changes.
-
-**How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook WirecellFiducialVolume.ipynb`
-2. Set the event number (evt variable) to analyze
-3. Run all cells to generate comparison visualizations
-
-**Fiducial Volume Boundaries:**
-- X: [-250.0, 250.0] cm
-- Y: [-203.3, 200.5] cm
-- Z: [4.7, 500.6] cm
-
-**Output:** Three figures per cluster pair showing:
-- **Figure 1:** Spatial before/after comparison (XZ view with 20% zoom padding around clusters)
-- **Figure 2:** X, Y, Z coordinate distributions BEFORE cuts (all points with boundary lines marked)
-- **Figure 3:** X, Y, Z coordinate distributions AFTER cuts (only kept points inside fiducial volume)
-
-Statistics include total points, kept points, and removal percentage for both true and reco clusters.
-
-**Current Focus:** True cluster 74 and its matching reco cluster (can be modified to analyze other clusters).
-
----
 
 ### ReadDrawWirecellBoundary.ipynb
 **Description:** Reads and visualizes the Wirecell detector boundary geometry to understand the active detector volume and physical constraints of the SBND TPC.
@@ -157,6 +95,125 @@ Statistics include total points, kept points, and removal percentage for both tr
 3. Run all cells to display dead area maps
 
 **Output:** Visualization of dead areas overlaid on the detector geometry showing inactive channel regions in Y-Z projection.
+
+---
+
+### CompareTimeWindowCorrection.ipynb
+**Description:** Analyzes the effects of time window corrections on cluster reconstruction quality and efficiency/purity metrics.
+
+**How to run:**
+1. Open the notebook in Jupyter: `jupyter notebook CompareTimeWindowCorrection.ipynb`
+2. Configure the event range and time window parameters
+3. Run all cells to compare performance metrics before and after corrections
+
+**Output:** Comparison plots showing efficiency and purity variations with different time window settings.
+
+---
+
+## Analysis and Utility Scripts
+
+### efficiency_purity_draw.py
+**Description:** Generates visualization plots for efficiency and purity analysis results. Creates heatmaps, scatter plots, and statistical distributions.
+
+**Usage:**
+```python
+python efficiency_purity_draw.py [options]
+```
+
+---
+
+### efficiency_purity_estimate.py
+**Description:** Calculates efficiency and purity metrics for cluster matching between true and reconstructed clusters.
+
+**Usage:**
+```python
+python efficiency_purity_estimate.py [true_clusters] [reco_clusters]
+```
+
+---
+
+### efficiency_purity_print.py
+**Description:** Prints formatted efficiency and purity statistics and summary tables.
+
+**Usage:**
+```python
+python efficiency_purity_print.py [results_file]
+```
+
+---
+
+### generate_summary_tables.py
+**Description:** Generates comprehensive summary tables from analysis results for reporting and documentation.
+
+**Usage:**
+```python
+python generate_summary_tables.py [input_data] [output_file]
+```
+
+---
+
+### DrawRecoTrueClusters.py
+**Description:** Visualizes true and reconstructed clusters side-by-side for visual comparison and validation.
+
+**Usage:**
+```python
+python DrawRecoTrueClusters.py [event_number] [options]
+```
+
+---
+
+### readfiles.py
+**Description:** Utility module for reading and parsing data files containing cluster information and event data.
+
+---
+
+### selections.py
+**Description:** Defines cluster selection criteria and filtering functions for analysis workflows.
+
+---
+
+### clusterpairmatching.py
+**Description:** Implements algorithms for matching true clusters to reconstructed clusters based on spatial overlap and hit matching.
+
+---
+
+### bee_display_link.py
+**Description:** Generates BEE (Browser Event Display) visualization links for interactive event inspection.
+
+**Usage:**
+```python
+python bee_display_link.py [event_id]
+```
+
+---
+
+### printbeelink.py
+**Description:** Prints formatted BEE event display links for easy access to visualization tools.
+
+**Usage:**
+```python
+python printbeelink.py [event_list]
+```
+
+---
+
+### run_bee_uploader.py
+**Description:** Automates the upload and registration of events to the BEE visualization system.
+
+**Usage:**
+```python
+python run_bee_uploader.py [event_range]
+```
+
+---
+
+### analyticresults.py
+**Description:** Processes and analyzes results from clustering evaluation studies.
+
+---
+
+### draw_analysis.py
+**Description:** Generates analysis-specific visualization plots and figures.
 
 ---
 
@@ -196,11 +253,12 @@ Install with: `pip install numpy matplotlib pandas seaborn scipy`
 
 ## Quick Start Workflow
 
-1. **Extract data:** Run `./jsontotext.sh apa0 && ./jsontotext.sh apa1` to convert JSON to text format
-2. **Single event analysis:** Use `single_cluster_eval.ipynb` to test a specific event
-3. **High statistics:** Run `HighStatsEvaluation.ipynb` to process all events and get overall performance metrics
-4. **Parameter optimization:** Use `*_optimization.ipynb` notebooks to find best threshold values
-5. **Diagnostics:** Run `TrueClusterPointSelection.ipynb` and `RecoClusterPointSelection.ipynb` to understand cutoff effects
+1. **Single event analysis:** Use `single_cluster_eval.ipynb` to test a specific event
+2. **High statistics (multi-file):** Run `HighStatsEvaluation_MultiFile.ipynb` to process all events and get overall performance metrics
+3. **Parameter optimization:** Use `single_cluster_eval_optimization.ipynb` to find best threshold values
+4. **Diagnostics:** Run `TrueClusterPointSelection.ipynb` and `RecoClusterPointSelection.ipynb` to understand cutoff effects
+5. **Event visualization:** Use `DrawRecoTrueClusters.py` for side-by-side cluster comparison
+6. **BEE display:** Use `bee_display_link.py` and `run_bee_uploader.py` for interactive event inspection
 
 ---
 

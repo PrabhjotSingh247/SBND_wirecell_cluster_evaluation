@@ -10,6 +10,8 @@ multi_file_plots_without_deghosting/
 *.root
 *.png
 *.pdf
+bee_links_final.txt
+bee_links_output.txt
 
 # Jupyter checkpoint files
 .ipynb_checkpoints/

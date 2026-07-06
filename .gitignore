@@ -2,6 +2,9 @@
 24308437_0/
 out/
 runcode/
+multi_file_plots_with_deghosting/
+multi_file_plots_with_deghosting_test/
+multi_file_plots_without_deghosting/
 
 # Output files
 *.root

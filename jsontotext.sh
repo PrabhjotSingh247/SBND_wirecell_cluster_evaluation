@@ -11,10 +11,11 @@
 #!/bin/bash
 
 OUTDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation/runcode
-FILEDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/Results_MC_2viewactive_2viewdead_newXin                       # TODO: we need to find a way to loop over all
+#FILEDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/Results_MC_2viewactive_2viewdead_old                       # TODO: we need to find a way to loop over all
                                                                                                               # sub-directories and still need to know the
                                                                                                               # information from where events came
 
+FILEDIR=/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/TrueJobs
 #TODO: we should loop over both APAs in single loop
 TRUTHDEPOS_SAVEAPA=${1}
 NEVT=12 # Number of events to process

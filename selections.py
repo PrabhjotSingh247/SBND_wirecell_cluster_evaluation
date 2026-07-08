@@ -13,8 +13,6 @@ def apply_energy_cutoff(true_points, energy_cutoff):
     true_points = np.array([point for point in true_points if cluster_sums[point[3]] >= energy_cutoff])
     return true_points
 
-
-
 # Filter true clusters by minimum point count threshold.
 # Removes clusters with fewer than min_points points.
 def apply_min_true_points_cutoff(true_points, min_points):
@@ -25,8 +23,6 @@ def apply_min_true_points_cutoff(true_points, min_points):
     true_points = np.array([point for point in true_points if cluster_counts[point[3]] >= min_points])
     return true_points
 
-
-
 # Filter reconstructed clusters by minimum point count threshold.
 # Removes clusters with fewer than min_points points.
 def apply_min_reco_points_cutoff(reco_points, min_points):
@@ -36,7 +32,6 @@ def apply_min_reco_points_cutoff(reco_points, min_points):
         cluster_counts[cluster_id] = cluster_counts.get(cluster_id, 0) + 1
     reco_points = np.array([point for point in reco_points if cluster_counts[point[3]] >= min_points])
     return reco_points
-
 
 # Remove true points outside the fiducial volume boundaries.
 # Keeps only points within x, y, z limits.
@@ -57,7 +52,6 @@ def apply_wire_readout_sensitive_yz_plane_cut_reco(reco_points, x_min, x_max, y_
         if x_min <= x <= x_max and y_min <= y <= y_max and z_min <= z <= z_max:
             filtered_points.append(point)
     return np.array(filtered_points) if filtered_points else np.array([]).reshape(0, 5)
-
 
 # Reassign cluster IDs to true clusters sequentially.
 # Ensures IDs start from 0 and are contiguous.
@@ -82,8 +76,6 @@ def reassign_cluster_ID_true(points_5d):
     
     points_5d_after_reassigning = np.vstack(new_points)
     return points_5d_after_reassigning
-
-
 
 # Reassign cluster IDs to reconstructed clusters sequentially.
 # Ensures IDs start from 0 and are contiguous.
@@ -361,14 +353,15 @@ def apply_deadarea_cut_true(true_points, apa, view_type="2view", output_dir=None
             pct = (removed / before) * 100
             print(f"  Cluster {cid}: {before} -> {after} points ({removed} removed, {pct:.1f}%)")
 
-    # Draw points before and after dead area cut
+    # Draw clusters before and after dead area cut
     if output_dir is not None:
         try:
-            from DrawRecoTrueClusters import DrawPointsBeforeAfterDeadArea
+            from DrawRecoTrueClusters import DrawClusterBeforeAfterDeadArea, DrawPointsBeforeAfterDeadArea
+            #DrawClusterBeforeAfterDeadArea(true_points, filtered_points, deadarea_data, event, apa, output_dir, file_name)
             DrawPointsBeforeAfterDeadArea(cluster_before, cluster_after, event, apa, output_dir, file_name)
-            print(f"\nDrew points before/after dead area visualization")
+            print(f"\nDrew before/after dead area visualizations")
         except Exception as e:
-            print(f"Warning: Could not draw points before/after visualization: {e}")
+            print(f"Warning: Could not draw before/after visualizations: {e}")
 
     # Draw affected clusters with dead area overlay if output_dir is provided
     if output_dir is not None and affected_clusters:

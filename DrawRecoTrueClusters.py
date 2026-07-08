@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from pathlib import Path
 
 def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
@@ -94,6 +95,56 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
         reco_y_cluster = points[:, 1]
         reco_z_cluster = points[:, 2]
         scatter = axes[1].scatter(reco_z_cluster, reco_y_cluster, s=1, alpha=0.5)
+        color = scatter.get_facecolor()[0]
+        axes[1].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.savefig(PLOTDIR_EVT / f"all_clusters_reco_true_event{event}_apa_{apa}_{view}.png")
+   # plt.show(block=False)
+    plt.close()
+
+def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
+    """Draw true and reco clusters in XY projection for comparison."""
+    marker_size = 1
+    view = "XY"
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    # First subplot - True clusters
+    axes[0].set_xlim(-250, 250)
+    axes[0].set_ylim(-250, 250)
+    axes[0].set_xlabel("x [cm]")
+    axes[0].set_ylabel("y [cm]")
+    title = "True clusters: Event " + str(event) + ", " + apa + ", " + view
+    if file_name:
+        title += f" ({file_name})"
+    axes[0].set_title(title)
+
+    for cluster_id, points in true_clusters.items():
+        points = np.array(points)
+        true_x_cluster = points[:, 0]
+        true_y_cluster = points[:, 1]
+        scatter = axes[0].scatter(true_x_cluster, true_y_cluster, s=marker_size, alpha=0.5)
+        color = scatter.get_facecolor()[0]
+        axes[0].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
+    axes[0].legend()
+
+    # Second subplot - Reco clusters
+    axes[1].set_xlim(axes[0].get_xlim())
+    axes[1].set_ylim(axes[0].get_ylim())
+    axes[1].set_xlabel("x [cm]")
+    axes[1].set_ylabel("y [cm]")
+    title = "Reco clusters: Event " + str(event) + ", " + apa + ", " + view
+    if file_name:
+        title += f" ({file_name})"
+    axes[1].set_title(title)
+
+    for cluster_id, points in predicted_clusters.items():
+        points = np.array(points)
+        reco_x_cluster = points[:, 0]
+        reco_y_cluster = points[:, 1]
+        scatter = axes[1].scatter(reco_x_cluster, reco_y_cluster, s=1, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[1].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
     axes[1].legend()
@@ -508,6 +559,196 @@ def DrawPointsBeforeAfterDeadArea(cluster_before, cluster_after, event, apa, out
 
     plt.tight_layout()
     plt.savefig(output_dir / f"points_before_after_deadarea_event{event}_apa_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawTrueClusterCategories(cluster_category_results, clusters_true, output_dir, event=None, apa=None, file_name=None):
+    """
+    Visualize true cluster categories in XZ projection with track classification.
+    Displays neutrino interactions as point clouds and cosmic rays as geometric tracks
+    with angle labels positioned at track midpoints. Color-coded by track type:
+    red (isochronous), green (normal), blue (prolonged).
+    """
+    if output_dir is None or not cluster_category_results:
+        return
+
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+    # Color mapping for track types
+    color_map = {'isochronous': 'red', 'normal': 'green', 'prolonged': 'blue'}
+
+    # Plot all points and track lines
+    colors_tab = plt.cm.tab20(np.linspace(0, 1, len(cluster_category_results)))
+
+    for idx, (cluster_id, data) in enumerate(cluster_category_results.items()):
+        points = np.array(clusters_true[cluster_id])
+        x_vals = points[:, 0]
+        z_vals = points[:, 2]
+
+        # Plot cluster points with marker size 1
+        marker = 'o' if data['is_neutrino'] else 's'  # circle for neutrino, square for cosmic
+        ax.scatter(z_vals, x_vals, s=1, alpha=0.6, color=colors_tab[idx], marker=marker, label=f'Cluster {cluster_id:.0f}')
+
+        # Draw track line only for cosmic clusters (not for neutrino)
+        if not data['is_neutrino']:
+            z_line = [data['z_min'], data['z_max']]
+            x_line = [data['x_at_z_min'], data['x_at_z_max']]
+            ax.plot(z_line, x_line, color=color_map[data['track_type']], linewidth=3, alpha=0.8)
+
+            # Add text label closer to the track line
+            z_mid = (data['z_min'] + data['z_max']) / 2
+            x_mid = (data['x_at_z_min'] + data['x_at_z_max']) / 2
+
+            label_text = f"ID:{cluster_id:.0f}\nθ={data['theta_xz']:.1f}°\n{data['track_type']}"
+
+            ax.text(z_mid, x_mid, label_text, fontsize=9, ha='center', va='center',
+                   bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7, edgecolor='black'),
+                   fontweight='bold')
+
+    ax.set_xlabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax.set_ylabel('X [cm]', fontsize=12, fontweight='bold')
+
+    title = 'True Cluster Categories (XZ View) - Neutrino vs Cosmic'
+    if event is not None and apa is not None:
+        title += f' - Event {event}, {apa}'
+    if file_name is not None:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+
+    # Create custom legend for track types
+    legend_elements = [
+        Line2D([0], [0], color='red', linewidth=3, label='Isochronous (θ < 20°)'),
+        Line2D([0], [0], color='green', linewidth=3, label='Normal (20° ≤ θ ≤ 70°)'),
+        Line2D([0], [0], color='blue', linewidth=3, label='Prolonged (θ > 70°)'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=8, label='Neutrino (q_true=1)'),
+        Line2D([0], [0], marker='s', color='w', markerfacecolor='gray', markersize=8, label='Cosmic (q_true=0)')
+    ]
+    ax.legend(handles=legend_elements, fontsize=11, loc='upper left')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plot_path = Path(output_dir) / 'cluster_category_xz_view.png'
+    plt.savefig(plot_path, dpi=100, bbox_inches='tight')
+    print(f"\nSaved cluster category XZ plot to: {plot_path}")
+    plt.close()
+
+
+def DrawClusterBeforeAfterDeadArea(true_points_before, true_points_after, deadarea_data,
+                                    event, apa, output_dir, file_name=None):
+    """
+    Draw true clusters before and after dead area cut with zoomed view of removed regions.
+    Top row: Full view - left (before), right (after)
+    Bottom row: Zoomed view around removed regions - left (before removed), right (after removed)
+    Dead areas are overlaid on all views with 10 cm zoom around cut regions.
+    """
+    from matplotlib.patches import Polygon as MplPolygon
+    from matplotlib.path import Path as MplPath
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 14))
+
+    marker_size = 1
+
+    # Convert points to arrays
+    true_before_arr = np.array(true_points_before) if len(true_points_before) > 0 else np.array([])
+    true_after_arr = np.array(true_points_after) if len(true_points_after) > 0 else np.array([])
+
+    # Identify removed points (in before but not in after)
+    removed_mask = np.ones(len(true_before_arr), dtype=bool)
+    if len(true_after_arr) > 0:
+        for i, point in enumerate(true_before_arr):
+            for after_point in true_after_arr:
+                if np.allclose(point, after_point):
+                    removed_mask[i] = False
+                    break
+    removed_points = true_before_arr[removed_mask]
+
+    # Find bounds of removed regions for zooming
+    if len(removed_points) > 0:
+        z_removed_min = removed_points[:, 2].min()
+        z_removed_max = removed_points[:, 2].max()
+        y_removed_min = removed_points[:, 1].min()
+        y_removed_max = removed_points[:, 1].max()
+        z_zoom_min = max(0, z_removed_min - 5)
+        z_zoom_max = min(500, z_removed_max + 5)
+        y_zoom_min = y_removed_min - 5
+        y_zoom_max = y_removed_max + 5
+    else:
+        z_zoom_min, z_zoom_max, y_zoom_min, y_zoom_max = 0, 500, -250, 250
+
+    # Helper function to draw dead areas
+    def draw_deadareas(ax):
+        for idx, polygon in enumerate(deadarea_data):
+            polygon_array = np.array(polygon)
+            polygon_swapped = polygon_array[:, [1, 0]]
+            patch = MplPolygon(polygon_swapped, closed=True, alpha=0.4, color='yellow',
+                              edgecolor='black', linewidth=1.5,
+                              label='Dead area' if idx == 0 else '', zorder=1)
+            ax.add_patch(patch)
+
+    # TOP-LEFT: Full view before dead area cut
+    ax_before = axes[0, 0]
+    if len(true_before_arr) > 0:
+        ax_before.scatter(true_before_arr[:, 2], true_before_arr[:, 1], s=marker_size, alpha=0.6,
+                         color='red', label='True clusters', zorder=3)
+    draw_deadareas(ax_before)
+    ax_before.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
+    ax_before.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
+    ax_before.set_title('Full View - Before Dead Area Cut', fontsize=12, fontweight='bold')
+    ax_before.legend(fontsize=9, loc='upper right')
+    ax_before.grid(True, alpha=0.3)
+    ax_before.set_xlim(0, 500)
+    ax_before.set_ylim(-250, 250)
+
+    # TOP-RIGHT: Full view after dead area cut
+    ax_after = axes[0, 1]
+    if len(true_after_arr) > 0:
+        ax_after.scatter(true_after_arr[:, 2], true_after_arr[:, 1], s=marker_size, alpha=0.6,
+                        color='red', label='True clusters', zorder=3)
+    draw_deadareas(ax_after)
+    ax_after.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
+    ax_after.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
+    ax_after.set_title('Full View - After Dead Area Cut', fontsize=12, fontweight='bold')
+    ax_after.legend(fontsize=9, loc='upper right')
+    ax_after.grid(True, alpha=0.3)
+    ax_after.set_xlim(0, 500)
+    ax_after.set_ylim(-250, 250)
+
+    # BOTTOM-LEFT: Zoomed view before dead area cut
+    ax_zoom_before = axes[1, 0]
+    if len(true_before_arr) > 0:
+        ax_zoom_before.scatter(true_before_arr[:, 2], true_before_arr[:, 1], s=marker_size, alpha=0.6,
+                              color='red', label='True clusters', zorder=3)
+    draw_deadareas(ax_zoom_before)
+    ax_zoom_before.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
+    ax_zoom_before.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
+    ax_zoom_before.set_title('Zoomed View - Before Dead Area Cut (10 cm zoom)', fontsize=12, fontweight='bold')
+    ax_zoom_before.legend(fontsize=9, loc='upper right')
+    ax_zoom_before.grid(True, alpha=0.3)
+    ax_zoom_before.set_xlim(z_zoom_min, z_zoom_max)
+    ax_zoom_before.set_ylim(y_zoom_min, y_zoom_max)
+
+    # BOTTOM-RIGHT: Zoomed view after dead area cut (shows gap where points were removed)
+    ax_zoom_after = axes[1, 1]
+    if len(true_after_arr) > 0:
+        ax_zoom_after.scatter(true_after_arr[:, 2], true_after_arr[:, 1], s=marker_size, alpha=0.6,
+                             color='red', label='True clusters', zorder=3)
+    draw_deadareas(ax_zoom_after)
+    ax_zoom_after.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
+    ax_zoom_after.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
+    ax_zoom_after.set_title('Zoomed View - After Dead Area Cut (10 cm zoom)', fontsize=12, fontweight='bold')
+    ax_zoom_after.legend(fontsize=9, loc='upper right')
+    ax_zoom_after.grid(True, alpha=0.3)
+    ax_zoom_after.set_xlim(z_zoom_min, z_zoom_max)
+    ax_zoom_after.set_ylim(y_zoom_min, y_zoom_max)
+
+    fig.suptitle(f'True Clusters Before/After Dead Area Cut - Event {event}, {apa}',
+                fontsize=14, fontweight='bold')
+    if file_name:
+        fig.suptitle(fig._suptitle.get_text() + f' ({file_name})', fontsize=13, fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"true_clusters_before_after_deadarea_event{event}_apa_{apa}.png",
                 dpi=100, bbox_inches='tight')
     plt.close()
 

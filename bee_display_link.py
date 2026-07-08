@@ -1,6 +1,6 @@
 """
 Module to print bee-display links for mabc*.zip files.
-Runs bee-upload.sh to generate links for mabc files.
+Runs bee-upload-with-truth.sh to generate links with truth data for mabc files.
 """
 
 from pathlib import Path
@@ -9,13 +9,14 @@ import subprocess
 import os
 
 
-# Path to bee-upload.sh script
-BEE_UPLOAD_SCRIPT = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/sbnd/bee-upload.sh")
+# Path to bee-upload-with-truth.sh script
+BEE_UPLOAD_SCRIPT = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation/bee-upload-with-truth.sh")
 
 
 def print_bee_display_link(input_dir):
     """
-    Print bee-display links by running bee-upload.sh if mabc*.zip files exist.
+    Print bee-display links by running bee-upload-with-truth.sh if mabc*.zip files exist.
+    Includes truth data (tru-apa*.json) if available in the same directory.
 
     Parameters
     ----------
@@ -42,16 +43,16 @@ def print_bee_display_link(input_dir):
         # No mabc files found, skip silently
         return
 
-    # Check if bee-upload.sh exists
+    # Check if bee-upload-with-truth.sh exists
     if not BEE_UPLOAD_SCRIPT.exists():
-        print(f"\nWarning: bee-upload.sh not found at {BEE_UPLOAD_SCRIPT}")
+        print(f"\nWarning: bee-upload-with-truth.sh not found at {BEE_UPLOAD_SCRIPT}")
         return
 
     print(f"\n{'='*70}")
     print(f"BEE-DISPLAY LINKS for {file_name}")
     print(f"{'='*70}")
 
-    # Run bee-upload.sh in the input directory
+    # Run bee-upload-with-truth.sh in the input directory
     try:
         # Save current directory
         original_dir = os.getcwd()
@@ -59,7 +60,7 @@ def print_bee_display_link(input_dir):
         # Change to input directory
         os.chdir(input_dir)
 
-        # Run bee-upload.sh
+        # Run bee-upload-with-truth.sh
         result = subprocess.run(
             ['bash', str(BEE_UPLOAD_SCRIPT)],
             capture_output=True,
@@ -78,15 +79,15 @@ def print_bee_display_link(input_dir):
                     print(f"  {line.strip()}")
 
         if result.returncode != 0:
-            print(f"  Error running bee-upload.sh:")
+            print(f"  Error running bee-upload-with-truth.sh:")
             for line in result.stderr.split('\n')[:5]:  # Show first 5 error lines
                 if line.strip():
                     print(f"    {line.strip()}")
 
     except subprocess.TimeoutExpired:
-        print(f"  Error: bee-upload.sh timed out (exceeded 5 minutes)")
+        print(f"  Error: bee-upload-with-truth.sh timed out (exceeded 5 minutes)")
     except Exception as e:
-        print(f"  Error running bee-upload.sh: {str(e)}")
+        print(f"  Error running bee-upload-with-truth.sh: {str(e)}")
     finally:
         # Ensure we're back in the original directory
         try:

@@ -14,8 +14,8 @@ def plot_efficiency_heatmap(efficiency_results, event, apa, output_dir, file_nam
         fill_value=0
     )
 
-    # avoid to draw reco cluster if it's id is 9999 (sentinel for unmatched)
-    efficiency_matrix = efficiency_matrix.loc[:, efficiency_matrix.columns != 9999]
+    # avoid to draw reco cluster if it's id is 8888 (sentinel for unmatched)
+    efficiency_matrix = efficiency_matrix.loc[:, efficiency_matrix.columns != 8888]
 
     plt.figure(figsize=(10, 8))
     sns.heatmap(efficiency_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
@@ -41,8 +41,8 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
         fill_value=0
     )
 
-    # avoid to draw reco cluster if it's id is 9999 (sentinel for unmatched)
-    purity_matrix = purity_matrix.loc[:, purity_matrix.columns != 9999]
+    # avoid to draw reco cluster if it's id is 8888 (sentinel for unmatched)
+    purity_matrix = purity_matrix.loc[:, purity_matrix.columns != 8888]
 
     plt.figure(figsize=(10, 8))
     sns.heatmap(purity_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
@@ -58,10 +58,83 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     plt.close()
     ##plt.show(block=False)
 
-def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, clusters_true, output_dir, event, apa, file_name=None):
+def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None):
+    """
+    Draw 2D histogram of Efficiency vs True Energy for a cluster category.
+    Returns the energies and efficiencies lists for use in 1D projections.
+
+    Args:
+        energies: List of energy values
+        efficiencies: List of efficiency values
+        output_dir: Output directory for saving plots
+        event: Event number (for single event) or 0 (for aggregated data)
+        apa: APA number
+        category_name: Name of cluster category for title
+        file_name: Optional file name for title
+        num_events: Optional number of events aggregated (if provided, shows event count instead of event number)
+    """
+    if not energies or not efficiencies:
+        return energies, efficiencies
+
+    plt.figure(figsize=(10, 8))
+    x_bin_size = 50  # MeV
+    xbins = np.arange(0, max(energies) + x_bin_size, x_bin_size)
+    y_bin_size = 0.05
+    ybins = np.arange(0, 1 + y_bin_size, y_bin_size)
+
+    plt.hist2d(energies, efficiencies, bins=[xbins, ybins], cmap='YlGnBu')
+    plt.colorbar(label='Count')
+    plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+
+    # Create title based on whether this is a single event or aggregated data
+    if num_events is not None:
+        title = f'Efficiency vs True Energy (2D) - {category_name} - {num_events} events, {apa}'
+    else:
+        title = f'Efficiency vs True Energy (2D) - {category_name} - Event {event}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.xlim(0, max(energies)*1.1)
+    plt.ylim(-0.05, 1.05)
+
+    # Save with appropriate filename based on category
+    category_suffix = category_name.lower().replace(' ', '_').replace('_clusters', '')
+    if num_events is not None:
+        filename = f"efficiency_vs_true_energy_2d_{category_suffix}_{num_events}events_{apa}.png"
+    else:
+        filename = f"efficiency_vs_true_energy_2d_{category_suffix}_event_{event}_{apa}.png"
+    plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+    return energies, efficiencies
+
+def plot_1d_efficiency_energy(energies, efficiencies, energy_bins):
+    """
+    Create 1D projection by binning energy and averaging efficiency values.
+    Returns bin centers and mean efficiencies for plotting.
+    """
+    if not energies or not efficiencies:
+        return [], []
+
+    bin_centers = (energy_bins[:-1] + energy_bins[1:]) / 2
+    bin_centers_nonzero = []
+    mean_efficiency_per_bin = []
+
+    for i in range(len(energy_bins)-1):
+        mask = (np.array(energies) >= energy_bins[i]) & (np.array(energies) < energy_bins[i+1])
+        if np.sum(mask) > 0:
+            mean_eff = np.mean(np.array(efficiencies)[mask])
+            mean_efficiency_per_bin.append(mean_eff)
+            bin_centers_nonzero.append(bin_centers[i])
+
+    return bin_centers_nonzero, mean_efficiency_per_bin
+
+def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, apa, file_name=None, cluster_category_results=None):
     """
     For each true cluster: calculate sum of efficiency values,
     then plot efficiency vs true cluster energy (2D and 1D).
+    If cluster_category_results is provided, also plot separate lines for isochronous, normal, and prolonged clusters.
     """
     if not efficiency_results:
         return
@@ -70,16 +143,210 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, clusters_true, output
     true_cluster_efficiency = {}
     for eff in efficiency_results:
         true_cid = eff['true_cluster_id']
-        if true_cid == 9999:  # Skip unmatched sentinel
-            continue
+        #if true_cid == 8888:  # Skip unmatched sentinel
+        #    continue
         if true_cid not in true_cluster_efficiency:
             true_cluster_efficiency[true_cid] = {
                 'total_efficiency': 0,
                 'total_energy': eff.get('total_true_cluster_energy', 0),
                 'num_reco_matches': 0
             }
+
         true_cluster_efficiency[true_cid]['total_efficiency'] += eff['efficiency_energy_weighted']
         true_cluster_efficiency[true_cid]['num_reco_matches'] += 1
+
+    if not true_cluster_efficiency:
+        return
+
+    # Debug: Print information about true clusters and their matched reco clusters
+    print_debug_info = False  # Set to False to disable debug printing
+    if print_debug_info:
+        print("\n" + "="*80)
+        print(f"DEBUG: Efficiency vs True Energy - Event {event}, {apa}")
+        print("="*80)
+        for true_cid in sorted(true_cluster_efficiency.keys()):
+            data = true_cluster_efficiency[true_cid]
+        print(f"\nTrue Cluster {true_cid:.0f}:")
+        print(f"  Total Energy: {data['total_energy']:.3f} MeV")
+        print(f"  Total Efficiency (sum): {data['total_efficiency']:.4f}")
+        print(f"  Number of Matched Reco Clusters: {data['num_reco_matches']}")
+
+        # Find and print individual efficiencies for each true-reco match
+        #print(f"  Individual True-Reco Matches:")
+        for eff in efficiency_results:
+            if eff['true_cluster_id'] == true_cid and eff['true_cluster_id'] != 8888:
+                reco_cid = eff.get('reco_cluster_id', 'N/A')
+                eff_val = eff['efficiency_energy_weighted']
+                #print(f"    → Reco Cluster {reco_cid:.0f}: efficiency = {eff_val:.4f}")
+        print("="*80 + "\n")
+
+    energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
+    efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
+
+    # 2D Histogram for all clusters
+    plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa,
+                             category_name="All Clusters", file_name=file_name)
+
+    # 2D plots by category (only if cluster_category_results is provided)
+    if cluster_category_results is not None:
+        category_styles = {
+            'neutrino': 'Neutrino Clusters',
+            'isochronous_cosmic': 'Isochronous Cosmic Clusters',
+            'normal_cosmic': 'Normal Cosmic Clusters',
+            'prolonged_cosmic': 'Prolonged Cosmic Clusters'
+        }
+
+        for category_key, category_label in category_styles.items():
+            # Filter clusters by category
+            if category_key == 'neutrino':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items() if data['is_neutrino']]
+            elif category_key == 'isochronous_cosmic':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'isochronous']
+            elif category_key == 'normal_cosmic':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'normal']
+            elif category_key == 'prolonged_cosmic':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'prolonged']
+
+            if not category_cluster_ids:
+                continue
+
+            # Get energies and efficiencies for this category
+            category_energies = [true_cluster_efficiency[cid]['total_energy'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
+            category_efficiencies = [true_cluster_efficiency[cid]['total_efficiency'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
+
+            # Draw 2D plot for this category
+            if category_energies:
+                plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, event, apa,
+                                         category_name=category_label, file_name=file_name)
+
+
+
+    # Setup binning for 1D projections
+    n_bins = 15
+    if energies:
+        energy_bins = np.linspace(0, max(energies)*1.1, n_bins+1)
+    else:
+        energy_bins = np.linspace(0, 10, n_bins+1)
+
+    # 1D Plot 1: All clusters (separate canvas)
+    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+
+    plt.figure(figsize=(12, 6))
+    if len(bin_centers_all) > 0:
+        plt.plot(bin_centers_all, mean_eff_all, 'o-', linewidth=2.5, markersize=10,
+                color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
+
+    plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    title = f'Efficiency vs True Energy (1D Projection) - Event {event}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, 3000)  # Adjust x-axis limit based on expected energy range
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_event_{event}_{apa}.png",
+                dpi=100, bbox_inches='tight', pad_inches=0.3)
+    ##plt.show(block=False)
+    plt.close()
+
+    # 1D Plot 2: By category (only if cluster_category_results is provided)
+    if cluster_category_results is not None:
+        plt.figure(figsize=(14, 7))
+
+        # Define categories combining track_type and neutrino/cosmic
+        category_info = {
+            'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple', 'marker': 'D'},
+            'isochronous_cosmic': {'label': 'Isochronous Cosmic', 'color': 'red', 'marker': 'o'},
+            'normal_cosmic': {'label': 'Normal Cosmic', 'color': 'green', 'marker': 's'},
+            'prolonged_cosmic': {'label': 'Prolonged Cosmic', 'color': 'blue', 'marker': '^'}
+        }
+
+        for category_key, info in category_info.items():
+            # Filter clusters by category
+            if category_key == 'neutrino':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items() if data['is_neutrino']]
+            elif category_key == 'isochronous_cosmic':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'isochronous']
+            elif category_key == 'normal_cosmic':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'normal']
+            elif category_key == 'prolonged_cosmic':
+                category_cluster_ids = [cid for cid, data in cluster_category_results.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'prolonged']
+
+            if not category_cluster_ids:
+                continue
+
+            # Get energies and efficiencies for this category
+            category_energies = [true_cluster_efficiency[cid]['total_energy'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
+            category_efficiencies = [true_cluster_efficiency[cid]['total_efficiency'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
+
+            if category_energies:
+                # Get 1D projection for this category
+                bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+
+                if len(bin_centers_cat) > 0:
+                    color = info['color']
+                    marker = info['marker']
+                    label_text = f"{info['label']} ({len(category_cluster_ids)} clusters)"
+                    plt.plot(bin_centers_cat, mean_eff_cat, marker=marker, linestyle='-', linewidth=2, markersize=8,
+                            color=color, label=label_text, markeredgecolor='black', markeredgewidth=0.5)
+
+        plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+        plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+        title = f'Efficiency vs True Energy (1D by Category) - Event {event}, {apa}'
+        if file_name:
+            title += f' ({file_name})'
+        plt.title(title, fontsize=12, fontweight='bold')
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.legend(fontsize=10)
+        plt.xlim(0, 3000)
+        plt.ylim(-0.05, 1.05)
+        plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_event_{event}_{apa}.png",
+                    dpi=100, bbox_inches='tight', pad_inches=0.3)
+        plt.close()
+
+
+def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_name=None, cluster_category_results=None, file_metadata_list=None):
+    """
+    File-level version: For each true cluster calculate sum of efficiency values,
+    then plot efficiency vs true cluster energy (2D and 1D) for all events in a file.
+    If cluster_category_results or file_metadata_list is provided, also plot separate 2D and 1D plots for each cluster category.
+    Note: Uses (event, true_cluster_id) composite key to ensure uniqueness across multiple events in a file.
+    """
+    if not efficiency_results:
+        return
+
+    # Count unique events in this file
+    unique_events = set()
+    if file_metadata_list is not None:
+        unique_events = set(m['event'] for m in file_metadata_list)
+    else:
+        unique_events = set(eff.get('event', 'unknown') for eff in efficiency_results)
+    num_events_in_file = len(unique_events)
+
+    # Group efficiency by (event, true_cluster_id) to ensure uniqueness across multiple events
+    true_cluster_efficiency = {}
+    for eff in efficiency_results:
+        event_key = eff.get('event', 'unknown')
+        true_cid = eff['true_cluster_id']
+        cluster_key = (event_key, true_cid)
+
+        if cluster_key not in true_cluster_efficiency:
+            true_cluster_efficiency[cluster_key] = {
+                'total_efficiency': 0,
+                'total_energy': eff.get('total_true_cluster_energy', 0),
+                'num_reco_matches': 0
+            }
+
+        true_cluster_efficiency[cluster_key]['total_efficiency'] += eff['efficiency_energy_weighted']
+        true_cluster_efficiency[cluster_key]['num_reco_matches'] += 1
 
     if not true_cluster_efficiency:
         return
@@ -87,62 +354,351 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, clusters_true, output
     energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
     efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
 
-    # 2D Histogram
-    plt.figure(figsize=(10, 8))
-    plt.hist2d(energies, efficiencies, bins=20, cmap='YlGnBu')
-    plt.colorbar(label='Count')
-    plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Sum of Efficiency (across matched reco)', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (2D) - Event {event}, {apa}'
-    if file_name:
-        title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_2d_event_{event}_{apa}.png",
-                dpi=100, bbox_inches='tight', pad_inches=0.3)
-    ##plt.show(block=False)
-    plt.close()
+    # 2D Histogram for all clusters
+    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+                             category_name="All Clusters (File Level)", file_name=file_name, num_events=num_events_in_file)
 
-    # 1D Projection with binned scatter points connected by lines
-    plt.figure(figsize=(12, 6))
+    # Build category info from file_metadata_list if provided, otherwise use cluster_category_results
+    category_info_source = None
+    if file_metadata_list is not None:
+        # Convert file_metadata_list to category dict format using (event, true_cluster_id) composite key
+        category_info_source = {}
+        for metadata in file_metadata_list:
+            event_key = metadata['event']
+            cid = metadata['true_cluster_id']
+            cluster_key = (event_key, cid)
+            if cluster_key not in category_info_source:
+                category_info_source[cluster_key] = {
+                    'is_neutrino': metadata['cluster_type'] == 'neutrino',
+                    'track_type': metadata['cluster_category']
+                }
+        print(f"    [FILE LEVEL] Built category_info_source from metadata: {len(category_info_source)} clusters")
+    elif cluster_category_results is not None:
+        category_info_source = cluster_category_results
+        print(f"    [FILE LEVEL] Using cluster_category_results: {len(category_info_source)} clusters")
 
+    # 2D plots by category (only if category info is available)
+    if category_info_source is not None:
+        print(f"    [FILE LEVEL] Drawing 2D efficiency plots for categories...")
+        category_styles = {
+            'neutrino': 'Neutrino Clusters',
+            'isochronous_cosmic': 'Isochronous Cosmic Clusters',
+            'normal_cosmic': 'Normal Cosmic Clusters',
+            'prolonged_cosmic': 'Prolonged Cosmic Clusters'
+        }
+
+        for category_key, category_label in category_styles.items():
+            # Filter clusters by category (using composite keys if available)
+            if category_key == 'neutrino':
+                category_cluster_keys = [key for key, data in category_info_source.items() if data['is_neutrino']]
+            elif category_key == 'isochronous_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'isochronous']
+            elif category_key == 'normal_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'normal']
+            elif category_key == 'prolonged_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'prolonged']
+
+            print(f"      {category_label}: found {len(category_cluster_keys)} clusters in metadata")
+
+            if not category_cluster_keys:
+                print(f"        → No clusters in this category, skipping...")
+                continue
+
+            # Get energies and efficiencies for this category
+            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+
+            print(f"        → Matched {len(category_energies)} clusters in efficiency_results")
+
+            # Draw 2D plot for this category
+            if category_energies:
+                print(f"        → Drawing 2D plot for {category_label}...")
+                plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+                                         category_name=category_label, file_name=file_name, num_events=num_events_in_file)
+            else:
+                print(f"        → No energies/efficiencies found, skipping plot...")
+
+    # Setup binning for 1D projections
     n_bins = 15
     if energies:
         energy_bins = np.linspace(0, max(energies)*1.1, n_bins+1)
     else:
         energy_bins = np.linspace(0, 10, n_bins+1)
 
-    bin_centers = (energy_bins[:-1] + energy_bins[1:]) / 2
-    mean_efficiency_per_bin = []
-    bin_counts = []
+    # 1D Plot: All clusters (separate canvas)
+    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
 
-    if energies:
-        for i in range(len(energy_bins)-1):
-            mask = (np.array(energies) >= energy_bins[i]) & (np.array(energies) < energy_bins[i+1])
-            if np.sum(mask) > 0:
-                mean_eff = np.mean(np.array(efficiencies)[mask])
-                count = np.sum(mask)
-                mean_efficiency_per_bin.append(mean_eff)
-                bin_counts.append(count)
-            else:
-                mean_efficiency_per_bin.append(0)
-                bin_counts.append(0)
-
-    if len(bin_centers) > 0:
-        plt.plot(bin_centers, mean_efficiency_per_bin, 'o-', linewidth=2, markersize=10,
-                color='darkblue', label='Mean Efficiency per Bin', markeredgecolor='black', markeredgewidth=1)
+    plt.figure(figsize=(12, 6))
+    if len(bin_centers_all) > 0:
+        plt.plot(bin_centers_all, mean_eff_all, 'o-', linewidth=2.5, markersize=10,
+                color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Sum of Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection) - Event {event}, {apa}'
+    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    title = f'Efficiency vs True Energy (1D Projection) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold')
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_event_{event}_{apa}.png",
+    plt.xlim(0, 3000)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
-    ##plt.show(block=False)
     plt.close()
+
+    # 1D Plot 2: By category (only if category info is available)
+    if category_info_source is not None:
+        plt.figure(figsize=(14, 7))
+
+        # Define categories combining track_type and neutrino/cosmic
+        category_info = {
+            'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple', 'marker': 'D'},
+            'isochronous_cosmic': {'label': 'Isochronous Cosmic', 'color': 'red', 'marker': 'o'},
+            'normal_cosmic': {'label': 'Normal Cosmic', 'color': 'green', 'marker': 's'},
+            'prolonged_cosmic': {'label': 'Prolonged Cosmic', 'color': 'blue', 'marker': '^'}
+        }
+
+        for category_key, info in category_info.items():
+            # Filter clusters by category (using composite keys if available)
+            if category_key == 'neutrino':
+                category_cluster_keys = [key for key, data in category_info_source.items() if data['is_neutrino']]
+            elif category_key == 'isochronous_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'isochronous']
+            elif category_key == 'normal_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'normal']
+            elif category_key == 'prolonged_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'prolonged']
+
+            if not category_cluster_keys:
+                continue
+
+            # Get energies and efficiencies for this category
+            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+
+            if category_energies:
+                # Get 1D projection for this category
+                bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+
+                if len(bin_centers_cat) > 0:
+                    color = info['color']
+                    marker = info['marker']
+                    label_text = f"{info['label']} ({len(category_cluster_keys)} clusters)"
+                    plt.plot(bin_centers_cat, mean_eff_cat, marker=marker, linestyle='-', linewidth=2, markersize=8,
+                            color=color, label=label_text, markeredgecolor='black', markeredgewidth=0.5)
+
+        plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+        plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+        title = f'Efficiency vs True Energy (1D by Category) - File Level, {apa}'
+        if file_name:
+            title += f' ({file_name})'
+        plt.title(title, fontsize=12, fontweight='bold')
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.legend(fontsize=10)
+        plt.xlim(0, 3000)
+        plt.ylim(-0.05, 1.05)
+        plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_file_{apa}.png",
+                    dpi=100, bbox_inches='tight', pad_inches=0.3)
+        plt.close()
+
+
+def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluster_category_results=None, job_metadata_list=None):
+    """
+    Job-level version: For each true cluster calculate sum of efficiency values,
+    then plot efficiency vs true cluster energy (2D and 1D) for all events in all files.
+    If cluster_category_results or job_metadata_list is provided, also plot separate 2D and 1D plots for each cluster category.
+    Note: Uses (event, true_cluster_id) composite key to ensure uniqueness across all files and events.
+    """
+    if not efficiency_results:
+        return
+
+    # Count unique events across all files
+    unique_events = set()
+    if job_metadata_list is not None:
+        unique_events = set(m['event'] for m in job_metadata_list)
+    else:
+        unique_events = set(eff.get('event', 'unknown') for eff in efficiency_results)
+    num_events_total = len(unique_events)
+
+    # Group efficiency by (event, true_cluster_id) to ensure uniqueness across all files and events
+    true_cluster_efficiency = {}
+    for eff in efficiency_results:
+        event_key = eff.get('event', 'unknown')
+        true_cid = eff['true_cluster_id']
+        cluster_key = (event_key, true_cid)
+
+        if cluster_key not in true_cluster_efficiency:
+            true_cluster_efficiency[cluster_key] = {
+                'total_efficiency': 0,
+                'total_energy': eff.get('total_true_cluster_energy', 0),
+                'num_reco_matches': 0
+            }
+
+        true_cluster_efficiency[cluster_key]['total_efficiency'] += eff['efficiency_energy_weighted']
+        true_cluster_efficiency[cluster_key]['num_reco_matches'] += 1
+
+    if not true_cluster_efficiency:
+        return
+
+    energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
+    efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
+
+    # 2D Histogram for all clusters
+    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+                             category_name="All Clusters (Job Level)", file_name=None, num_events=num_events_total)
+
+    # Build category info from job_metadata_list if provided, otherwise use cluster_category_results
+    category_info_source = None
+    if job_metadata_list is not None:
+        # Convert job_metadata_list to category dict format using (event, true_cluster_id) composite key
+        category_info_source = {}
+        for metadata in job_metadata_list:
+            event_key = metadata['event']
+            cid = metadata['true_cluster_id']
+            cluster_key = (event_key, cid)
+            if cluster_key not in category_info_source:
+                category_info_source[cluster_key] = {
+                    'is_neutrino': metadata['cluster_type'] == 'neutrino',
+                    'track_type': metadata['cluster_category']
+                }
+        print(f"  [JOB LEVEL] Built category_info_source from metadata: {len(category_info_source)} clusters")
+    elif cluster_category_results is not None:
+        category_info_source = cluster_category_results
+        print(f"  [JOB LEVEL] Using cluster_category_results: {len(category_info_source)} clusters")
+
+    # 2D plots by category (only if category info is available)
+    if category_info_source is not None:
+        print(f"  [JOB LEVEL] Drawing 2D efficiency plots for categories...")
+        category_styles = {
+            'neutrino': 'Neutrino Clusters',
+            'isochronous_cosmic': 'Isochronous Cosmic Clusters',
+            'normal_cosmic': 'Normal Cosmic Clusters',
+            'prolonged_cosmic': 'Prolonged Cosmic Clusters'
+        }
+
+        for category_key, category_label in category_styles.items():
+            # Filter clusters by category (using composite keys if available)
+            if category_key == 'neutrino':
+                category_cluster_keys = [key for key, data in category_info_source.items() if data['is_neutrino']]
+            elif category_key == 'isochronous_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'isochronous']
+            elif category_key == 'normal_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'normal']
+            elif category_key == 'prolonged_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'prolonged']
+
+            print(f"    {category_label}: found {len(category_cluster_keys)} clusters in metadata")
+
+            if not category_cluster_keys:
+                print(f"      → No clusters in this category, skipping...")
+                continue
+
+            # Get energies and efficiencies for this category
+            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+
+            print(f"      → Matched {len(category_energies)} clusters in efficiency_results")
+
+            # Draw 2D plot for this category
+            if category_energies:
+                print(f"      → Drawing 2D plot for {category_label}...")
+                plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+                                         category_name=category_label, file_name=None, num_events=num_events_total)
+            else:
+                print(f"      → No energies/efficiencies found, skipping plot...")
+
+    # Setup binning for 1D projections
+    n_bins = 15
+    if energies:
+        energy_bins = np.linspace(0, max(energies)*1.1, n_bins+1)
+    else:
+        energy_bins = np.linspace(0, 10, n_bins+1)
+
+    # 1D Plot: All clusters (separate canvas)
+    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+
+    plt.figure(figsize=(12, 6))
+    if len(bin_centers_all) > 0:
+        plt.plot(bin_centers_all, mean_eff_all, 'o-', linewidth=2.5, markersize=10,
+                color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
+
+    plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    title = f'Efficiency vs True Energy (1D Projection) - Job Level, {apa}'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, 3000)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_job_{apa}.png",
+                dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+    # 1D Plot 2: By category (only if category info is available)
+    if category_info_source is not None:
+        plt.figure(figsize=(14, 7))
+
+        # Define categories combining track_type and neutrino/cosmic
+        category_info = {
+            'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple', 'marker': 'D'},
+            'isochronous_cosmic': {'label': 'Isochronous Cosmic', 'color': 'red', 'marker': 'o'},
+            'normal_cosmic': {'label': 'Normal Cosmic', 'color': 'green', 'marker': 's'},
+            'prolonged_cosmic': {'label': 'Prolonged Cosmic', 'color': 'blue', 'marker': '^'}
+        }
+
+        for category_key, info in category_info.items():
+            # Filter clusters by category (using composite keys if available)
+            if category_key == 'neutrino':
+                category_cluster_keys = [key for key, data in category_info_source.items() if data['is_neutrino']]
+            elif category_key == 'isochronous_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'isochronous']
+            elif category_key == 'normal_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'normal']
+            elif category_key == 'prolonged_cosmic':
+                category_cluster_keys = [key for key, data in category_info_source.items()
+                                       if not data['is_neutrino'] and data['track_type'] == 'prolonged']
+
+            if not category_cluster_keys:
+                continue
+
+            # Get energies and efficiencies for this category
+            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+
+            if category_energies:
+                # Get 1D projection for this category
+                bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+
+                if len(bin_centers_cat) > 0:
+                    color = info['color']
+                    marker = info['marker']
+                    label_text = f"{info['label']} ({len(category_cluster_keys)} clusters)"
+                    plt.plot(bin_centers_cat, mean_eff_cat, marker=marker, linestyle='-', linewidth=2, markersize=8,
+                            color=color, label=label_text, markeredgecolor='black', markeredgewidth=0.5)
+
+        plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+        plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+        title = f'Efficiency vs True Energy (1D by Category) - Job Level, {apa}'
+        plt.title(title, fontsize=12, fontweight='bold')
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.legend(fontsize=10)
+        plt.xlim(0, 3000)
+        plt.ylim(-0.05, 1.05)
+        plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_job_{apa}.png",
+                    dpi=100, bbox_inches='tight', pad_inches=0.3)
+        plt.close()
 
 def DrawPurityVsRecoChargePerEvent(purity_results, output_dir, event, apa, file_name=None):
     """
@@ -155,7 +711,7 @@ def DrawPurityVsRecoChargePerEvent(purity_results, output_dir, event, apa, file_
     purities = []
 
     for pur in purity_results:
-        if pur['reco_cluster_id'] == 9999:  # Skip unmatched sentinel
+        if pur['reco_cluster_id'] == 8888:  # Skip unmatched sentinel
             continue
         charges.append(pur.get('total_reco_cluster_charge', 0))
         purities.append(pur['purity'])
@@ -229,7 +785,7 @@ def DrawAggregatedEfficiencyPlots(efficiency_results, output_dir, level_name, ap
     if not efficiency_results:
         return
 
-    efficiencies = [e['efficiency_energy_weighted'] for e in efficiency_results if e['reco_cluster_id'] != 9999]
+    efficiencies = [e['efficiency_energy_weighted'] for e in efficiency_results if e['reco_cluster_id'] != 8888]
 
     if not efficiencies:
         return
@@ -253,7 +809,7 @@ def DrawAggregatedPurityPlots(purity_results, output_dir, level_name, apa):
     if not purity_results:
         return
 
-    purities = [p['purity'] for p in purity_results if p['reco_cluster_id'] != 9999]
+    purities = [p['purity'] for p in purity_results if p['reco_cluster_id'] != 8888]
 
     if not purities:
         return

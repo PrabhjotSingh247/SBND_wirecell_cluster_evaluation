@@ -26,7 +26,7 @@ def MatchRecoTruePair1to1(all_purity_results, all_eff_results):
     return final_matched_pairs
 
 
-def MatchRecoTrueCluster1toMany(all_purity_results, all_eff_results):
+def MatchTruetoReco_OneToMany(all_purity_results, all_eff_results):
     """
     One-to-many matching between true and reco clusters.
     For each true cluster, finds all reco clusters with non-zero efficiency.

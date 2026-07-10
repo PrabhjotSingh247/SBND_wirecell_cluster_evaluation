@@ -1,10 +1,34 @@
-file1: https://www.phy.bnl.gov/twister/bee/set/cb034018-a5f2-4708-95a6-523c3ef5bdd6/event/list/
-file2: https://www.phy.bnl.gov/twister/bee/set/41652f8e-f98b-4639-a600-e8ab042dc0a8/event/list/
-file3: https://www.phy.bnl.gov/twister/bee/set/66cb1a32-c555-4c75-b99c-ff8ec752128d/event/list/
-file4: https://www.phy.bnl.gov/twister/bee/set/5782902b-d6a0-4398-94d9-1f027e20065a/event/list/
-file5: https://www.phy.bnl.gov/twister/bee/set/169cefbc-93bf-4050-9d2f-afcb04672243/event/list/
-file6: https://www.phy.bnl.gov/twister/bee/set/ae7009a3-a108-46b5-83f7-eb5b2922bbdb/event/list/
-file7: https://www.phy.bnl.gov/twister/bee/set/f0a6649f-bac5-4df4-9952-f85a18c5845f/event/list/
-file8: https://www.phy.bnl.gov/twister/bee/set/525e8e12-9e50-4df7-b779-10392a62949b/event/list/
-file9: https://www.phy.bnl.gov/twister/bee/set/dc46e2db-c3da-4378-8ce8-b6e84d0d399e/event/list/
-file10: https://www.phy.bnl.gov/twister/bee/set/13b193c6-4774-45e0-976c-c49f23688969/event/list/
+# BEE Event Display Links with Original Input File Mapping
+# Generated from: /exp/sbnd/app/users/yuhw/2025-fall-prod-sample/mc_paths-10files.lst
+#
+# Format: file{N}: input_root_filename | BEE_link
+
+file1: gen_g4_detsim_reco1-6548848c-576f-520e-c045-2cc101674fea.root
+      https://www.phy.bnl.gov/twister/bee/set/cb034018-a5f2-4708-95a6-523c3ef5bdd6/event/list/
+
+file2: gen_g4_detsim_reco1-c7d2311d-cfb2-4c47-b343-1c32c594a09f.root
+      https://www.phy.bnl.gov/twister/bee/set/41652f8e-f98b-4639-a600-e8ab042dc0a8/event/list/
+
+file3: gen_g4_detsim_reco1-5802c4d5-175c-7f43-c5f9-10bef6b7e1a7.root
+      https://www.phy.bnl.gov/twister/bee/set/66cb1a32-c555-4c75-b99c-ff8ec752128d/event/list/
+
+file4: gen_g4_detsim_reco1-34a680cf-9980-5f67-25f5-c3c84bbfa254.root
+      https://www.phy.bnl.gov/twister/bee/set/5782902b-d6a0-4398-94d9-1f027e20065a/event/list/
+
+file5: gen_g4_detsim_reco1-37f977b7-2190-f7fc-0b6b-c95a5dabc75a.root
+      https://www.phy.bnl.gov/twister/bee/set/169cefbc-93bf-4050-9d2f-afcb04672243/event/list/
+
+file6: gen_g4_detsim_reco1-f0b98864-7e0a-a9a6-eaec-e5c48187472c.root
+      https://www.phy.bnl.gov/twister/bee/set/ae7009a3-a108-46b5-83f7-eb5b2922bbdb/event/list/
+
+file7: gen_g4_detsim_reco1-de7a2414-5a44-9df0-01a8-461b1ff0f336.root
+      https://www.phy.bnl.gov/twister/bee/set/f0a6649f-bac5-4df4-9952-f85a18c5845f/event/list/
+
+file8: gen_g4_detsim_reco1-773f9a14-1f83-7025-8e57-3bccc2e433cc.root
+      https://www.phy.bnl.gov/twister/bee/set/525e8e12-9e50-4df7-b779-10392a62949b/event/list/
+
+file9: gen_g4_detsim_reco1-353e0acf-2061-3e22-f382-33221ddba6b6.root
+      https://www.phy.bnl.gov/twister/bee/set/dc46e2db-c3da-4378-8ce8-b6e84d0d399e/event/list/
+
+file10: gen_g4_detsim_reco1-cb26a4bc-c5a2-4aea-daa1-44da28308691.root
+       https://www.phy.bnl.gov/twister/bee/set/13b193c6-4774-45e0-976c-c49f23688969/event/list/

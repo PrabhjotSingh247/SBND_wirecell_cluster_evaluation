@@ -161,7 +161,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     Shows efficiency/purity values in legend. Zooms to true cluster bounds ±30%.
 
     Parameters:
-    - matched_info: Dict from MatchRecoTrueCluster1toMany with keys:
+    - matched_info: Dict from MatchTruetoReco_OneToMany with keys:
         'event', 'true_cluster_id', 'matched_reco_clusters' (list of dicts with reco_cluster_id, efficiency_energy_weighted, purity)
     - clusters_true: Dict of {true_cid: array of points}
     - clusters_reco: Dict of {reco_cid: array of points}
@@ -630,7 +630,7 @@ def DrawTrueClusterCategories(cluster_category_results, clusters_true, output_di
     plt.tight_layout()
     plot_path = Path(output_dir) / 'cluster_category_xz_view.png'
     plt.savefig(plot_path, dpi=100, bbox_inches='tight')
-    print(f"\nSaved cluster category XZ plot to: {plot_path}")
+    #print(f"\nSaved cluster category XZ plot to: {plot_path}")
     plt.close()
 
 

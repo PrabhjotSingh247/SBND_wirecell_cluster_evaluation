@@ -46,9 +46,9 @@ def cluster_category(clusters_true, output_dir=None, event=None, apa=None, file_
 
     results = {}
 
-    print("\n" + "="*70)
-    print("CLUSTER CATEGORY CLASSIFICATION (Neutrino/Cosmic, XZ plane angle)")
-    print("="*70)
+    #print("\n" + "="*70)
+    #print("CLUSTER CATEGORY CLASSIFICATION (Neutrino/Cosmic, XZ plane angle)")
+    #print("="*70)
 
     for cluster_id, points in clusters_true.items():
         points = np.array(points)
@@ -73,7 +73,7 @@ def cluster_category(clusters_true, output_dir=None, event=None, apa=None, file_
             z_min = z_vals.min()
             z_max = z_vals.max()
 
-            print(f"True Cluster {cluster_id:6.0f}: NEUTRINO  {track_type:15s} | Z range: {z_min:.2f}-{z_max:.2f} cm | (q_true={q_true:.0f})")
+            #print(f"True Cluster {cluster_id:6.0f}: NEUTRINO  {track_type:15s} | Z range: {z_min:.2f}-{z_max:.2f} cm | (q_true={q_true:.0f})")
 
             results[cluster_id] = {
                 'track_type': track_type,
@@ -140,7 +140,7 @@ def cluster_category(clusters_true, output_dir=None, event=None, apa=None, file_
             else:
                 track_type = "normal"
 
-            print(f"True Cluster {cluster_id:6.0f}: COSMIC    {track_type:15s} | theta_xz={theta_xz:6.2f}° | Z range: {z_min:.2f}-{z_max:.2f} cm | X: {x_at_z_min:.2f}-{x_at_z_max:.2f} cm")
+            #print(f"True Cluster {cluster_id:6.0f}: COSMIC    {track_type:15s} | theta_xz={theta_xz:6.2f}° | Z range: {z_min:.2f}-{z_max:.2f} cm | X: {x_at_z_min:.2f}-{x_at_z_max:.2f} cm")
 
             results[cluster_id] = {
                 'track_type': track_type,

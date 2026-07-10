@@ -26,8 +26,8 @@ def print_bee_display_link(input_dir):
 
     Returns
     -------
-    None
-        Prints the bee-display links to stdout if files exist, otherwise skips silently.
+    str or None
+        Returns the bee-display URL if found, otherwise None.
     """
     input_dir = Path(input_dir)
 
@@ -41,12 +41,12 @@ def print_bee_display_link(input_dir):
 
     if not mabc_files:
         # No mabc files found, skip silently
-        return
+        return None
 
     # Check if bee-upload-with-truth.sh exists
     if not BEE_UPLOAD_SCRIPT.exists():
         print(f"\nWarning: bee-upload-with-truth.sh not found at {BEE_UPLOAD_SCRIPT}")
-        return
+        return None
 
     print(f"\n{'='*70}")
     print(f"BEE-DISPLAY LINKS for {file_name}")
@@ -72,11 +72,14 @@ def print_bee_display_link(input_dir):
         os.chdir(original_dir)
 
         # Extract URLs from output
+        bee_url = None
         if result.stdout:
             # Parse the output for URLs
             for line in result.stdout.split('\n'):
                 if 'https://' in line:
-                    print(f"  {line.strip()}")
+                    url_str = line.strip()
+                    print(f"  {url_str}")
+                    bee_url = url_str
 
         if result.returncode != 0:
             print(f"  Error running bee-upload-with-truth.sh:")
@@ -84,15 +87,20 @@ def print_bee_display_link(input_dir):
                 if line.strip():
                     print(f"    {line.strip()}")
 
+        print()
+        return bee_url
+
     except subprocess.TimeoutExpired:
         print(f"  Error: bee-upload-with-truth.sh timed out (exceeded 5 minutes)")
+        print()
+        return None
     except Exception as e:
         print(f"  Error running bee-upload-with-truth.sh: {str(e)}")
+        print()
+        return None
     finally:
         # Ensure we're back in the original directory
         try:
             os.chdir(original_dir)
         except:
             pass
-
-    print()

@@ -5,7 +5,7 @@ import seaborn as sns
 from scipy.spatial import KDTree
 
 # Evaluate reconstruction efficiency by comparing true and reconstructed clusters using KDTree spatial matching
-# Returns list of efficiency metrics for matched cluster pairs, with unmatched true clusters marked as reco_cluster_id=9999
+# Returns list of efficiency metrics for matched cluster pairs, with unmatched true clusters marked as reco_cluster_id=8888
 def EvaluateEfficiency(clusters_true, clusters_reco, event, radius_efficiency=1, min_recopoints_threshold=5):
     efficiency_results = []
     matched_true_cids = set()  # Track which true clusters found a match
@@ -51,7 +51,7 @@ def EvaluateEfficiency(clusters_true, clusters_reco, event, radius_efficiency=1,
                 efficiency_results.append({
                     'event': event,
                     'true_cluster_id': cid_true,
-                    'reco_cluster_id': 9999,  # Sentinel for unmatched
+                    'reco_cluster_id': 8888,  # Sentinel for unmatched
                     'efficiency_energy_weighted': 0,  # Sentinel for unmatched
                     'matched_true_cluster_energy': 0.0,
                     'total_true_cluster_energy': total_true_energy
@@ -61,7 +61,7 @@ def EvaluateEfficiency(clusters_true, clusters_reco, event, radius_efficiency=1,
     return efficiency_results
 
 # Evaluate cluster purity by measuring the fraction of reconstructed points matching true cluster locations using KDTree projection matching
-# Returns list of purity metrics for matched cluster pairs, with unmatched reco clusters marked as true_cluster_id=9999 and purity=-0.1
+# Returns list of purity metrics for matched cluster pairs, with unmatched reco clusters marked as true_cluster_id=8888 and purity=-0.1
 def EvaluatePurity(clusters_true, clusters_reco, event, radius_purity_xz=1, radius_purity_yz=2):
     purity_results = []
     matched_reco_cids = set()  # Track which reco clusters found a match
@@ -100,7 +100,7 @@ def EvaluatePurity(clusters_true, clusters_reco, event, radius_purity_xz=1, radi
                     'purity': purity
                 })
     
-    # Add unmatched reco clusters with purity=-0.1 and true_cluster_id=9999
+    # Add unmatched reco clusters with purity=-0.1 and true_cluster_id=8888
     for cid_reco, reco_pts in clusters_reco.items():
         if cid_reco not in matched_reco_cids:
             # This reco cluster has no true match
@@ -110,7 +110,7 @@ def EvaluatePurity(clusters_true, clusters_reco, event, radius_purity_xz=1, radi
                 purity_results.append({
                     'event': event,
                     'reco_cluster_id': cid_reco,
-                    'true_cluster_id': 9999,  # Sentinel for unmatched
+                    'true_cluster_id': 8888,  # Sentinel for unmatched
                     'purity': -0.1,  # Sentinel for unmatched
                     'total_reco_cluster_charge': total_reco_charge,
                     'matched_reco_charge': -50.0,  # Sentinel for unmatched

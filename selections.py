@@ -69,7 +69,6 @@ def reassign_cluster_ID_true(points_5d):
         avg_xy = np.mean(points[:, 0])
         avg_xy = round(avg_xy, 2)
         if points[:, 4].any() == 1:
-#           avg_xy = 9999 + len(points_5d)
             avg_xy = 9999
         points[:, 3] = avg_xy
         new_points.append(points)

@@ -1,0 +1,10 @@
+file1: https://www.phy.bnl.gov/twister/bee/set/cb034018-a5f2-4708-95a6-523c3ef5bdd6/event/list/
+file2: https://www.phy.bnl.gov/twister/bee/set/41652f8e-f98b-4639-a600-e8ab042dc0a8/event/list/
+file3: https://www.phy.bnl.gov/twister/bee/set/66cb1a32-c555-4c75-b99c-ff8ec752128d/event/list/
+file4: https://www.phy.bnl.gov/twister/bee/set/5782902b-d6a0-4398-94d9-1f027e20065a/event/list/
+file5: https://www.phy.bnl.gov/twister/bee/set/169cefbc-93bf-4050-9d2f-afcb04672243/event/list/
+file6: https://www.phy.bnl.gov/twister/bee/set/ae7009a3-a108-46b5-83f7-eb5b2922bbdb/event/list/
+file7: https://www.phy.bnl.gov/twister/bee/set/f0a6649f-bac5-4df4-9952-f85a18c5845f/event/list/
+file8: https://www.phy.bnl.gov/twister/bee/set/525e8e12-9e50-4df7-b779-10392a62949b/event/list/
+file9: https://www.phy.bnl.gov/twister/bee/set/dc46e2db-c3da-4378-8ce8-b6e84d0d399e/event/list/
+file10: https://www.phy.bnl.gov/twister/bee/set/13b193c6-4774-45e0-976c-c49f23688969/event/list/

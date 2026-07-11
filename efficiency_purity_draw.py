@@ -58,7 +58,7 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     plt.close()
     ##plt.show(block=False)
 
-def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None):
+def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None, num_clusters=None):
     """
     Draw 2D histogram of Efficiency vs True Energy for a cluster category.
     Returns the energies and efficiencies lists for use in 1D projections.
@@ -72,6 +72,7 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
         category_name: Name of cluster category for title
         file_name: Optional file name for title
         num_events: Optional number of events aggregated (if provided, shows event count instead of event number)
+        num_clusters: Optional number of true clusters that went into this plot (shown alongside num_events)
     """
     if not energies or not efficiencies:
         return energies, efficiencies
@@ -90,6 +91,8 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
     # Create title based on whether this is a single event or aggregated data
     if num_events is not None:
         title = f'Efficiency vs True Energy (2D) - {category_name} - {num_events} events, {apa}'
+        if num_clusters is not None:
+            title += f', {num_clusters} true clusters'
     else:
         title = f'Efficiency vs True Energy (2D) - {category_name} - Event {event}, {apa}'
     if file_name:
@@ -102,6 +105,8 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
     category_suffix = category_name.lower().replace(' ', '_').replace('_clusters', '')
     if num_events is not None:
         filename = f"efficiency_vs_true_energy_2d_{category_suffix}_{num_events}events_{apa}.png"
+        if num_clusters is not None:
+            filename = f"efficiency_vs_true_energy_2d_{category_suffix}_{num_events}events_{num_clusters}trueclusters_{apa}.png"
     else:
         filename = f"efficiency_vs_true_energy_2d_{category_suffix}_event_{event}_{apa}.png"
     plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -356,7 +361,8 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
 
     # 2D Histogram for all clusters
     plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
-                             category_name="All Clusters (File Level)", file_name=file_name, num_events=num_events_in_file)
+                             category_name="All Clusters (File Level)", file_name=file_name, num_events=num_events_in_file,
+                             num_clusters=len(energies))
 
     # Build category info from file_metadata_list if provided, otherwise use cluster_category_results
     category_info_source = None
@@ -417,7 +423,8 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
             if category_energies:
                 print(f"        → Drawing 2D plot for {category_label}...")
                 plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
-                                         category_name=category_label, file_name=file_name, num_events=num_events_in_file)
+                                         category_name=category_label, file_name=file_name, num_events=num_events_in_file,
+                                         num_clusters=len(category_energies))
             else:
                 print(f"        → No energies/efficiencies found, skipping plot...")
 
@@ -552,7 +559,8 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
 
     # 2D Histogram for all clusters
     plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
-                             category_name="All Clusters (Job Level)", file_name=None, num_events=num_events_total)
+                             category_name="All Clusters (Job Level)", file_name=None, num_events=num_events_total,
+                             num_clusters=len(energies))
 
     # Build category info from job_metadata_list if provided, otherwise use cluster_category_results
     category_info_source = None
@@ -613,7 +621,8 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
             if category_energies:
                 print(f"      → Drawing 2D plot for {category_label}...")
                 plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
-                                         category_name=category_label, file_name=None, num_events=num_events_total)
+                                         category_name=category_label, file_name=None, num_events=num_events_total,
+                                         num_clusters=len(category_energies))
             else:
                 print(f"      → No energies/efficiencies found, skipping plot...")
 

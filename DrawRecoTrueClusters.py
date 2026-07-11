@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from pathlib import Path
+from scipy.spatial import KDTree
 
 def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
     """Draw true and reco clusters in XZ projection for comparison."""
@@ -154,11 +155,17 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
    # plt.show(block=False)
     plt.close()
 
-def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, output_dir, event, apa, file_name=None):
+def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, output_dir, event, apa, file_name=None,
+                                    radius_efficiency=1, min_recopoints_threshold=5):
     """
     Draw a single true cluster with all its matched reco clusters (1-to-many).
     True cluster in red, matched reco clusters in distinct colors.
     Shows efficiency/purity values in legend. Zooms to true cluster bounds ±30%.
+    A second row of views below shows only the true points that did not match
+    any reco cluster (i.e. the points that were missed in the efficiency estimation).
+    A true point is considered matched if, for at least one matched reco cluster,
+    it has more than `min_recopoints_threshold` reco points within `radius_efficiency`
+    - mirrors the per-point criterion used in EvaluateEfficiency.
 
     Parameters:
     - matched_info: Dict from MatchTruetoReco_OneToMany with keys:
@@ -176,10 +183,15 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
         return
 
     true_points = np.array(clusters_true[true_cid])
+    true_coords = true_points[:, :3]
     marker_size = 1
     colors = ['blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'pink']
 
-    fig, (ax_xz, ax_yz, ax_xy) = plt.subplots(1, 3, figsize=(24, 6))
+    fig, ((ax_xz, ax_yz, ax_xy), (ax_missed_xz, ax_missed_yz, ax_missed_xy)) = plt.subplots(
+        2, 3, figsize=(24, 12), sharex='col', sharey='col')
+
+    # Track which true points matched at least one reco cluster (same criterion as EvaluateEfficiency)
+    matched_mask = np.zeros(len(true_points), dtype=bool)
 
     # Plot each matched reco cluster with different colors (first)
     for idx, reco_info in enumerate(matched_reco_list):
@@ -191,23 +203,40 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
             continue
 
         reco_points = np.array(clusters_reco[reco_cid])
+        reco_coords = reco_points[:, :3]
         color       = colors[idx % len(colors)]
         label       = f'Reco ID={reco_cid:.0f} (ε={eff:.2f}, p={pur:.2f})'
 
-        ax_xz.scatter(reco_points[:, 0], reco_points[:, 2], c=color, s=marker_size, alpha=0.7,
+        ax_xz.scatter(reco_points[:, 2], reco_points[:, 0], c=color, s=marker_size, alpha=0.7,
                       label=label)
-        ax_yz.scatter(reco_points[:, 1], reco_points[:, 2], c=color, s=marker_size, alpha=0.7,
+        ax_yz.scatter(reco_points[:, 2], reco_points[:, 1], c=color, s=marker_size, alpha=0.7,
                       label=label)
         ax_xy.scatter(reco_points[:, 0], reco_points[:, 1], c=color, s=marker_size, alpha=0.7,
                       label=label)
 
+        reco_tree = KDTree(reco_coords)
+        neighbors = reco_tree.query_ball_point(true_coords, r=radius_efficiency)
+        matched_mask |= np.array([len(n) > min_recopoints_threshold for n in neighbors])
+
+    missed_points = true_points[~matched_mask]
+    
     # Plot true cluster (red) on top of reco clusters
-    ax_xz.scatter(true_points[:, 0], true_points[:, 2], c='red', s=marker_size, alpha=0.8,
+    ax_xz.scatter(true_points[:, 2], true_points[:, 0], c='red', s=marker_size, alpha=0.8,
                   label=f'True ID={true_cid:.0f}', zorder=10)
-    ax_yz.scatter(true_points[:, 1], true_points[:, 2], c='red', s=marker_size, alpha=0.8,
+    ax_yz.scatter(true_points[:, 2], true_points[:, 1], c='red', s=marker_size, alpha=0.8,
                   label=f'True ID={true_cid:.0f}', zorder=10)
     ax_xy.scatter(true_points[:, 0], true_points[:, 1], c='red', s=marker_size, alpha=0.8,
                   label=f'True ID={true_cid:.0f}', zorder=10)
+
+    # Plot only the missed (unmatched) true points on the second row
+    if len(missed_points) > 0:
+        missed_label = f'True ID={true_cid:.0f} (missed, {len(missed_points)}/{len(true_points)} pts)'
+        ax_missed_xz.scatter(missed_points[:, 2], missed_points[:, 0], c='red', s=marker_size, alpha=0.8,
+                              label=missed_label)
+        ax_missed_yz.scatter(missed_points[:, 2], missed_points[:, 1], c='red', s=marker_size, alpha=0.8,
+                              label=missed_label)
+        ax_missed_xy.scatter(missed_points[:, 0], missed_points[:, 1], c='red', s=marker_size, alpha=0.8,
+                              label=missed_label)
 
     # Calculate zoom bounds: 30% padding on all sides of true cluster
     x_min, x_max = true_points[:, 0].min(), true_points[:, 0].max()
@@ -223,10 +252,10 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     z_lim = [z_min - z_pad, z_max + z_pad]
 
     # XZ projection
-    ax_xz.set_xlim(x_lim)
-    ax_xz.set_ylim(z_lim)
-    ax_xz.set_xlabel('X [cm]', fontsize=12, fontweight='bold')
-    ax_xz.set_ylabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax_xz.set_xlim(z_lim)
+    ax_xz.set_ylim(x_lim)
+    ax_xz.set_xlabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax_xz.set_ylabel('X [cm]', fontsize=12, fontweight='bold')
     xz_title = f'True Cluster {true_cid:.0f} with Matched Reco (XZ) - Event {event}, {apa}'
     if file_name:
         xz_title += f' ({file_name})'
@@ -235,10 +264,10 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     ax_xz.grid(True, linestyle='--', alpha=0.3)
 
     # YZ projection
-    ax_yz.set_xlim(y_lim)
-    ax_yz.set_ylim(z_lim)
-    ax_yz.set_xlabel('Y [cm]', fontsize=12, fontweight='bold')
-    ax_yz.set_ylabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax_yz.set_xlim(z_lim)
+    ax_yz.set_ylim(y_lim)
+    ax_yz.set_xlabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax_yz.set_ylabel('Y [cm]', fontsize=12, fontweight='bold')
     yz_title = f'True Cluster {true_cid:.0f} with Matched Reco (YZ) - Event {event}, {apa}'
     if file_name:
         yz_title += f' ({file_name})'
@@ -257,8 +286,49 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     ax_xy.set_title(xy_title, fontsize=12, fontweight='bold')
     ax_xy.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_xy.grid(True, linestyle='--', alpha=0.3)
+
+    # Missed XZ projection
+    ax_missed_xz.set_xlim(z_lim)
+    ax_missed_xz.set_ylim(x_lim)
+    ax_missed_xz.set_xlabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax_missed_xz.set_ylabel('X [cm]', fontsize=12, fontweight='bold')
+    missed_xz_title = f'True Cluster {true_cid:.0f} Missed Points (XZ) - Event {event}, {apa}'
+    if file_name:
+        missed_xz_title += f' ({file_name})'
+    ax_missed_xz.set_title(missed_xz_title, fontsize=12, fontweight='bold')
+    if len(missed_points) > 0:
+        ax_missed_xz.legend(fontsize=18, loc='upper right', framealpha=0.9)
+    ax_missed_xz.grid(True, linestyle='--', alpha=0.3)
+
+    # Missed YZ projection
+    ax_missed_yz.set_xlim(z_lim)
+    ax_missed_yz.set_ylim(y_lim)
+    ax_missed_yz.set_xlabel('Z [cm]', fontsize=12, fontweight='bold')
+    ax_missed_yz.set_ylabel('Y [cm]', fontsize=12, fontweight='bold')
+    missed_yz_title = f'True Cluster {true_cid:.0f} Missed Points (YZ) - Event {event}, {apa}'
+    if file_name:
+        missed_yz_title += f' ({file_name})'
+    ax_missed_yz.set_title(missed_yz_title, fontsize=12, fontweight='bold')
+    if len(missed_points) > 0:
+        ax_missed_yz.legend(fontsize=18, loc='upper right', framealpha=0.9)
+    ax_missed_yz.grid(True, linestyle='--', alpha=0.3)
+
+    # Missed XY projection
+    ax_missed_xy.set_xlim(x_lim)
+    ax_missed_xy.set_ylim(y_lim)
+    ax_missed_xy.set_xlabel('X [cm]', fontsize=12, fontweight='bold')
+    ax_missed_xy.set_ylabel('Y [cm]', fontsize=12, fontweight='bold')
+    missed_xy_title = f'True Cluster {true_cid:.0f} Missed Points (XY) - Event {event}, {apa}'
+    if file_name:
+        missed_xy_title += f' ({file_name})'
+    ax_missed_xy.set_title(missed_xy_title, fontsize=12, fontweight='bold')
+    if len(missed_points) > 0:
+        ax_missed_xy.legend(fontsize=18, loc='upper right', framealpha=0.9)
+    ax_missed_xy.grid(True, linestyle='--', alpha=0.3)
+
     plt.tight_layout()
-    plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_with_reco_event_{event}_{apa}_XY.png",
+    reco_ids_str = '_'.join(f"{r['reco_cluster_id']:.0f}" for r in matched_reco_list)
+    plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_with_reco_{reco_ids_str}_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
    # plt.show(block=False)
     plt.close()
@@ -444,6 +514,126 @@ def DrawLabels(true_clusters, event, apa, PLOTDIR_EVT, file_name=None):
     plt.tight_layout()
     plt.savefig(PLOTDIR_EVT / f"true_clusters_by_type_event{event}_apa_{apa}.png", dpi=100, bbox_inches='tight')
     plt.close()
+
+def _count_cluster_types(metadata_list):
+    """
+    Count neutrino vs cosmic true clusters, and cosmic sub-categories, from a metadata list
+    produced by add_metadata_true_clusters (one entry per true cluster per event).
+    Also returns the number of unique events represented in the list.
+    """
+    neutrino_count = sum(1 for m in metadata_list if m['cluster_type'] == 'neutrino')
+    cosmic_count   = sum(1 for m in metadata_list if m['cluster_type'] == 'cosmic')
+
+    cosmic_categories = {'isochronous': 0, 'normal': 0, 'prolonged': 0}
+    for m in metadata_list:
+        if m['cluster_type'] == 'cosmic':
+            cosmic_categories[m['cluster_category']] = cosmic_categories.get(m['cluster_category'], 0) + 1
+
+    num_events = len(set(m['event'] for m in metadata_list))
+    return neutrino_count, cosmic_count, cosmic_categories, num_events
+
+def _draw_neutrino_cosmic_bar(metadata_list, output_dir, apa, level_name, filename_prefix, file_name=None):
+    """
+    Bar chart of neutrino vs cosmic true cluster counts, aggregated over many events
+    (file level or job level).
+    """
+    if not metadata_list:
+        return
+
+    neutrino_count, cosmic_count, _, num_events = _count_cluster_types(metadata_list)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    categories = ['Neutrino', 'Cosmic']
+    counts     = [neutrino_count, cosmic_count]
+    colors     = ['red', 'blue']
+
+    bars = ax.bar(categories, counts, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
+
+    ax.set_ylabel('Number of True Clusters', fontsize=12, fontweight='bold')
+    ax.set_xlabel('Cluster Type', fontsize=12, fontweight='bold')
+    title = f'True Clusters by Type - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"true_clusters_by_type_{filename_prefix}_{num_events}events_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+def _draw_cosmic_category_bar(metadata_list, output_dir, apa, level_name, filename_prefix, file_name=None):
+    """
+    Bar chart of cosmic true cluster sub-categories (isochronous, normal, prolonged),
+    aggregated over many events (file level or job level).
+    """
+    if not metadata_list:
+        return
+
+    _, cosmic_count, cosmic_categories, num_events = _count_cluster_types(metadata_list)
+    if cosmic_count == 0:
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    categories = ['Isochronous', 'Normal', 'Prolonged']
+    counts     = [cosmic_categories['isochronous'], cosmic_categories['normal'], cosmic_categories['prolonged']]
+    colors     = ['orange', 'green', 'purple']
+
+    bars = ax.bar(categories, counts, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
+
+    ax.set_ylabel('Number of Cosmic True Clusters', fontsize=12, fontweight='bold')
+    ax.set_xlabel('Cosmic Track Category', fontsize=12, fontweight='bold')
+    title = f'Cosmic Clusters by Category - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"cosmic_clusters_by_category_{filename_prefix}_{num_events}events_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+def DrawLabelPerFile(file_metadata_list, output_dir, apa, file_name=None):
+    """
+    File-level version of DrawLabels. Draws two bar charts aggregated over all events in a file:
+    1. Neutrino vs cosmic true cluster counts.
+    2. Cosmic true clusters broken down into isochronous, normal, and prolonged categories.
+
+    Parameters:
+    - file_metadata_list: List of per-true-cluster metadata dicts from add_metadata_true_clusters,
+      with keys 'event', 'cluster_type' ('neutrino'/'cosmic'), 'cluster_category'
+      ('isochronous'/'normal'/'prolonged')
+    - output_dir: Output directory
+    - apa: APA identifier
+    - file_name: Optional file name for title
+    """
+    _draw_neutrino_cosmic_bar(file_metadata_list, output_dir, apa, 'File Level', 'file', file_name=file_name)
+    _draw_cosmic_category_bar(file_metadata_list, output_dir, apa, 'File Level', 'file', file_name=file_name)
+
+def DrawLabelPerJob(job_metadata_list, output_dir, apa):
+    """
+    Job-level version of DrawLabels. Draws two bar charts aggregated over all events across all files:
+    1. Neutrino vs cosmic true cluster counts.
+    2. Cosmic true clusters broken down into isochronous, normal, and prolonged categories.
+
+    Parameters:
+    - job_metadata_list: List of per-true-cluster metadata dicts from add_metadata_true_clusters,
+      with keys 'event', 'cluster_type' ('neutrino'/'cosmic'), 'cluster_category'
+      ('isochronous'/'normal'/'prolonged')
+    - output_dir: Output directory
+    - apa: APA identifier
+    """
+    _draw_neutrino_cosmic_bar(job_metadata_list, output_dir, apa, 'Job Level', 'job')
+    _draw_cosmic_category_bar(job_metadata_list, output_dir, apa, 'Job Level', 'job')
 
 def DrawTrueClusterWithDeadArea(true_cluster_points_full, deadarea_polygons, cluster_id, event, apa, output_dir, file_name=None):
     """

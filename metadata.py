@@ -76,7 +76,7 @@ def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results,
     Args:
         matched_pairs: List of matched pair dictionaries from MatchTrueToReco1to1, each
             containing true_cluster_id, reco_cluster_id, efficiency_energy_weighted, purity,
-            and total_true_cluster_energy
+            total_true_cluster_energy, and total_reco_cluster_charge
         cluster_category_results: Dictionary mapping cluster IDs to category info (is_neutrino, track_type)
         file_name: Name of the input file (e.g., "file1")
         event: Event number
@@ -120,7 +120,8 @@ def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results,
             'cluster_category': track_type,  # isochronous, prolonged, normal (only for cosmic)
             'efficiency': pair.get('efficiency_energy_weighted', 0),
             'purity': pair.get('purity', 0),
-            'total_true_energy': pair.get('total_true_cluster_energy', 0)
+            'total_true_energy': pair.get('total_true_cluster_energy', 0),
+            'total_reco_charge': pair.get('total_reco_cluster_charge', 0)
         }
 
         metadata_list.append(metadata)

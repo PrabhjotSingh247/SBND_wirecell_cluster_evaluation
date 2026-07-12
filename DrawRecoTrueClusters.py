@@ -715,6 +715,62 @@ def DrawTrueRecoMatchMultiplicity(metadata_list, output_dir, apa, level_name, fi
         _draw_match_multiplicity_bar(category_metadata, output_dir, apa, level_name, filename_prefix,
                                      category_label, category_suffix, bar_color, file_name=file_name)
 
+    # Write lookup text files for true clusters with a reco-match count other than 1
+    _write_non_one_match_clusters(metadata_list, output_dir, level_name, filename_prefix, apa, file_name=file_name)
+
+def _write_non_one_match_clusters(metadata_list, output_dir, level_name, filename_prefix, apa, file_name=None):
+    """
+    Write true clusters whose reco-match count is not exactly 1 (i.e. 0, 2, 3, 4, 5, or 5+)
+    to text files for later lookup when inspecting cluster plots. Separate files are written
+    for neutrino clusters and for all cosmic clusters; the cosmic file additionally lists each
+    cluster's cosmic sub-category (isochronous, normal, prolonged).
+
+    Match count is corrected the same way as the multiplicity bar charts: a true cluster with
+    total_efficiency <= 0 (unmatched, 8888 sentinel) counts as 0 matches rather than the raw
+    num_reco_matches value of 1.
+    """
+    if not metadata_list:
+        return
+
+    def _corrected_count(m):
+        return 0 if m['total_efficiency'] <= 0 else m['num_reco_matches']
+
+    flagged = [m for m in metadata_list if _corrected_count(m) != 1]
+    if not flagged:
+        return
+
+    num_events = len(set(m['event'] for m in metadata_list))
+    multiplicity_dir = output_dir / "true_reco_matched_multiplicity"
+    multiplicity_dir.mkdir(parents=True, exist_ok=True)
+
+    def _header(category_label):
+        lines = [
+            f"{category_label} True Clusters with Reco-Match Count != 1",
+            f"Level: {level_name}, {apa}, {num_events} events" + (f" ({file_name})" if file_name else ""),
+            "=" * 80,
+        ]
+        return lines
+
+    # Neutrino clusters
+    neutrino_flagged = [m for m in flagged if m['cluster_type'] == 'neutrino']
+    if neutrino_flagged:
+        lines = _header("Neutrino")
+        lines.append(f"{'event':<20}{'true_cluster_id':<18}{'num_reco_matches':<18}")
+        for m in sorted(neutrino_flagged, key=lambda m: (str(m['event']), m['true_cluster_id'])):
+            lines.append(f"{str(m['event']):<20}{m['true_cluster_id']:<18.0f}{_corrected_count(m):<18}")
+        with open(multiplicity_dir / f"non_one_match_neutrino_{filename_prefix}_{apa}.txt", 'w') as f:
+            f.write('\n'.join(lines) + '\n')
+
+    # All cosmic clusters, with sub-category (isochronous/normal/prolonged) noted
+    cosmic_flagged = [m for m in flagged if m['cluster_type'] == 'cosmic']
+    if cosmic_flagged:
+        lines = _header("Cosmic")
+        lines.append(f"{'event':<20}{'true_cluster_id':<18}{'num_reco_matches':<18}{'cosmic_category':<15}")
+        for m in sorted(cosmic_flagged, key=lambda m: (m['cluster_category'], str(m['event']), m['true_cluster_id'])):
+            lines.append(f"{str(m['event']):<20}{m['true_cluster_id']:<18.0f}{_corrected_count(m):<18}{m['cluster_category']:<15}")
+        with open(multiplicity_dir / f"non_one_match_cosmic_{filename_prefix}_{apa}.txt", 'w') as f:
+            f.write('\n'.join(lines) + '\n')
+
 def DrawTrueClusterWithDeadArea(true_cluster_points_full, deadarea_polygons, cluster_id, event, apa, output_dir, file_name=None):
     """
     Draw full true cluster in YZ projection with dead area regions overlaid.

@@ -1,29 +1,29 @@
 import pandas as pd
 
 
-def MatchRecoTruePair1to1(all_purity_results, all_eff_results):
+def MatchTrueToReco1to1(efficiency_results, purity_results):
     """
-    One-to-one matching between true and reco clusters.
-    For each true cluster, finds the reco cluster with highest purity.
-    For each reco cluster, keeps only the true cluster with highest purity.
+    One-to-one matching from true clusters to reco clusters.
+    For each true cluster with non-zero efficiency to exactly one reco cluster, that pair is the match.
+    For each true cluster with non-zero efficiency to more than one reco cluster, the reco cluster
+    with the highest efficiency is selected as the match.
+    (No reco-side deduplication: a single reco cluster may end up paired with more than one true cluster.)
     """
-    purity_df       = pd.DataFrame(all_purity_results)
-    efficiency_df   = pd.DataFrame(all_eff_results)
+    efficiency_df   = pd.DataFrame(efficiency_results)
+    purity_df       = pd.DataFrame(purity_results)
 
-    merged_df       = pd.merge(purity_df, efficiency_df, on=['event', 'true_cluster_id', 'reco_cluster_id'])
-    matched_pairs   = merged_df[merged_df['efficiency'] > 0]
+    merged_df       = pd.merge(efficiency_df, purity_df, on=['event', 'true_cluster_id', 'reco_cluster_id'])
+    matched_pairs   = merged_df[merged_df['efficiency_energy_weighted'] > 0]
 
-    # For each (event, true_cluster), find the reco_cluster with highest purity
-    best_matched_eff = matched_pairs.loc[matched_pairs.groupby(['event', 'true_cluster_id'])['efficiency'].idxmax()]
+    if matched_pairs.empty:
+        print("Found 0 matched pairs of true and reco clusters (1-to-1)")
+        return []
 
-    # For each (event, reco_cluster), keep only the true_cluster with highest purity
-    final_matched_pairs = []
-    for (event, reco_cluster_id), group in best_matched_eff.groupby(['event', 'reco_cluster_id']):
-        best_pair = group.loc[group['purity'].idxmax()]
-        final_matched_pairs.append(best_pair)
+    # For each (event, true_cluster), find the reco_cluster with highest efficiency
+    best_matched = matched_pairs.loc[matched_pairs.groupby(['event', 'true_cluster_id'])['efficiency_energy_weighted'].idxmax()]
 
-    print(f"Found {len(final_matched_pairs)} matched pairs of true and reco clusters (1-to-1)")
-    return final_matched_pairs
+    print(f"Found {len(best_matched)} matched pairs of true and reco clusters (1-to-1)")
+    return best_matched.to_dict('records')
 
 
 def MatchTruetoReco_OneToMany(all_purity_results, all_eff_results):

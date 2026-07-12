@@ -635,6 +635,86 @@ def DrawLabelPerJob(job_metadata_list, output_dir, apa):
     _draw_neutrino_cosmic_bar(job_metadata_list, output_dir, apa, 'Job Level', 'job')
     _draw_cosmic_category_bar(job_metadata_list, output_dir, apa, 'Job Level', 'job')
 
+def _draw_match_multiplicity_bar(metadata_list, output_dir, apa, level_name, filename_prefix,
+                                 category_label, category_suffix, bar_color, file_name=None):
+    """
+    Single bar chart of true-reco match multiplicity for one cluster category.
+    Bins: 0 (unmatched), 1, 2, 3, 4, 5, and 5+ (more than 5) matched reco clusters.
+    Unmatched true clusters (total_efficiency == 0, whose single metadata entry is the
+    8888 sentinel) fill the '0' bin.
+    """
+    if not metadata_list:
+        return
+
+    num_events = len(set(m['event'] for m in metadata_list))
+
+    bin_labels = ['0', '1', '2', '3', '4', '5', '5+']
+    counts     = [0] * len(bin_labels)
+    for m in metadata_list:
+        if m['total_efficiency'] <= 0:
+            counts[0] += 1
+        elif m['num_reco_matches'] <= 5:
+            counts[m['num_reco_matches']] += 1
+        else:
+            counts[6] += 1
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bars = ax.bar(bin_labels, counts, color=bar_color, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
+
+    ax.set_ylabel('Number of True Clusters', fontsize=12, fontweight='bold')
+    ax.set_xlabel('Number of Matched Reco Clusters', fontsize=12, fontweight='bold')
+    title = f'True-Reco Match Multiplicity ({category_label}) - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    multiplicity_dir = output_dir / "true_reco_matched_multiplicity"
+    multiplicity_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(multiplicity_dir / f"true_reco_match_multiplicity_{category_suffix}_{filename_prefix}_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+def DrawTrueRecoMatchMultiplicity(metadata_list, output_dir, apa, level_name, filename_prefix, file_name=None):
+    """
+    Bar charts of how many true clusters match to how many reco clusters, using the
+    per-true-cluster metadata from add_metadata_true_clusters ('num_reco_matches' key).
+    Bins: 0 (unmatched), 1, 2, 3, 4, 5, and 5+ (more than 5) matched reco clusters.
+
+    Draws one chart for all clusters, plus separate charts for neutrino clusters,
+    all cosmic clusters, and each cosmic sub-category (isochronous, normal, prolonged).
+    Categories with no clusters are skipped.
+
+    Parameters:
+    - metadata_list: List of per-true-cluster metadata dicts from add_metadata_true_clusters
+    - output_dir: Output directory
+    - apa: APA identifier
+    - level_name: Label for the title (e.g. 'Event 5', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_5', 'file', 'job')
+    - file_name: Optional input file name for title
+    """
+    if not metadata_list:
+        return
+
+    categories = [
+        ('All Clusters',       'all',                lambda m: True,                                                                     'steelblue'),
+        ('Neutrino',           'neutrino',           lambda m: m['cluster_type'] == 'neutrino',                                          'red'),
+        ('All Cosmics',        'cosmic',             lambda m: m['cluster_type'] == 'cosmic',                                            'blue'),
+        ('Isochronous Cosmic', 'isochronous_cosmic', lambda m: m['cluster_type'] == 'cosmic' and m['cluster_category'] == 'isochronous', 'orange'),
+        ('Normal Cosmic',      'normal_cosmic',      lambda m: m['cluster_type'] == 'cosmic' and m['cluster_category'] == 'normal',      'green'),
+        ('Prolonged Cosmic',   'prolonged_cosmic',   lambda m: m['cluster_type'] == 'cosmic' and m['cluster_category'] == 'prolonged',   'purple'),
+    ]
+
+    for category_label, category_suffix, selector, bar_color in categories:
+        category_metadata = [m for m in metadata_list if selector(m)]
+        _draw_match_multiplicity_bar(category_metadata, output_dir, apa, level_name, filename_prefix,
+                                     category_label, category_suffix, bar_color, file_name=file_name)
+
 def DrawTrueClusterWithDeadArea(true_cluster_points_full, deadarea_polygons, cluster_id, event, apa, output_dir, file_name=None):
     """
     Draw full true cluster in YZ projection with dead area regions overlaid.

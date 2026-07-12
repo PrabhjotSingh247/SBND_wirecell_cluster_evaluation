@@ -69,6 +69,65 @@ def add_metadata_true_clusters(efficiency_results, cluster_category_results, fil
     return metadata_list
 
 
+def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results, file_name, event, apa, view, event_key=None):
+    """
+    Create metadata for each matched true-reco cluster pair (1-to-1 matching).
+
+    Args:
+        matched_pairs: List of matched pair dictionaries from MatchTrueToReco1to1, each
+            containing true_cluster_id, reco_cluster_id, efficiency_energy_weighted, purity,
+            and total_true_cluster_energy
+        cluster_category_results: Dictionary mapping cluster IDs to category info (is_neutrino, track_type)
+        file_name: Name of the input file (e.g., "file1")
+        event: Event number
+        apa: APA number (e.g., "APA0")
+        view: View type (e.g., "2view", "3view")
+        event_key: Full event key like "file1_0" (if None, will be constructed from file_name and event)
+
+    Returns:
+        List of metadata dictionaries, one per matched true-reco pair
+    """
+    # Construct full event_key if not provided
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+    if not matched_pairs:
+        return []
+
+    metadata_list = []
+
+    for pair in matched_pairs:
+        true_cid = pair['true_cluster_id']
+        reco_cid = pair['reco_cluster_id']
+
+        # Get category information
+        category_info = cluster_category_results.get(true_cid, {})
+        is_neutrino = category_info.get('is_neutrino', False)
+        track_type = category_info.get('track_type', 'normal')
+
+        # Determine cluster type
+        cluster_type = 'neutrino' if is_neutrino else 'cosmic'
+
+        # Create metadata dictionary
+        metadata = {
+            'file_name': file_name,
+            'event': event_key,  # Store the full event_key (e.g., "file1_0") for proper matching
+            'event_num': event,  # Also store the event number for reference
+            'apa': apa,
+            'view': view,
+            'true_cluster_id': true_cid,
+            'reco_cluster_id': reco_cid,
+            'cluster_type': cluster_type,  # neutrino or cosmic
+            'cluster_category': track_type,  # isochronous, prolonged, normal (only for cosmic)
+            'efficiency': pair.get('efficiency_energy_weighted', 0),
+            'purity': pair.get('purity', 0),
+            'total_true_energy': pair.get('total_true_cluster_energy', 0)
+        }
+
+        metadata_list.append(metadata)
+
+    return metadata_list
+
+
 def aggregate_metadata(metadata_list):
     """
     Aggregate metadata entries across multiple events/files.

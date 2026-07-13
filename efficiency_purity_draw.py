@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import seaborn as sns
 from pathlib import Path
 
@@ -134,6 +135,83 @@ def plot_1d_efficiency_energy(energies, efficiencies, energy_bins):
             bin_centers_nonzero.append(bin_centers[i])
 
     return bin_centers_nonzero, mean_efficiency_per_bin
+
+def plot_2d_purity_charge(charges, purities, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None, num_clusters=None):
+    """
+    Draw 2D histogram of Purity vs Reco Cluster Charge for a cluster category.
+    Returns the charges and purities lists for use in 1D projections.
+
+    Args:
+        charges: List of reco cluster charge values (ADC arbitrary units)
+        purities: List of purity values
+        output_dir: Output directory for saving plots
+        event: Event number (for single event) or 0 (for aggregated data)
+        apa: APA number
+        category_name: Name of cluster category for title
+        file_name: Optional file name for title
+        num_events: Optional number of events aggregated (if provided, shows event count instead of event number)
+        num_clusters: Optional number of reco clusters that went into this plot (shown alongside num_events)
+    """
+    if not charges or not purities:
+        return charges, purities
+
+    plt.figure(figsize=(10, 8))
+    n_xbins = 20
+    xbins = np.linspace(0, max(charges)*1.1, n_xbins+1)
+    y_bin_size = 0.05
+    ybins = np.arange(0, 1 + y_bin_size, y_bin_size)
+
+    plt.hist2d(charges, purities, bins=[xbins, ybins], cmap='YlGnBu')
+    plt.colorbar(label='Count')
+    plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
+    plt.ylabel('Purity', fontsize=12, fontweight='bold')
+
+    # Create title based on whether this is a single event or aggregated data
+    if num_events is not None:
+        title = f'Purity vs Reco Charge (2D) - {category_name} - {num_events} events, {apa}'
+        if num_clusters is not None:
+            title += f', {num_clusters} reco clusters'
+    else:
+        title = f'Purity vs Reco Charge (2D) - {category_name} - Event {event}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.xlim(0, max(charges)*1.1)
+    plt.ylim(-0.05, 1.05)
+
+    # Save with appropriate filename based on category
+    category_suffix = category_name.lower().replace(' ', '_').replace('_clusters', '')
+    if num_events is not None:
+        filename = f"purity_vs_reco_charge_2d_{category_suffix}_{num_events}events_{apa}.png"
+        if num_clusters is not None:
+            filename = f"purity_vs_reco_charge_2d_{category_suffix}_{num_events}events_{num_clusters}recoclusters_{apa}.png"
+    else:
+        filename = f"purity_vs_reco_charge_2d_{category_suffix}_event_{event}_{apa}.png"
+    plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+    return charges, purities
+
+def plot_1d_purity_charge(charges, purities, charge_bins):
+    """
+    Create 1D projection by binning reco cluster charge and averaging purity values.
+    Returns bin centers and mean purities for plotting.
+    """
+    if not charges or not purities:
+        return [], []
+
+    bin_centers = (charge_bins[:-1] + charge_bins[1:]) / 2
+    bin_centers_nonzero = []
+    mean_purity_per_bin = []
+
+    for i in range(len(charge_bins)-1):
+        mask = (np.array(charges) >= charge_bins[i]) & (np.array(charges) < charge_bins[i+1])
+        if np.sum(mask) > 0:
+            mean_pur = np.mean(np.array(purities)[mask])
+            mean_purity_per_bin.append(mean_pur)
+            bin_centers_nonzero.append(bin_centers[i])
+
+    return bin_centers_nonzero, mean_purity_per_bin
 
 def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, apa, file_name=None, cluster_category_results=None):
     """
@@ -1035,65 +1113,61 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa)
     plt.close()
 
 
-def DrawPurityVsRecoChargePerEvent(purity_results, output_dir, event, apa, file_name=None):
+def DrawPurityVsRecoChargePerEvent(pair_metadata_list, output_dir, event, apa, file_name=None):
     """
-    For each reco cluster: plot purity vs reco charge (2D and 1D).
+    For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster): plot purity
+    vs reco cluster charge (2D and 1D). The purity value is the one corresponding to the
+    highest-efficiency reco cluster matched to each true cluster.
+    Draws plots for all clusters and broken down by cluster category
+    (neutrino, all cosmics, isochronous/normal/prolonged cosmic).
     """
-    if not purity_results:
+    if not pair_metadata_list:
         return
 
-    charges = []
-    purities = []
+    def _in_category(metadata, category_key):
+        if category_key == 'neutrino':
+            return metadata['cluster_type'] == 'neutrino'
+        if category_key == 'cosmic':
+            return metadata['cluster_type'] == 'cosmic'
+        return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
 
-    for pur in purity_results:
-        if pur['reco_cluster_id'] == 8888:  # Skip unmatched sentinel
-            continue
-        charges.append(pur.get('total_reco_cluster_charge', 0))
-        purities.append(pur['purity'])
+    charges  = [m['total_reco_charge'] for m in pair_metadata_list]
+    purities = [m['purity'] for m in pair_metadata_list]
 
     if not charges:
         return
 
-    # 2D Histogram
-    plt.figure(figsize=(10, 8))
-    plt.hist2d(charges, purities, bins=20, cmap='YlGnBu')
-    plt.colorbar(label='Count')
-    plt.xlabel('Reco Cluster Charge', fontsize=12, fontweight='bold')
-    plt.ylabel('Purity', fontsize=12, fontweight='bold')
-    title = f'Purity vs Reco Charge (2D) - Event {event}, {apa}'
-    if file_name:
-        title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
-    plt.savefig(output_dir / f"purity_vs_reco_charge_2d_event_{event}_{apa}.png",
-                dpi=100, bbox_inches='tight', pad_inches=0.3)
-    ##plt.show(block=False)
-    plt.close()
+    # 2D Histogram for all clusters
+    plot_2d_purity_charge(charges, purities, output_dir, event, apa,
+                          category_name="All Clusters", file_name=file_name)
 
-    # 1D Projection with binned scatter points connected by lines
-    plt.figure(figsize=(12, 6))
+    # 2D plots by category
+    category_styles = {
+        'neutrino': 'Neutrino Clusters',
+        'cosmic': 'All Cosmic Clusters',
+        'isochronous_cosmic': 'Isochronous Cosmic Clusters',
+        'normal_cosmic': 'Normal Cosmic Clusters',
+        'prolonged_cosmic': 'Prolonged Cosmic Clusters'
+    }
 
+    for category_key, category_label in category_styles.items():
+        category_entries = [m for m in pair_metadata_list if _in_category(m, category_key)]
+        if not category_entries:
+            continue
+
+        category_charges  = [m['total_reco_charge'] for m in category_entries]
+        category_purities = [m['purity'] for m in category_entries]
+        plot_2d_purity_charge(category_charges, category_purities, output_dir, event, apa,
+                              category_name=category_label, file_name=file_name)
+
+    # Setup binning for 1D projections
     n_bins = 15
-    if charges:
-        charge_bins = np.linspace(0, max(charges)*1.1, n_bins+1)
-    else:
-        charge_bins = np.linspace(0, 10, n_bins+1)
+    charge_bins = np.linspace(0, max(charges)*1.1, n_bins+1)
 
-    bin_centers = (charge_bins[:-1] + charge_bins[1:]) / 2
-    mean_purity_per_bin = []
-    bin_counts = []
+    # 1D Plot 1: All clusters (separate canvas)
+    bin_centers, mean_purity_per_bin = plot_1d_purity_charge(charges, purities, charge_bins)
 
-    if charges:
-        for i in range(len(charge_bins)-1):
-            mask = (np.array(charges) >= charge_bins[i]) & (np.array(charges) < charge_bins[i+1])
-            if np.sum(mask) > 0:
-                mean_pur = np.mean(np.array(purities)[mask])
-                count = np.sum(mask)
-                mean_purity_per_bin.append(mean_pur)
-                bin_counts.append(count)
-            else:
-                mean_purity_per_bin.append(0)
-                bin_counts.append(0)
-
+    plt.figure(figsize=(12, 6))
     if len(bin_centers) > 0:
         plt.plot(bin_centers, mean_purity_per_bin, 'o-', linewidth=2, markersize=10,
                 color='darkred', label='Mean Purity per Bin', markeredgecolor='black', markeredgewidth=1)
@@ -1106,9 +1180,183 @@ def DrawPurityVsRecoChargePerEvent(purity_results, output_dir, event, apa, file_
     plt.title(title, fontsize=12, fontweight='bold')
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
+    plt.xlim(0, max(charges)*1.1)
+    plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"purity_vs_reco_charge_1d_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plot 2: By category
+    plt.figure(figsize=(14, 7))
+
+    category_info = {
+        'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple', 'marker': 'D'},
+        'cosmic': {'label': 'All Cosmics', 'color': 'black', 'marker': 'v'},
+        'isochronous_cosmic': {'label': 'Isochronous Cosmic', 'color': 'red', 'marker': 'o'},
+        'normal_cosmic': {'label': 'Normal Cosmic', 'color': 'green', 'marker': 's'},
+        'prolonged_cosmic': {'label': 'Prolonged Cosmic', 'color': 'blue', 'marker': '^'}
+    }
+
+    for category_key, info in category_info.items():
+        category_entries = [m for m in pair_metadata_list if _in_category(m, category_key)]
+        if not category_entries:
+            continue
+
+        category_charges  = [m['total_reco_charge'] for m in category_entries]
+        category_purities = [m['purity'] for m in category_entries]
+
+        bin_centers_cat, mean_pur_cat = plot_1d_purity_charge(category_charges, category_purities, charge_bins)
+        if len(bin_centers_cat) > 0:
+            label_text = f"{info['label']} ({len(category_entries)} clusters)"
+            plt.plot(bin_centers_cat, mean_pur_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
+                    color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
+
+    plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
+    plt.ylabel('Purity', fontsize=12, fontweight='bold')
+    title = f'Purity vs Reco Charge (1D by Category) - Event {event}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, max(charges)*1.1)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / f"purity_vs_reco_charge_1d_by_category_event_{event}_{apa}.png",
+                dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+
+def _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, level_name, filename_suffix, file_name=None):
+    """
+    Shared implementation for file-level and job-level purity vs reco charge plots (2D and 1D),
+    aggregated over many events, using the 1-to-1 true-reco pair metadata. The purity value is
+    the one corresponding to the highest-efficiency reco cluster matched to each true cluster.
+    Draws plots for all clusters and broken down by cluster category
+    (neutrino, all cosmics, isochronous/normal/prolonged cosmic).
+    """
+    if not pair_metadata_list:
+        return
+
+    def _in_category(metadata, category_key):
+        if category_key == 'neutrino':
+            return metadata['cluster_type'] == 'neutrino'
+        if category_key == 'cosmic':
+            return metadata['cluster_type'] == 'cosmic'
+        return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
+
+    num_events = len(set(m['event'] for m in pair_metadata_list))
+
+    charges  = [m['total_reco_charge'] for m in pair_metadata_list]
+    purities = [m['purity'] for m in pair_metadata_list]
+
+    if not charges:
+        return
+
+    # 2D Histogram for all clusters
+    plot_2d_purity_charge(charges, purities, output_dir, 0, apa,
+                          category_name=f"All Clusters ({level_name})", file_name=file_name,
+                          num_events=num_events, num_clusters=len(charges))
+
+    # 2D plots by category
+    category_styles = {
+        'neutrino': 'Neutrino Clusters',
+        'cosmic': 'All Cosmic Clusters',
+        'isochronous_cosmic': 'Isochronous Cosmic Clusters',
+        'normal_cosmic': 'Normal Cosmic Clusters',
+        'prolonged_cosmic': 'Prolonged Cosmic Clusters'
+    }
+
+    for category_key, category_label in category_styles.items():
+        category_entries = [m for m in pair_metadata_list if _in_category(m, category_key)]
+        if not category_entries:
+            continue
+
+        category_charges  = [m['total_reco_charge'] for m in category_entries]
+        category_purities = [m['purity'] for m in category_entries]
+        plot_2d_purity_charge(category_charges, category_purities, output_dir, 0, apa,
+                              category_name=category_label, file_name=file_name,
+                              num_events=num_events, num_clusters=len(category_charges))
+
+    # Setup binning for 1D projections
+    n_bins = 15
+    charge_bins = np.linspace(0, max(charges)*1.1, n_bins+1)
+
+    # 1D Plot 1: All clusters (separate canvas)
+    bin_centers, mean_purity_per_bin = plot_1d_purity_charge(charges, purities, charge_bins)
+
+    plt.figure(figsize=(12, 6))
+    if len(bin_centers) > 0:
+        plt.plot(bin_centers, mean_purity_per_bin, 'o-', linewidth=2, markersize=10,
+                color='darkred', label='Mean Purity per Bin', markeredgecolor='black', markeredgewidth=1)
+
+    plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
+    plt.ylabel('Purity', fontsize=12, fontweight='bold')
+    title = f'Purity vs Reco Charge (1D Projection) - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, max(charges)*1.1)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / f"purity_vs_reco_charge_1d_{filename_suffix}_{apa}.png",
+                dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+    # 1D Plot 2: By category
+    plt.figure(figsize=(14, 7))
+
+    category_info = {
+        'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple', 'marker': 'D'},
+        'cosmic': {'label': 'All Cosmics', 'color': 'black', 'marker': 'v'},
+        'isochronous_cosmic': {'label': 'Isochronous Cosmic', 'color': 'red', 'marker': 'o'},
+        'normal_cosmic': {'label': 'Normal Cosmic', 'color': 'green', 'marker': 's'},
+        'prolonged_cosmic': {'label': 'Prolonged Cosmic', 'color': 'blue', 'marker': '^'}
+    }
+
+    for category_key, info in category_info.items():
+        category_entries = [m for m in pair_metadata_list if _in_category(m, category_key)]
+        if not category_entries:
+            continue
+
+        category_charges  = [m['total_reco_charge'] for m in category_entries]
+        category_purities = [m['purity'] for m in category_entries]
+
+        bin_centers_cat, mean_pur_cat = plot_1d_purity_charge(category_charges, category_purities, charge_bins)
+        if len(bin_centers_cat) > 0:
+            label_text = f"{info['label']} ({len(category_entries)} clusters)"
+            plt.plot(bin_centers_cat, mean_pur_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
+                    color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
+
+    plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
+    plt.ylabel('Purity', fontsize=12, fontweight='bold')
+    title = f'Purity vs Reco Charge (1D by Category) - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, max(charges)*1.1)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / f"purity_vs_reco_charge_1d_by_category_{filename_suffix}_{apa}.png",
+                dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+
+def DrawPurityVsRecoChargePerFile(pair_metadata_list, output_dir, apa, file_name=None):
+    """
+    File-level version: purity vs reco charge (2D and 1D) for all events in a file,
+    using the 1-to-1 true-reco pair metadata, for all clusters and per cluster category.
+    """
+    _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, 'File Level', 'file', file_name=file_name)
+
+
+def DrawPurityVsRecoChargePerJob(pair_metadata_list, output_dir, apa):
+    """
+    Job-level version: purity vs reco charge (2D and 1D) for all events in all files,
+    using the 1-to-1 true-reco pair metadata, for all clusters and per cluster category.
+    """
+    _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, 'Job Level', 'job')
 
 # ============================================================================
 # AGGREGATION FUNCTIONS FOR MULTIPLE EVENTS/FILES/JOB
@@ -1185,49 +1433,202 @@ def DrawMatchedPairsPlots(matched_pairs, output_dir, level_name, apa):
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-def DrawEfficiencyVsPurity_MatchedPairs(true_reco_matched_pairs, output_dir, apa):
-    plt.figure(figsize=(14, 11))
-    plt.scatter([entry['efficiency_energy_weighted'] for entry in true_reco_matched_pairs],
-                [entry['purity'] for entry in true_reco_matched_pairs],
-                color='blue', alpha=0.7, s=100)
+_EFF_PUR_CATEGORY_STYLE = {
+    'neutrino':            {'label': 'Neutrino Clusters',  'color': 'purple', 'marker': 'D'},
+    'cosmic':              {'label': 'All Cosmics',        'color': 'black',  'marker': 'v'},
+    'isochronous_cosmic':  {'label': 'Isochronous Cosmic', 'color': 'red',    'marker': 'o'},
+    'normal_cosmic':       {'label': 'Normal Cosmic',      'color': 'green',  'marker': 's'},
+    'prolonged_cosmic':    {'label': 'Prolonged Cosmic',   'color': 'blue',   'marker': '^'},
+}
 
-    plt.xlim(-0.02, 1.02)
-    plt.ylim(-0.02, 1.02)
-    plt.title(f"Efficiency vs Purity for True-Reco Cluster Pairs ({apa}), {len(true_reco_matched_pairs)} clusters", fontsize=20, fontweight='bold')
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.xlabel('Efficiency', fontsize=20, fontweight='bold')
-    plt.ylabel('Purity', fontsize=20, fontweight='bold')
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    plt.subplots_adjust(left=0.15, right=0.95, top=0.93, bottom=0.12)
-    plt.savefig(output_dir / f"efficiency_vs_purity_{apa}_all_files.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
-    plt.close()
-    # ##plt.show(block=False)
+_UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI = -0.1, 0.0  # bottom-left "no reco match" bin, both axes
 
-# function to draw efficiency vs purity 2D histogram (colz)
+def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_name, apa, file_name=None,
+                                        all_true_metadata_list=None):
+    """
+    Draw purity-vs-efficiency (x=Purity, y=Efficiency) scatter and 2D histogram (colz)
+    plots from 1-to-1 true-reco pair metadata (add_metadata_true_reco_pair_cluster).
+    Used at Event, File, and Job level alike - level_name controls the title/filename,
+    e.g. "Event 5", "File Level", "Job Level".
 
-def DrawEfficiencyVsPurity_MatchedPairsColz(true_reco_matched_pairs, output_dir, apa):
-    efficiency_values = [entry['efficiency_energy_weighted'] for entry in true_reco_matched_pairs]
-    purity_values = [entry['purity'] for entry in true_reco_matched_pairs]
+    True clusters that never matched any reco cluster (present in all_true_metadata_list
+    from add_metadata_true_clusters, but absent from pair_metadata_list) are drawn as
+    points inside a dedicated "no match" bin in the bottom-left corner
+    ([-0.1, 0] x [-0.1, 0]), outlined with a dashed box.
 
-    plt.figure(figsize=(14, 11))
-    h = plt.hist2d(efficiency_values, purity_values, bins=40, cmap='YlOrRd', range=[[0, 1], [0, 1]])
-    cbar = plt.colorbar(h[3], label='Count')
-    cbar.set_label('Count', fontsize=20, fontweight='bold')
-    cbar.ax.tick_params(labelsize=20)
+    Produces:
+      - All Clusters: one scatter plot, one colz plot
+      - Neutrino vs Cosmic: one overlaid scatter plot (2 colors) + separate colz per category
+      - Neutrino + Cosmic-by-type: one overlaid scatter plot (4 colors) + separate colz per category
+      - Cosmic-by-type only (isochronous/normal/prolonged): one overlaid scatter plot (3 colors)
+    """
+    if not pair_metadata_list:
+        return
 
-    plt.xlim(-0.02, 1.02)
-    plt.ylim(-0.02, 1.02)
-    plt.title(f"Efficiency vs Purity 2D Histogram ({apa}), {len(true_reco_matched_pairs)} clusters", fontsize=20, fontweight='bold')
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.xlabel('Efficiency', fontsize=20, fontweight='bold')
-    plt.ylabel('Purity', fontsize=20, fontweight='bold')
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    plt.subplots_adjust(left=0.15, right=0.92, top=0.93, bottom=0.12)
-    plt.savefig(output_dir / f"efficiency_vs_purity_colz_{apa}_all_files.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
-    plt.close()
-    #(block=False)# Function to match true and reco clusters based on purity and efficiency results
+    def _in_category(metadata, category_key):
+        if category_key == 'neutrino':
+            return metadata['cluster_type'] == 'neutrino'
+        if category_key == 'cosmic':
+            return metadata['cluster_type'] == 'cosmic'
+        return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
+
+    # True clusters with no reco match at all: present in all_true_metadata_list but
+    # absent from the 1-to-1 matched pair_metadata_list.
+    if all_true_metadata_list:
+        matched_keys = {(m['event'], m['true_cluster_id']) for m in pair_metadata_list}
+        unmatched_metadata_list = [m for m in all_true_metadata_list
+                                    if (m['event'], m['true_cluster_id']) not in matched_keys]
+    else:
+        unmatched_metadata_list = []
+
+    level_suffix = level_name.lower().replace(' ', '_')
+
+    # Shared across all jitter draws in this call, so unmatched points from
+    # different categories/plots don't land on identical coordinates and hide each other.
+    _jitter_rng = np.random.default_rng(42)
+
+    def _title_suffix():
+        return f' ({file_name})' if file_name else ''
+
+    def _axis_limits():
+        return (_UNMATCHED_BOX_LO - 0.02, 1.02)
+
+    def _jitter_unmatched(n):
+        if n == 0:
+            return np.array([]), np.array([])
+        x = _jitter_rng.uniform(_UNMATCHED_BOX_LO + 0.005, _UNMATCHED_BOX_HI - 0.005, n)
+        y = _jitter_rng.uniform(_UNMATCHED_BOX_LO + 0.005, _UNMATCHED_BOX_HI - 0.005, n)
+        return x, y
+
+    def _draw_unmatched_box():
+        plt.gca().add_patch(Rectangle(
+            (_UNMATCHED_BOX_LO, _UNMATCHED_BOX_LO),
+            _UNMATCHED_BOX_HI - _UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI - _UNMATCHED_BOX_LO,
+            fill=False, edgecolor='gray', linestyle='--', linewidth=1.5))
+
+    def _format_axes():
+        lo, hi = _axis_limits()
+        plt.xlim(lo, hi)
+        plt.ylim(lo, hi)
+        _draw_unmatched_box()
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.xlabel('Purity', fontsize=20, fontweight='bold')
+        plt.ylabel('Efficiency', fontsize=20, fontweight='bold')
+        plt.xticks(fontsize=16)
+        plt.yticks(fontsize=16)
+
+    def _scatter(entries, category_name, filename_tag, unmatched_entries=None, color='blue', marker='o'):
+        unmatched_entries = unmatched_entries or []
+        if not entries and not unmatched_entries:
+            return
+        purities     = [m['purity'] for m in entries]
+        efficiencies = [m['efficiency'] for m in entries]
+
+        plt.figure(figsize=(14, 11))
+        if entries:
+            plt.scatter(purities, efficiencies, color=color, marker=marker, alpha=0.7, s=100, edgecolors='black', linewidth=0.5,
+                        label=f"Matched ({len(entries)})")
+        if unmatched_entries:
+            ux, uy = _jitter_unmatched(len(unmatched_entries))
+            plt.scatter(ux, uy, color='gray', marker='x', alpha=0.8, s=100, linewidth=2,
+                        label=f"Unmatched ({len(unmatched_entries)})")
+
+        total = len(entries) + len(unmatched_entries)
+        plt.title(f"Efficiency vs Purity - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
+                  fontsize=16, fontweight='bold')
+        _format_axes()
+        plt.legend(fontsize=12)
+        plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
+        plt.savefig(output_dir / f"efficiency_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
+                    dpi=150, bbox_inches='tight', pad_inches=0.3)
+        plt.close()
+
+    def _scatter_overlay(category_keys, group_label, filename_tag):
+        entries_by_cat    = {k: [m for m in pair_metadata_list if _in_category(m, k)] for k in category_keys}
+        unmatched_by_cat  = {k: [m for m in unmatched_metadata_list if _in_category(m, k)] for k in category_keys}
+        if not any(entries_by_cat.values()) and not any(unmatched_by_cat.values()):
+            return
+
+        plt.figure(figsize=(14, 11))
+        for category_key in category_keys:
+            info    = _EFF_PUR_CATEGORY_STYLE[category_key]
+            entries = entries_by_cat[category_key]
+            if entries:
+                purities     = [m['purity'] for m in entries]
+                efficiencies = [m['efficiency'] for m in entries]
+                plt.scatter(purities, efficiencies, color=info['color'], marker=info['marker'], alpha=0.6, s=80,
+                            edgecolors='black', linewidth=0.5, label=f"{info['label']} ({len(entries)})")
+
+            unmatched = unmatched_by_cat[category_key]
+            if unmatched:
+                ux, uy = _jitter_unmatched(len(unmatched))
+                plt.scatter(ux, uy, color=info['color'], marker='x', alpha=0.8, s=90, linewidth=2,
+                            label=f"{info['label']} unmatched ({len(unmatched)})")
+
+        total = sum(len(v) for v in entries_by_cat.values()) + sum(len(v) for v in unmatched_by_cat.values())
+        plt.title(f"Efficiency vs Purity - {group_label} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
+                  fontsize=16, fontweight='bold')
+        _format_axes()
+        plt.legend(fontsize=11)
+        plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
+        plt.savefig(output_dir / f"efficiency_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
+                    dpi=150, bbox_inches='tight', pad_inches=0.3)
+        plt.close()
+
+    def _colz(entries, category_name, filename_tag, unmatched_entries=None):
+        unmatched_entries = unmatched_entries or []
+        if not entries and not unmatched_entries:
+            return
+        purities     = [m['purity'] for m in entries]
+        efficiencies = [m['efficiency'] for m in entries]
+        if unmatched_entries:
+            # Place all unmatched clusters at a single representative point inside the
+            # dedicated no-match bin, so they collect into that one 2D-histogram cell.
+            box_mid = (_UNMATCHED_BOX_LO + _UNMATCHED_BOX_HI) / 2
+            purities     = purities + [box_mid] * len(unmatched_entries)
+            efficiencies = efficiencies + [box_mid] * len(unmatched_entries)
+
+        # One wide bin covering the no-match box, then regular bins across [0, 1]
+        edges = np.concatenate(([_UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI], np.linspace(0, 1, 41)[1:]))
+
+        plt.figure(figsize=(14, 11))
+        h = plt.hist2d(purities, efficiencies, bins=[edges, edges], cmap='YlOrRd')
+        cbar = plt.colorbar(h[3], label='Count')
+        cbar.set_label('Count', fontsize=18, fontweight='bold')
+        cbar.ax.tick_params(labelsize=16)
+
+        total = len(entries) + len(unmatched_entries)
+        plt.title(f"Efficiency vs Purity 2D Histogram - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
+                  fontsize=16, fontweight='bold')
+        _format_axes()
+        plt.subplots_adjust(left=0.15, right=0.92, top=0.90, bottom=0.12)
+        plt.savefig(output_dir / f"efficiency_vs_purity_colz_{filename_tag}_{level_suffix}_{apa}.png",
+                    dpi=150, bbox_inches='tight', pad_inches=0.3)
+        plt.close()
+
+    # All clusters
+    _scatter(pair_metadata_list, "All Clusters", "all", unmatched_entries=unmatched_metadata_list)
+    _colz(pair_metadata_list, "All Clusters", "all", unmatched_entries=unmatched_metadata_list)
+
+    # Overlaid scatter groupings
+    _scatter_overlay(['neutrino', 'cosmic'],
+                      "Neutrino vs Cosmic", "neutrino_vs_cosmic")
+    _scatter_overlay(['neutrino', 'isochronous_cosmic', 'normal_cosmic', 'prolonged_cosmic'],
+                      "Neutrino + Cosmic by Type", "neutrino_and_cosmic_by_type")
+    _scatter_overlay(['isochronous_cosmic', 'normal_cosmic', 'prolonged_cosmic'],
+                      "Cosmic by Type", "cosmic_by_type")
+
+    # Separate scatter and colz figure per individual category
+    for category_key in ['neutrino', 'cosmic', 'isochronous_cosmic', 'normal_cosmic', 'prolonged_cosmic']:
+        category_entries   = [m for m in pair_metadata_list if _in_category(m, category_key)]
+        category_unmatched = [m for m in unmatched_metadata_list if _in_category(m, category_key)]
+        info = _EFF_PUR_CATEGORY_STYLE[category_key]
+        _scatter(category_entries, info['label'], category_key,
+                 unmatched_entries=category_unmatched, color=info['color'], marker=info['marker'])
+        _colz(category_entries, info['label'], category_key,
+              unmatched_entries=category_unmatched)
+
+# Function to match true and reco clusters based on purity and efficiency results
 # make pairing based on highest purity for each true cluster, then ensure one-to-one matching by keeping only the best pair for each reco cluster
 # TODO: we need to change matching creteria to energy-weighted efficiency instead of purity
 

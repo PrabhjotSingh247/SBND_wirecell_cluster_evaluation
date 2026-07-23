@@ -6,6 +6,7 @@ multi_file_plots_with_deghosting/
 multi_file_plots_with_deghosting_test/
 multi_file_plots_without_deghosting/
 2view/
+spread_cluster_analysis/
 
 # Output files
 *.root

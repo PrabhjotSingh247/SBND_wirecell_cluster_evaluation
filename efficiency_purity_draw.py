@@ -740,7 +740,7 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
     Note: Uses (event, true_cluster_id) composite key to ensure uniqueness across all files and events.
     """
     if not efficiency_results:
-        return
+        return [], []
 
     # Count unique events across all files
     unique_events = set()
@@ -768,7 +768,7 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
         true_cluster_efficiency[cluster_key]['num_reco_matches'] += 1
 
     if not true_cluster_efficiency:
-        return
+        return [], []
 
     energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
     efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
@@ -924,6 +924,12 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
         plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_job_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close()
+
+    # Per-true-cluster (event, true_cluster_id) energies/efficiencies - the exact
+    # population plotted in efficiency_vs_true_energy_1d_job_<APA>.png ("All Clusters"),
+    # so callers can compute summary statistics that agree with that plot instead of
+    # re-deriving them from the raw (fragmented) efficiency_results pair rows.
+    return energies, efficiencies
 
 
 def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa, file_name=None, all_true_metadata_list=None):
@@ -1386,7 +1392,7 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     pairs and does not include true clusters that never matched any reco cluster.
     """
     if not pair_metadata_list:
-        return
+        return [], []
 
     def _in_category(metadata, category_key):
         if category_key == 'neutrino':
@@ -1484,6 +1490,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # Per-pair energies/efficiencies - the exact population plotted in
+    # efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_job_<APA>.png ("All Clusters").
+    return energies, efficiencies
 
 
 def DrawPurityVsRecoChargePerEvent(pair_metadata_list, output_dir, event, apa, file_name=None):
@@ -1853,6 +1863,10 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
                                     if (m['event'], m['true_cluster_id']) not in matched_keys]
     else:
         unmatched_metadata_list = []
+    # Only draw the "no match" box/legend when the caller actually asked for unmatched
+    # true clusters to be tracked (all_true_metadata_list provided) - otherwise this is
+    # the "excluding unmatched" variant and the box shouldn't appear at all.
+    show_unmatched_box = bool(all_true_metadata_list)
 
     level_suffix = level_name.lower().replace(' ', '_')
 
@@ -1883,7 +1897,8 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
         lo, hi = _axis_limits()
         plt.xlim(lo, hi)
         plt.ylim(lo, hi)
-        _draw_unmatched_box()
+        if show_unmatched_box:
+            _draw_unmatched_box()
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.xlabel('Purity', fontsize=20, fontweight='bold')
         plt.ylabel('Efficiency', fontsize=20, fontweight='bold')

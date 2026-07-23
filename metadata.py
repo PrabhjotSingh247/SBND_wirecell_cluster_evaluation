@@ -129,6 +129,39 @@ def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results,
     return metadata_list
 
 
+def add_single_metadata(metadata_list, field_name, value_lookup,
+                          key_fields=('file_name', 'event', 'apa', 'true_cluster_id'), default=None):
+    """
+    Attach one additional field to every entry of an existing metadata list, looked up by key.
+
+    Lets you extend metadata already built by add_metadata_true_clusters (or any other
+    list of per-cluster dicts) with a new per-cluster quantity without rebuilding the whole
+    list. For example, adding PCA linearity to true-cluster metadata:
+
+        linearity_lookup = {
+            (file_name, event_key, apa, true_cluster_id): linearity_value,
+            ...
+        }
+        add_single_metadata(true_metadata_list, 'linearity', linearity_lookup)
+
+    Args:
+        metadata_list: List of metadata dictionaries (modified in place).
+        field_name: Name of the new field to add to each dictionary.
+        value_lookup: Dict mapping a key_fields tuple to the value for that cluster.
+        key_fields: Dictionary keys used to build the lookup key, in order (default matches
+            the schema produced by add_metadata_true_clusters).
+        default: Value to assign when a metadata entry has no matching key in value_lookup.
+
+    Returns:
+        The same metadata_list, with field_name added to every entry.
+    """
+    for metadata in metadata_list:
+        key = tuple(metadata[k] for k in key_fields)
+        metadata[field_name] = value_lookup.get(key, default)
+
+    return metadata_list
+
+
 def aggregate_metadata(metadata_list):
     """
     Aggregate metadata entries across multiple events/files.
@@ -183,7 +216,9 @@ def aggregate_metadata(metadata_list):
 
 def print_metadata(metadata_list):
     """
-    Print metadata in a formatted table.
+    Print metadata in a formatted table, showing every field present across the metadata
+    dictionaries (not a fixed subset) so fields attached later via add_single_metadata
+    (e.g. linearity) show up automatically without needing this function updated.
 
     Args:
         metadata_list: List of metadata dictionaries
@@ -192,13 +227,32 @@ def print_metadata(metadata_list):
         print("No metadata to display")
         return
 
-    print("\n" + "="*120)
-    print(f"{'File':<10} {'Event':<8} {'APA':<6} {'View':<8} {'Cluster ID':<12} {'Type':<10} {'Category':<15} {'Efficiency':<12} {'Reco Matches':<15}")
-    print("="*120)
-
+    # Union of keys across all entries, in first-seen order (handles entries where a
+    # field was only attached to some rows).
+    columns = []
+    seen = set()
     for metadata in metadata_list:
-        print(f"{metadata['file_name']:<10} {metadata['event']:<8} {metadata['apa']:<6} {metadata['view']:<8} "
-              f"{metadata['true_cluster_id']:<12.0f} {metadata['cluster_type']:<10} {metadata['cluster_category']:<15} "
-              f"{metadata['total_efficiency']:<12.4f} {metadata['num_reco_matches']:<15}")
+        for key in metadata:
+            if key not in seen:
+                seen.add(key)
+                columns.append(key)
 
-    print("="*120 + "\n")
+    def format_value(value):
+        if isinstance(value, float):
+            return f"{value:.4f}"
+        if value is None:
+            return "N/A"
+        return str(value)
+
+    rows = [[format_value(metadata.get(col, "N/A")) for col in columns] for metadata in metadata_list]
+    widths = [max(len(col), *(len(row[i]) for row in rows)) + 2 for i, col in enumerate(columns)]
+    total_width = sum(widths)
+
+    print("\n" + "="*total_width)
+    print("".join(col.ljust(widths[i]) for i, col in enumerate(columns)))
+    print("="*total_width)
+
+    for row in rows:
+        print("".join(value.ljust(widths[i]) for i, value in enumerate(row)))
+
+    print("="*total_width + "\n")

@@ -129,6 +129,67 @@ def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results,
     return metadata_list
 
 
+def add_metadata_reco_clusters(purity_results, file_name, event, apa, view, event_key=None):
+    """
+    Create metadata for each reco cluster. Symmetric counterpart to add_metadata_true_clusters,
+    aggregated from purity_results (EvaluatePurity) the same way the true-side function
+    aggregates from efficiency_results (EvaluateEfficiency).
+
+    Args:
+        purity_results: List of purity result dictionaries from EvaluatePurity
+        file_name: Name of the input file (e.g., "file1")
+        event: Event number
+        apa: APA number (e.g., "APA0")
+        view: View type (e.g., "2view", "3view")
+        event_key: Full event key like "file1_0" (if None, will be constructed from file_name and event)
+
+    Returns:
+        List of metadata dictionaries, one per unique reco cluster
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+    if not purity_results:
+        return []
+
+    # Group purity data by reco cluster
+    reco_cluster_data = {}
+    for pur in purity_results:
+        reco_cid = pur['reco_cluster_id']
+
+        if reco_cid not in reco_cluster_data:
+            reco_cluster_data[reco_cid] = {
+                'total_purity': 0,
+                'true_match_count': 0,
+                'total_reco_charge': pur.get('total_reco_cluster_charge', 0)
+            }
+
+        # The unmatched sentinel (true_cluster_id=8888, purity=-0.1) marks a reco cluster
+        # with no true match at all - don't fold it into the purity sum/match count.
+        if pur.get('true_cluster_id') != 8888:
+            reco_cluster_data[reco_cid]['total_purity'] += pur['purity']
+            reco_cluster_data[reco_cid]['true_match_count'] += 1
+
+    # Create metadata entries for each reco cluster
+    metadata_list = []
+
+    for reco_cid, cluster_info in reco_cluster_data.items():
+        metadata = {
+            'file_name': file_name,
+            'event': event_key,  # Store the full event_key (e.g., "file1_0") for proper matching
+            'event_num': event,  # Also store the event number for reference
+            'apa': apa,
+            'view': view,
+            'reco_cluster_id': reco_cid,
+            'total_purity': cluster_info['total_purity'],
+            'num_true_matches': cluster_info['true_match_count'],
+            'total_reco_charge': cluster_info['total_reco_charge']
+        }
+
+        metadata_list.append(metadata)
+
+    return metadata_list
+
+
 def add_single_metadata(metadata_list, field_name, value_lookup,
                           key_fields=('file_name', 'event', 'apa', 'true_cluster_id'), default=None):
     """

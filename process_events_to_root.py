@@ -7,8 +7,14 @@ run, plus draws ~10 plots per event - this is the reason a 10-file run takes >30
 which won't scale to hundreds of files. This script runs that same expensive, point-cloud-
 dependent work exactly once per file/event/APA (same cut configuration and selection order
 as the notebook), with NO plotting, and writes both the raw cluster point data and all
-computed metadata into a single ROOT file via uproot. A later pass will rewire
-analysis/plotting to read from this file instead of recomputing everything.
+computed metadata into a single ROOT file via uproot.
+
+The per-event accumulation (accumulate_event_points, build_event_metadata) and the final
+ROOT write (write_root_file) are plain functions, not inlined in main() - so
+HighStatsEvaluation_MultiFile.ipynb can import and call them directly from inside its own
+existing loop (reusing the clusters_true/clusters_reco/cluster_category_results/
+efficiency_results/purity_results it already computes for plotting) and get the same ROOT
+file as a side output, without recomputing anything or duplicating this logic.
 
 Usage:
     python process_events_to_root.py [--view 2view] [--file file1] [--apa APA0] [--out FILE.root]
@@ -164,6 +170,234 @@ def process_reco_clusters(x, y, z, cid, q):
     return GroupClustersByID(points)
 
 
+# ============================================================================
+# Reusable pieces, called both by this script's own main() and by
+# HighStatsEvaluation_MultiFile.ipynb (imported directly - see module docstring).
+# ============================================================================
+
+def new_points_accumulators():
+    """Fresh accumulator dicts for true_points/reco_points/true_points_before_deadarea -
+    call once per output ROOT file you intend to write (once per whole run for this
+    script's own main(), once per APA for the notebook's per-job_summary output)."""
+    true_points_cols = {k: [] for k in
+                         ["file", "event", "apa", "true_cluster_id", "x", "y", "z", "q_true", "energy", "time"]}
+    reco_points_cols = {k: [] for k in
+                        ["file", "event", "apa", "reco_cluster_id", "x", "y", "z", "charge"]}
+    true_points_before_deadarea_cols = {k: [] for k in
+                         ["file", "event", "apa", "true_cluster_id", "x", "y", "z", "q_true", "energy", "time"]}
+    return true_points_cols, reco_points_cols, true_points_before_deadarea_cols
+
+
+def accumulate_event_points(true_points_cols, reco_points_cols, true_points_before_deadarea_cols,
+                             file_name, evt, apa, clusters_true, clusters_reco, deadarea_info):
+    """Appends one event's true/reco points, and pre-deadarea-cut points for any cluster
+    the cut affected, into the given accumulator dicts (in place)."""
+    for true_cid, points in clusters_true.items():
+        points = np.array(points)
+        n = len(points)
+        true_points_cols["file"].extend([file_name] * n)
+        true_points_cols["event"].extend([evt] * n)
+        true_points_cols["apa"].extend([apa] * n)
+        true_points_cols["true_cluster_id"].append(np.full(n, true_cid))
+        true_points_cols["x"].append(points[:, 0])
+        true_points_cols["y"].append(points[:, 1])
+        true_points_cols["z"].append(points[:, 2])
+        true_points_cols["q_true"].append(points[:, 4])
+        true_points_cols["energy"].append(points[:, 5])
+        true_points_cols["time"].append(points[:, 6])
+
+    for reco_cid, points in clusters_reco.items():
+        points = np.array(points)
+        n = len(points)
+        reco_points_cols["file"].extend([file_name] * n)
+        reco_points_cols["event"].extend([evt] * n)
+        reco_points_cols["apa"].extend([apa] * n)
+        reco_points_cols["reco_cluster_id"].append(np.full(n, reco_cid))
+        reco_points_cols["x"].append(points[:, 0])
+        reco_points_cols["y"].append(points[:, 1])
+        reco_points_cols["z"].append(points[:, 2])
+        reco_points_cols["charge"].append(points[:, 4])
+
+    before_counts = deadarea_info.get("before", {})
+    after_counts = deadarea_info.get("after", {})
+    pre_cut_points = deadarea_info.get("pre_cut_points", {})
+    for cid_, pre_points in pre_cut_points.items():
+        if before_counts.get(cid_) == after_counts.get(cid_):
+            continue  # not affected by the dead-area cut
+        n = len(pre_points)
+        true_points_before_deadarea_cols["file"].extend([file_name] * n)
+        true_points_before_deadarea_cols["event"].extend([evt] * n)
+        true_points_before_deadarea_cols["apa"].extend([apa] * n)
+        true_points_before_deadarea_cols["true_cluster_id"].append(np.full(n, cid_))
+        true_points_before_deadarea_cols["x"].append(pre_points[:, 0])
+        true_points_before_deadarea_cols["y"].append(pre_points[:, 1])
+        true_points_before_deadarea_cols["z"].append(pre_points[:, 2])
+        true_points_before_deadarea_cols["q_true"].append(pre_points[:, 4])
+        true_points_before_deadarea_cols["energy"].append(pre_points[:, 5])
+        true_points_before_deadarea_cols["time"].append(pre_points[:, 6])
+
+
+def build_event_metadata(file_name, evt, apa, view, event_key,
+                          clusters_true, clusters_reco, cluster_category_results,
+                          efficiency_results, purity_results, deadarea_info,
+                          true_linearity_lookup=None, reco_linearity_lookup=None):
+    """
+    Builds one event's true_cluster_metadata, reco_cluster_metadata, and
+    true_reco_pair_metadata rows from data the caller already has in memory (clusters,
+    category classification, KDTree efficiency/purity results, dead-area before/after
+    info). Pass true_linearity_lookup/reco_linearity_lookup if the caller already computed
+    PCA linearity for other purposes (e.g. plotting); otherwise it's computed here.
+
+    Returns (event_true_metadata, event_reco_metadata, event_pair_metadata).
+    """
+    if true_linearity_lookup is None:
+        true_linearity_lookup = {
+            (file_name, event_key, apa, cid): calculate_pca_linearity(pts)
+            for cid, pts in clusters_true.items()
+        }
+    if reco_linearity_lookup is None:
+        reco_linearity_lookup = {
+            (file_name, event_key, apa, cid): calculate_pca_linearity(pts)
+            for cid, pts in clusters_reco.items()
+        }
+
+    before_counts = deadarea_info.get("before", {})
+    after_counts = deadarea_info.get("after", {})
+
+    event_true_metadata = add_metadata_true_clusters(
+        efficiency_results, cluster_category_results,
+        file_name=file_name, event=evt, apa=apa, view=view, event_key=event_key)
+    add_single_metadata(event_true_metadata, "linearity", true_linearity_lookup)
+
+    # Dead-area before/after point counts (all true clusters in this event).
+    before_lookup = {(file_name, event_key, apa, c): n for c, n in before_counts.items()}
+    after_lookup = {(file_name, event_key, apa, c): n for c, n in after_counts.items()}
+    add_single_metadata(event_true_metadata, "n_points_before_deadarea", before_lookup, default=None)
+    add_single_metadata(event_true_metadata, "n_points_after_deadarea", after_lookup, default=None)
+
+    # Category geometry, for reproducing DrawTrueClusterCategories without
+    # recomputing cluster_category() from raw points at analysis time.
+    is_neutrino_lookup   = {(file_name, event_key, apa, c): bool(info["is_neutrino"]) for c, info in cluster_category_results.items()}
+    theta_xz_lookup      = {(file_name, event_key, apa, c): _none_to_nan(info["theta_xz"]) for c, info in cluster_category_results.items()}
+    z_min_lookup         = {(file_name, event_key, apa, c): _none_to_nan(info["z_min"]) for c, info in cluster_category_results.items()}
+    z_max_lookup         = {(file_name, event_key, apa, c): _none_to_nan(info["z_max"]) for c, info in cluster_category_results.items()}
+    x_at_z_min_lookup    = {(file_name, event_key, apa, c): _none_to_nan(info["x_at_z_min"]) for c, info in cluster_category_results.items()}
+    x_at_z_max_lookup    = {(file_name, event_key, apa, c): _none_to_nan(info["x_at_z_max"]) for c, info in cluster_category_results.items()}
+    add_single_metadata(event_true_metadata, "is_neutrino", is_neutrino_lookup, default=False)
+    add_single_metadata(event_true_metadata, "theta_xz", theta_xz_lookup, default=np.nan)
+    add_single_metadata(event_true_metadata, "z_min", z_min_lookup, default=np.nan)
+    add_single_metadata(event_true_metadata, "z_max", z_max_lookup, default=np.nan)
+    add_single_metadata(event_true_metadata, "x_at_z_min", x_at_z_min_lookup, default=np.nan)
+    add_single_metadata(event_true_metadata, "x_at_z_max", x_at_z_max_lookup, default=np.nan)
+
+    # Full one-to-many match set (every reco cluster id a true cluster matched, not just
+    # the 1-to-1 best), with the exact per-pair efficiency and purity - so
+    # DrawTrueClusterWithMatchedReco and the heatmaps can be reproduced from metadata alone
+    # at analysis time, without an aggregate approximation.
+    matched_true_reco_clusters = MatchTruetoReco_OneToMany(purity_results, efficiency_results)
+    matched_reco_ids_lookup = {
+        (file_name, event_key, apa, m["true_cluster_id"]):
+            [rc["reco_cluster_id"] for rc in m["matched_reco_clusters"]]
+        for m in matched_true_reco_clusters
+    }
+    matched_reco_efficiencies_lookup = {
+        (file_name, event_key, apa, m["true_cluster_id"]):
+            [rc["efficiency_energy_weighted"] for rc in m["matched_reco_clusters"]]
+        for m in matched_true_reco_clusters
+    }
+    add_single_metadata(event_true_metadata, "matched_reco_ids", matched_reco_ids_lookup, default=None)
+    add_single_metadata(event_true_metadata, "matched_reco_efficiencies", matched_reco_efficiencies_lookup, default=None)
+
+    # Reco-centric inversion of the same one-to-many match set: for each reco cluster,
+    # every true cluster it matched and that pair's exact purity.
+    reco_matches = {}
+    for m in matched_true_reco_clusters:
+        for rc in m["matched_reco_clusters"]:
+            reco_matches.setdefault(rc["reco_cluster_id"], []).append((m["true_cluster_id"], rc["purity"]))
+    matched_true_ids_lookup = {
+        (file_name, event_key, apa, rid): [t[0] for t in matches]
+        for rid, matches in reco_matches.items()
+    }
+    matched_true_purities_lookup = {
+        (file_name, event_key, apa, rid): [t[1] for t in matches]
+        for rid, matches in reco_matches.items()
+    }
+
+    event_reco_metadata = add_metadata_reco_clusters(
+        purity_results, file_name=file_name, event=evt, apa=apa, view=view, event_key=event_key)
+    add_single_metadata(event_reco_metadata, "linearity", reco_linearity_lookup,
+                        key_fields=("file_name", "event", "apa", "reco_cluster_id"))
+    add_single_metadata(event_reco_metadata, "matched_true_ids", matched_true_ids_lookup, default=None,
+                        key_fields=("file_name", "event", "apa", "reco_cluster_id"))
+    add_single_metadata(event_reco_metadata, "matched_true_purities", matched_true_purities_lookup, default=None,
+                        key_fields=("file_name", "event", "apa", "reco_cluster_id"))
+
+    matched_pairs = MatchTrueToReco1to1(efficiency_results, purity_results)
+    event_pair_metadata = add_metadata_true_reco_pair_cluster(
+        matched_pairs, cluster_category_results,
+        file_name=file_name, event=evt, apa=apa, view=view, event_key=event_key)
+
+    return event_true_metadata, event_reco_metadata, event_pair_metadata
+
+
+def _finalize_points(cols, id_col):
+    if not cols[id_col]:
+        return {k: np.array([]) for k in cols}
+    out = {}
+    for k, v in cols.items():
+        if k in ("file", "event", "apa"):
+            out[k] = np.array(v)
+        else:
+            out[k] = np.concatenate(v)
+    return out
+
+
+def _metadata_to_columns(metadata_list):
+    # Plain dict-of-arrays, not a DataFrame passed directly - uproot would otherwise
+    # also write the DataFrame's RangeIndex as a spurious extra "index" branch.
+    if not metadata_list:
+        return {}
+    df = pd.DataFrame(metadata_list)
+    out = {}
+    for col in df.columns:
+        # list-valued columns (e.g. matched_reco_ids) are jagged - need an awkward
+        # Array, not a plain numpy array of Python list objects, for uproot to write them.
+        if df[col].apply(lambda v: isinstance(v, list)).any():
+            out[col] = ak.Array([v if isinstance(v, list) else [] for v in df[col]])
+        else:
+            out[col] = df[col].to_numpy()
+    return out
+
+
+def write_root_file(out_path, true_points_cols, reco_points_cols, true_points_before_deadarea_cols,
+                     true_cluster_metadata_list, reco_cluster_metadata_list, true_reco_pair_metadata_list):
+    """Finalizes accumulated point columns + metadata lists (built via
+    accumulate_event_points/build_event_metadata) and writes them into one ROOT file with
+    the six TTrees described in this module's docstring."""
+    true_points_data = _finalize_points(true_points_cols, "true_cluster_id")
+    reco_points_data = _finalize_points(reco_points_cols, "reco_cluster_id")
+    true_points_before_deadarea_data = _finalize_points(true_points_before_deadarea_cols, "true_cluster_id")
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with uproot.recreate(out_path) as f:
+        f["true_points"] = true_points_data
+        f["reco_points"] = reco_points_data
+        f["true_points_before_deadarea"] = true_points_before_deadarea_data
+        f["true_cluster_metadata"] = _metadata_to_columns(true_cluster_metadata_list)
+        f["reco_cluster_metadata"] = _metadata_to_columns(reco_cluster_metadata_list)
+        f["true_reco_pair_metadata"] = _metadata_to_columns(true_reco_pair_metadata_list)
+
+    return {
+        "true_points": len(true_points_data["true_cluster_id"]),
+        "reco_points": len(reco_points_data["reco_cluster_id"]),
+        "true_points_before_deadarea": len(true_points_before_deadarea_data["true_cluster_id"]),
+        "true_cluster_metadata": len(true_cluster_metadata_list),
+        "reco_cluster_metadata": len(reco_cluster_metadata_list),
+        "true_reco_pair_metadata": len(true_reco_pair_metadata_list),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--view", default="2view", choices=["2view", "3view"])
@@ -194,17 +428,7 @@ def main():
     print(f"APA(s) to process: {apa_list}")
     print(f"Output file: {out_path}")
 
-    # Point-level accumulators (event_info group) - list of per-column numpy arrays,
-    # concatenated once at the end for speed.
-    true_points_cols = {k: [] for k in
-                         ["file", "event", "apa", "true_cluster_id", "x", "y", "z", "q_true", "energy", "time"]}
-    reco_points_cols = {k: [] for k in
-                        ["file", "event", "apa", "reco_cluster_id", "x", "y", "z", "charge"]}
-    # Pre-deadarea-cut points, written only for clusters the cut actually affected.
-    true_points_before_deadarea_cols = {k: [] for k in
-                         ["file", "event", "apa", "true_cluster_id", "x", "y", "z", "q_true", "energy", "time"]}
-
-    # Metadata accumulators (metadata_info group) - one row (dict) per cluster/pair.
+    true_points_cols, reco_points_cols, true_points_before_deadarea_cols = new_points_accumulators()
     true_cluster_metadata_list = []
     reco_cluster_metadata_list = []
     true_reco_pair_metadata_list = []
@@ -239,51 +463,8 @@ def main():
 
                 event_key = f"{file_name}_{evt}"
 
-                # ---- raw point clouds (event_info) ----
-                for true_cid, points in clusters_true.items():
-                    points = np.array(points)
-                    n = len(points)
-                    true_points_cols["file"].extend([file_name] * n)
-                    true_points_cols["event"].extend([evt] * n)
-                    true_points_cols["apa"].extend([apa] * n)
-                    true_points_cols["true_cluster_id"].append(np.full(n, true_cid))
-                    true_points_cols["x"].append(points[:, 0])
-                    true_points_cols["y"].append(points[:, 1])
-                    true_points_cols["z"].append(points[:, 2])
-                    true_points_cols["q_true"].append(points[:, 4])
-                    true_points_cols["energy"].append(points[:, 5])
-                    true_points_cols["time"].append(points[:, 6])
-
-                for reco_cid, points in clusters_reco.items():
-                    points = np.array(points)
-                    n = len(points)
-                    reco_points_cols["file"].extend([file_name] * n)
-                    reco_points_cols["event"].extend([evt] * n)
-                    reco_points_cols["apa"].extend([apa] * n)
-                    reco_points_cols["reco_cluster_id"].append(np.full(n, reco_cid))
-                    reco_points_cols["x"].append(points[:, 0])
-                    reco_points_cols["y"].append(points[:, 1])
-                    reco_points_cols["z"].append(points[:, 2])
-                    reco_points_cols["charge"].append(points[:, 4])
-
-                # ---- pre-deadarea-cut points, for clusters the cut affected ----
-                before_counts = deadarea_info.get("before", {})
-                after_counts = deadarea_info.get("after", {})
-                pre_cut_points = deadarea_info.get("pre_cut_points", {})
-                for cid_, pre_points in pre_cut_points.items():
-                    if before_counts.get(cid_) == after_counts.get(cid_):
-                        continue  # not affected by the dead-area cut
-                    n = len(pre_points)
-                    true_points_before_deadarea_cols["file"].extend([file_name] * n)
-                    true_points_before_deadarea_cols["event"].extend([evt] * n)
-                    true_points_before_deadarea_cols["apa"].extend([apa] * n)
-                    true_points_before_deadarea_cols["true_cluster_id"].append(np.full(n, cid_))
-                    true_points_before_deadarea_cols["x"].append(pre_points[:, 0])
-                    true_points_before_deadarea_cols["y"].append(pre_points[:, 1])
-                    true_points_before_deadarea_cols["z"].append(pre_points[:, 2])
-                    true_points_before_deadarea_cols["q_true"].append(pre_points[:, 4])
-                    true_points_before_deadarea_cols["energy"].append(pre_points[:, 5])
-                    true_points_before_deadarea_cols["time"].append(pre_points[:, 6])
+                accumulate_event_points(true_points_cols, reco_points_cols, true_points_before_deadarea_cols,
+                                         file_name, evt, apa, clusters_true, clusters_reco, deadarea_info)
 
                 # ---- category classification (needs point clouds -> must run here) ----
                 cluster_category_results = cluster_category(clusters_true, output_dir=None, event=evt, apa=apa, file_name=file_name)
@@ -296,92 +477,12 @@ def main():
                     clusters_true, clusters_reco, event_key,
                     radius_purity_xz=RADIUS_PURITY_XZ, radius_purity_yz=RADIUS_PURITY_YZ, radius_purity_xy=RADIUS_PURITY_XY)
 
-                # ---- PCA linearity per cluster (needs point clouds) ----
-                true_linearity_lookup = {
-                    (file_name, event_key, apa, cid): calculate_pca_linearity(pts)
-                    for cid, pts in clusters_true.items()
-                }
-                reco_linearity_lookup = {
-                    (file_name, event_key, apa, cid): calculate_pca_linearity(pts)
-                    for cid, pts in clusters_reco.items()
-                }
-
-                # ---- metadata (cheap - built from the results above) ----
-                event_true_metadata = add_metadata_true_clusters(
-                    efficiency_results, cluster_category_results,
-                    file_name=file_name, event=evt, apa=apa, view=args.view, event_key=event_key)
-                add_single_metadata(event_true_metadata, "linearity", true_linearity_lookup)
-
-                # Dead-area before/after point counts (all true clusters in this event).
-                before_lookup = {(file_name, event_key, apa, c): n for c, n in before_counts.items()}
-                after_lookup = {(file_name, event_key, apa, c): n for c, n in after_counts.items()}
-                add_single_metadata(event_true_metadata, "n_points_before_deadarea", before_lookup, default=None)
-                add_single_metadata(event_true_metadata, "n_points_after_deadarea", after_lookup, default=None)
-
-                # Category geometry, for reproducing DrawTrueClusterCategories without
-                # recomputing cluster_category() from raw points at analysis time.
-                is_neutrino_lookup   = {(file_name, event_key, apa, c): bool(info["is_neutrino"]) for c, info in cluster_category_results.items()}
-                theta_xz_lookup      = {(file_name, event_key, apa, c): _none_to_nan(info["theta_xz"]) for c, info in cluster_category_results.items()}
-                z_min_lookup         = {(file_name, event_key, apa, c): _none_to_nan(info["z_min"]) for c, info in cluster_category_results.items()}
-                z_max_lookup         = {(file_name, event_key, apa, c): _none_to_nan(info["z_max"]) for c, info in cluster_category_results.items()}
-                x_at_z_min_lookup    = {(file_name, event_key, apa, c): _none_to_nan(info["x_at_z_min"]) for c, info in cluster_category_results.items()}
-                x_at_z_max_lookup    = {(file_name, event_key, apa, c): _none_to_nan(info["x_at_z_max"]) for c, info in cluster_category_results.items()}
-                add_single_metadata(event_true_metadata, "is_neutrino", is_neutrino_lookup, default=False)
-                add_single_metadata(event_true_metadata, "theta_xz", theta_xz_lookup, default=np.nan)
-                add_single_metadata(event_true_metadata, "z_min", z_min_lookup, default=np.nan)
-                add_single_metadata(event_true_metadata, "z_max", z_max_lookup, default=np.nan)
-                add_single_metadata(event_true_metadata, "x_at_z_min", x_at_z_min_lookup, default=np.nan)
-                add_single_metadata(event_true_metadata, "x_at_z_max", x_at_z_max_lookup, default=np.nan)
-
-                # Full one-to-many match set (every reco cluster id a true cluster matched,
-                # not just the 1-to-1 best), with the exact per-pair efficiency and purity -
-                # so DrawTrueClusterWithMatchedReco and the heatmaps can be reproduced from
-                # metadata alone at analysis time, without the aggregate approximation.
-                matched_true_reco_clusters = MatchTruetoReco_OneToMany(purity_results, efficiency_results)
-                matched_reco_ids_lookup = {
-                    (file_name, event_key, apa, m["true_cluster_id"]):
-                        [rc["reco_cluster_id"] for rc in m["matched_reco_clusters"]]
-                    for m in matched_true_reco_clusters
-                }
-                matched_reco_efficiencies_lookup = {
-                    (file_name, event_key, apa, m["true_cluster_id"]):
-                        [rc["efficiency_energy_weighted"] for rc in m["matched_reco_clusters"]]
-                    for m in matched_true_reco_clusters
-                }
-                add_single_metadata(event_true_metadata, "matched_reco_ids", matched_reco_ids_lookup, default=None)
-                add_single_metadata(event_true_metadata, "matched_reco_efficiencies", matched_reco_efficiencies_lookup, default=None)
-
+                event_true_metadata, event_reco_metadata, event_pair_metadata = build_event_metadata(
+                    file_name, evt, apa, args.view, event_key,
+                    clusters_true, clusters_reco, cluster_category_results,
+                    efficiency_results, purity_results, deadarea_info)
                 true_cluster_metadata_list.extend(event_true_metadata)
-
-                # Reco-centric inversion of the same one-to-many match set: for each reco
-                # cluster, every true cluster it matched and that pair's exact purity.
-                reco_matches = {}
-                for m in matched_true_reco_clusters:
-                    for rc in m["matched_reco_clusters"]:
-                        reco_matches.setdefault(rc["reco_cluster_id"], []).append((m["true_cluster_id"], rc["purity"]))
-                matched_true_ids_lookup = {
-                    (file_name, event_key, apa, rid): [t[0] for t in matches]
-                    for rid, matches in reco_matches.items()
-                }
-                matched_true_purities_lookup = {
-                    (file_name, event_key, apa, rid): [t[1] for t in matches]
-                    for rid, matches in reco_matches.items()
-                }
-
-                event_reco_metadata = add_metadata_reco_clusters(
-                    purity_results, file_name=file_name, event=evt, apa=apa, view=args.view, event_key=event_key)
-                add_single_metadata(event_reco_metadata, "linearity", reco_linearity_lookup,
-                                    key_fields=("file_name", "event", "apa", "reco_cluster_id"))
-                add_single_metadata(event_reco_metadata, "matched_true_ids", matched_true_ids_lookup, default=None,
-                                    key_fields=("file_name", "event", "apa", "reco_cluster_id"))
-                add_single_metadata(event_reco_metadata, "matched_true_purities", matched_true_purities_lookup, default=None,
-                                    key_fields=("file_name", "event", "apa", "reco_cluster_id"))
                 reco_cluster_metadata_list.extend(event_reco_metadata)
-
-                matched_pairs = MatchTrueToReco1to1(efficiency_results, purity_results)
-                event_pair_metadata = add_metadata_true_reco_pair_cluster(
-                    matched_pairs, cluster_category_results,
-                    file_name=file_name, event=evt, apa=apa, view=args.view, event_key=event_key)
                 true_reco_pair_metadata_list.extend(event_pair_metadata)
 
                 total_events_processed += 1
@@ -389,54 +490,10 @@ def main():
 
     print(f"\nTotal events processed: {total_events_processed}")
 
-    # ---- concatenate point-level columns into flat numpy arrays ----
-    def finalize_points(cols, id_col):
-        if not cols[id_col]:
-            return {k: np.array([]) for k in cols}
-        out = {}
-        for k, v in cols.items():
-            if k in ("file", "event", "apa"):
-                out[k] = np.array(v)
-            else:
-                out[k] = np.concatenate(v)
-        return out
-
-    true_points_data = finalize_points(true_points_cols, "true_cluster_id")
-    reco_points_data = finalize_points(reco_points_cols, "reco_cluster_id")
-    true_points_before_deadarea_data = finalize_points(true_points_before_deadarea_cols, "true_cluster_id")
-
-    print(f"true_points rows: {len(true_points_data['true_cluster_id'])}")
-    print(f"reco_points rows: {len(reco_points_data['reco_cluster_id'])}")
-    print(f"true_points_before_deadarea rows: {len(true_points_before_deadarea_data['true_cluster_id'])}")
-    print(f"true_cluster_metadata rows: {len(true_cluster_metadata_list)}")
-    print(f"reco_cluster_metadata rows: {len(reco_cluster_metadata_list)}")
-    print(f"true_reco_pair_metadata rows: {len(true_reco_pair_metadata_list)}")
-
-    def to_columns(metadata_list):
-        # Plain dict-of-arrays, not a DataFrame passed directly - uproot would otherwise
-        # also write the DataFrame's RangeIndex as a spurious extra "index" branch.
-        if not metadata_list:
-            return {}
-        df = pd.DataFrame(metadata_list)
-        out = {}
-        for col in df.columns:
-            # list-valued columns (e.g. matched_reco_ids) are jagged - need an awkward
-            # Array, not a plain numpy array of Python list objects, for uproot to write them.
-            if df[col].apply(lambda v: isinstance(v, list)).any():
-                out[col] = ak.Array([v if isinstance(v, list) else [] for v in df[col]])
-            else:
-                out[col] = df[col].to_numpy()
-        return out
-
-    # ---- write everything to one ROOT file ----
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with uproot.recreate(out_path) as f:
-        f["true_points"] = true_points_data
-        f["reco_points"] = reco_points_data
-        f["true_points_before_deadarea"] = true_points_before_deadarea_data
-        f["true_cluster_metadata"] = to_columns(true_cluster_metadata_list)
-        f["reco_cluster_metadata"] = to_columns(reco_cluster_metadata_list)
-        f["true_reco_pair_metadata"] = to_columns(true_reco_pair_metadata_list)
+    row_counts = write_root_file(out_path, true_points_cols, reco_points_cols, true_points_before_deadarea_cols,
+                                  true_cluster_metadata_list, reco_cluster_metadata_list, true_reco_pair_metadata_list)
+    for name, count in row_counts.items():
+        print(f"{name} rows: {count}")
 
     elapsed = time.monotonic() - start_clock
     print(f"\nWrote {out_path} in {elapsed/60:.2f} min")

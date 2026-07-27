@@ -13,6 +13,7 @@ Haiwang_test_file_charge_light_matching/
 *.root
 *.png
 *.pdf
+*.log
 bee_links_final.txt
 bee_links_output.txt
 

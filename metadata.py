@@ -1,4 +1,5 @@
 import numpy as np
+from pathlib import Path
 
 def add_metadata_true_clusters(efficiency_results, cluster_category_results, file_name, event, apa, view, event_key=None):
     """
@@ -317,3 +318,403 @@ def print_metadata(metadata_list):
         print("".join(value.ljust(widths[i]) for i, value in enumerate(row)))
 
     print("="*total_width + "\n")
+
+
+# ============================================================================
+# CHARGE-LIGHT MATCHING FORMAT (additive; existing functions above are untouched)
+# ============================================================================
+
+def build_cluster_flash_metadata(op_data, file_name, event, apa, event_key=None):
+    """
+    Build per-img-global-cluster-ID optical flash records from the per-flash
+    arrays returned by read_op_json() (readfiles.py). op_cluster_ids[i] lists
+    the img-global reco cluster IDs matched to flash index i (empty if none);
+    every cluster ID in that bracket shares flash i's time (op_t[i]) and APA
+    (apa[i]). Verified against the test data: no cluster ID appears in more
+    than one flash's bracket, so each cluster ID produces exactly one record.
+    Intended for future work (cathode-crossing matching, x-drift-distance
+    correction) -- not used for that yet, but feeds DrawRecoTrueFlashes.draw_flashes().
+
+    Args:
+        op_data: Dict from read_op_json()
+        file_name: Name of the input file (e.g., "file0")
+        event: Event number
+        apa: Processing-level APA label (e.g. "Combined") -- NOT the same as
+            each flash's own detector APA assignment, stored separately below
+            as 'flash_apa'
+        event_key: Full event key like "file0_9" (if None, constructed from file_name and event)
+
+    Returns a list of dicts (one per matched cluster ID, same shape convention
+    as add_metadata_true_clusters/add_metadata_true_reco_pair_cluster) so
+    records from multiple events can be concatenated for file/job-level
+    aggregation -- see DrawRecoTrueFlashes.draw_flashes().
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+
+    records = []
+    for flash_index, cluster_ids in enumerate(op_data['op_cluster_ids']):
+        if not cluster_ids:
+            continue
+        flash_time = op_data['op_t'][flash_index]
+        flash_apa  = op_data['apa'][flash_index]
+        for cluster_id in cluster_ids:
+            records.append({
+                'file_name': file_name,
+                'event': event_key,
+                'event_num': event,
+                'apa': apa,
+                'reco_cluster_id': cluster_id,
+                'flash_index': flash_index,
+                'flash_time': flash_time,
+                'flash_apa': flash_apa,
+            })
+    return records
+
+
+CATHODE_CROSSING_TIME_DIFF_MAX_US = 0.02  # 20 ns
+
+
+def build_img_cluster_flash_metadata(img_data, clustering_data, cluster_flash_records, file_name, event, apa, event_key=None):
+    """
+    Bridge op.json flash info (attached to img-global cluster IDs by
+    build_cluster_flash_metadata) onto clustering-global cluster IDs, even
+    though img-global and clustering-global use unrelated cluster_id
+    numbering (clustering-global is built AFTER charge-light matching --
+    points get re-clustered, possibly merged across the cathode -- so
+    cluster_id can't be used to connect the two files directly). This
+    function only READS img_data/clustering_data to build an association
+    table -- it never modifies or merges the underlying point data in either
+    file; any merging visible in clustering-global's clusters already
+    happened upstream, before either file was read here.
+
+    The join key is each point's charge ('q'): verified against test data
+    that every clustering-global q value has a matching q value somewhere in
+    img-global (point order/clustering differs completely between the two
+    files, so this must be a value match, not an index match -- only ~0.1%
+    of points happen to share position at the same index). img-global q
+    values are ~99.2% unique; the rare duplicates are dropped as ambiguous
+    rather than guessed at.
+
+    A clustering cluster can match multiple img clusters. Two cases:
+      - Same flash (identical flash_time): fragmented img-level sub-clusters
+        re-merged into one clustering cluster -- kept as separate records,
+        nothing to resolve (their times already agree exactly).
+      - Different flashes, close in time (within CATHODE_CROSSING_TIME_DIFF_MAX_US)
+        AND from different APAs: this is a cathode-crossing track -- the same
+        physical light burst reconstructed independently by each side's
+        optical system. These are merged into ONE record with the averaged
+        flash_time (verified against test data: e.g. 1.09731/1.09872 us,
+        APA 1/0 -> averaged to 1.098015 us). Close-in-time flashes from the
+        SAME APA are NOT merged -- that's not the cathode-crossing signature,
+        just coincidence (or, as with same-time entries, already handled above).
+      - Otherwise (genuinely different, unrelated flashes): kept as separate records.
+
+    Args:
+        img_data: Tuple from readfiles.read_img_global_from_json() --
+            (x, y, z, cluster_id, q, real_cluster_id)
+        clustering_data: Tuple from readfiles.read_cluster_global_from_json() --
+            (x, y, z, cluster_id, q, real_cluster_id)
+        cluster_flash_records: Output of build_cluster_flash_metadata() for
+            this same event (img-global-cluster-ID-keyed flash records)
+        file_name: Name of the input file (e.g., "file0")
+        event: Event number
+        apa: Processing-level APA label (e.g. "Combined")
+        event_key: Full event key like "file0_9" (if None, constructed from file_name and event)
+
+    Returns a list of dicts, one per resolved (clustering_cluster_id, flash)
+    match -- clustering clusters with no flash-matched img cluster are simply
+    absent, same convention as build_cluster_flash_metadata. Each record has
+    'img_cluster_id' (representative, first-matched) and 'img_cluster_ids'
+    (full list -- length 2 for a cathode-crossing merge), 'flash_apa' and
+    'is_cathode_crossing' (bool).
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+
+    _, _, _, img_cluster_id, img_q, _ = img_data
+    # clustering-global's own 'cluster_id' is a COARSER grouping than
+    # 'real_cluster_id' -- it can merge multiple physically distinct tracks
+    # that only 'real_cluster_id' keeps separate (confirmed against real data:
+    # a single cluster_id spanning two disjoint Y ranges that split cleanly
+    # into two real_cluster_id values, each matching a different true
+    # cluster). Group/key by real_cluster_id here so clustering_cluster_id in
+    # the output records reflects the physically correct clusters.
+    _, _, _, _, clu_q, clu_real_cluster_id = clustering_data
+
+    # img cluster_id -> list of flash records (a cluster can only appear in
+    # one flash's bracket per build_cluster_flash_metadata, but keep this
+    # general in case that changes).
+    img_flash_lookup = {}
+    for record in cluster_flash_records:
+        img_flash_lookup.setdefault(record['reco_cluster_id'], []).append(record)
+
+    # q value -> img cluster_id, dropping ambiguous (duplicate, conflicting) q values.
+    q_to_img_cluster = {}
+    ambiguous_q = set()
+    for q, cid in zip(img_q, img_cluster_id):
+        if q in q_to_img_cluster and q_to_img_cluster[q] != cid:
+            ambiguous_q.add(q)
+        else:
+            q_to_img_cluster[q] = cid
+    for q in ambiguous_q:
+        del q_to_img_cluster[q]
+
+    # Tally, per clustering cluster, how many of its points matched into each img cluster.
+    clu_to_img_counts = {}
+    for q, clu_cid in zip(clu_q, clu_real_cluster_id):
+        img_cid = q_to_img_cluster.get(q)
+        if img_cid is None:
+            continue
+        counts = clu_to_img_counts.setdefault(clu_cid, {})
+        counts[img_cid] = counts.get(img_cid, 0) + 1
+
+    records = []
+    for clu_cid, img_counts in clu_to_img_counts.items():
+        # One entry per (img_cluster_id, flash) match for this clustering cluster.
+        entries = []
+        for img_cid, n_matched_points in img_counts.items():
+            for flash_record in img_flash_lookup.get(img_cid, []):
+                entries.append({
+                    'img_cluster_id': img_cid,
+                    'n_matched_points': n_matched_points,
+                    'flash_index': flash_record['flash_index'],
+                    'flash_time': flash_record['flash_time'],
+                    'flash_apa': flash_record['flash_apa'],
+                })
+        if not entries:
+            continue
+
+        # Greedy adjacent merge (by time) of entries within
+        # CATHODE_CROSSING_TIME_DIFF_MAX_US of the previous entry AND from a
+        # different APA. Entries with identical time (fragmented same-flash
+        # matches, e.g. img sub-clusters re-merged) never satisfy "different
+        # APA from a same-time same-APA neighbor" unless they genuinely are
+        # on a different APA, so they naturally stay unmerged as before.
+        entries.sort(key=lambda e: e['flash_time'])
+        groups = []
+        for entry in entries:
+            if groups and (entry['flash_time'] - groups[-1][-1]['flash_time'] <= CATHODE_CROSSING_TIME_DIFF_MAX_US
+                            and entry['flash_apa'] != groups[-1][-1]['flash_apa']):
+                groups[-1].append(entry)
+            else:
+                groups.append([entry])
+
+        for group in groups:
+            is_cathode_crossing = len(group) > 1
+            avg_time = sum(e['flash_time'] for e in group) / len(group)
+            records.append({
+                'file_name': file_name,
+                'event': event_key,
+                'event_num': event,
+                'apa': apa,
+                'clustering_cluster_id': clu_cid,
+                'img_cluster_id': group[0]['img_cluster_id'],
+                'img_cluster_ids': [e['img_cluster_id'] for e in group],
+                'n_matched_points': sum(e['n_matched_points'] for e in group),
+                'flash_index': group[0]['flash_index'],
+                'flash_time': avg_time,
+                'flash_apa': group[0]['flash_apa'] if not is_cathode_crossing else '/'.join(e['flash_apa'] for e in group),
+                'is_cathode_crossing': is_cathode_crossing,
+            })
+    return records
+
+
+def build_true_cluster_type_records(clusters_true, file_name, event, event_key=None):
+    """
+    Per-true-cluster {cluster_id, is_neutrino, nu_idx_values} records for
+    DrawLabelsAggregated and DrawLabelsByNuIdx.
+
+    is_neutrino is determined by q_true>0 on the cluster's points, NOT via
+    cluster_category_results (which checks only the FIRST point and assumes
+    q_true==1 exactly -- silently wrong once q_true can be a neutrino index
+    of 2 or higher). All points in a given post-reassignment cosmic cluster
+    share q_true=0, so checking any single point is safe there -- the bug in
+    the pre-existing code was the ==1 comparison, not the single-point read.
+
+    nu_idx_values: sorted list of the DISTINCT nu_idx (q_true) values present
+    among the cluster's points; [] for cosmic clusters. reassign_cluster_ID_true
+    merges ALL true clusters with any q_true>0 into a single cluster_id=9999,
+    regardless of how many distinct neutrino interactions contributed points --
+    so cluster 9999 can itself contain multiple nu_idx values, which is why
+    this is a list rather than a single value. is_neutrino's definition and
+    the one-record-per-post-reassignment-cluster_id shape are UNCHANGED so
+    DrawLabelsAggregated's counts are unaffected by this field.
+
+    There is deliberately NO in_beam_window field. True clusters carry no flash
+    and no time (build_true_points_charge_light fills the time column with
+    zeros), so any "true cluster in the beam window" flag could only be inferred
+    by spatially matching to a reco cluster whose flash landed in the window --
+    which mixes beam timing with reconstruction + flash-matching efficiency
+    while reading as a truth-level timing selection. Beam-window membership is
+    a RECO-side quantity only (see build_img_cluster_flash_metadata and
+    writeinformation.write_reco_cluster_info); do not reintroduce it here.
+
+    Args:
+        clusters_true: Dict {cluster_id: points}, points columns
+            [x, y, z, cluster_id, q_true, energy, time] (post reassign_cluster_ID_true)
+        file_name: Name of the input file (e.g., "file0")
+        event: Event number
+        event_key: Full event key like "file0_9" (if None, constructed from file_name and event)
+
+    Returns:
+        List of dicts, one per true cluster:
+            {file_name, event, event_num, cluster_id, is_neutrino, nu_idx_values}
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+    if not clusters_true:
+        return []
+
+    records = []
+    for cluster_id, points in clusters_true.items():
+        points = np.array(points)
+        is_neutrino = bool(points[0, 4] > 0) if len(points) > 0 else False
+        if is_neutrino:
+            nu_idx_values = sorted(set(int(v) for v in points[:, 4] if v > 0))
+        else:
+            nu_idx_values = []
+        records.append({
+            'file_name': file_name,
+            'event': event_key,
+            'event_num': event,
+            'cluster_id': cluster_id,
+            'is_neutrino': is_neutrino,
+            'nu_idx_values': nu_idx_values,
+        })
+    return records
+
+
+def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, event_key=None,
+                                  x_min=None, x_max=None, y_min=None, y_max=None,
+                                  z_min=None, z_max=None,
+                                  clusters_true_precut=None, min_cluster_energy=None):
+    """
+    One record per TRUE NEUTRINO INTERACTION in an event, built from mc.json's
+    interaction-vertex root nodes (flatten_mc_tree records with
+    is_interaction_vertex=True), joined to the true cluster that interaction
+    produced.
+
+    The join is by nu_idx, not by position: reassign_cluster_ID_true_charge_light
+    gives interaction nu_idx the cluster_id 99990+nu_idx, and mc.json's root text
+    carries the same nu_idx -- so the two sides link exactly, with no spatial
+    matching and no tolerance to tune.
+
+    VERTEX: the root node's start_xyz. For a root, start == end (it is a point,
+    not a track), in the same cm frame as the true points -- verified by
+    measuring in-volume vertices against their own cluster's deposits (agreement
+    to ~0.03-0.13 cm).
+
+    ENERGY -- read this before using any energy from here:
+      - cluster_energy_MeV is the TRUE cluster energy summed from the
+        sed-sce_drift_smear_readout points (column 5), i.e. the same quantity
+        apply_energy_cutoff and every efficiency plot use. THIS is the energy for
+        evaluation and selection.
+      - mc_total_energy_MeV ('Etot') and mc_edep_MeV ('Edep') are copied from
+        mc.json's root text for reference only -- Etot is the incident neutrino's
+        total energy (not deposited anywhere), Edep is mc.json's own deposited
+        figure. Neither is used for cuts and neither should be: they come from a
+        different bookkeeping than the point cloud the pipeline measures.
+
+    A neutrino interaction can have NO true cluster (has_true_cluster=False):
+    an out-of-volume interaction may deposit nothing in the active volume, and a
+    cluster may also have been removed by the pipeline's cuts. cluster_energy_MeV
+    and n_true_points therefore describe the cluster AS PASSED IN -- if
+    clusters_true is post-cut (as in the main pipeline), so are these numbers.
+
+    Pass clusters_true_precut (the same clusters BEFORE the cuts) to get the
+    diagnostics for those removed interactions: precut_energy_MeV,
+    precut_n_points and removal_reason, which distinguishes "never deposited
+    anything" from "deposited, but the cuts took it" -- the two need completely
+    different follow-up. removal_reason names the energy cut specifically when
+    min_cluster_energy is given and the pre-cut energy falls below it; anything
+    that had enough energy and still vanished is attributed to the geometric
+    cuts (fiducial / dead area / min-points). Records that survived carry
+    removal_reason=None.
+
+    Parameters:
+    - mc_records: flatten_mc_tree(result['mc']) output
+    - clusters_true: Dict {cluster_id: points}, points columns
+        [x, y, z, cluster_id, q_true, energy, time]
+    - file_name, event, event_key: identification, as elsewhere
+    - x_min..z_max: volume bounds for the vertex_in_volume flag; if any is None
+        the flag is left None rather than guessed
+
+    Returns:
+        List of dicts, one per neutrino interaction found in mc.json
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+    if not mc_records:
+        return []
+
+    bounds = (x_min, x_max, y_min, y_max, z_min, z_max)
+    have_bounds = all(b is not None for b in bounds)
+
+    records = []
+    for mc in mc_records:
+        if not mc.get('is_interaction_vertex'):
+            continue
+        vertex = mc.get('start_xyz')
+        nu_idx = mc.get('nu_idx')
+
+        if vertex is not None and have_bounds:
+            vx, vy, vz = vertex
+            in_volume = bool(x_min <= vx <= x_max and y_min <= vy <= y_max and z_min <= vz <= z_max)
+        else:
+            in_volume = None
+
+        cluster_id = 99990.0 + nu_idx if nu_idx is not None else None
+        points = clusters_true.get(cluster_id) if cluster_id is not None else None
+        if points is not None and len(points) > 0:
+            points = np.asarray(points)
+            cluster_energy = float(points[:, 5].sum())
+            n_true_points = int(len(points))
+            has_cluster = True
+        else:
+            cluster_energy, n_true_points, has_cluster = None, 0, False
+
+        precut_energy, precut_n_points, removal_reason, removal_category = None, 0, None, None
+        if clusters_true_precut is not None and cluster_id is not None:
+            precut_points = clusters_true_precut.get(cluster_id)
+            if precut_points is not None and len(precut_points) > 0:
+                precut_points = np.asarray(precut_points)
+                precut_energy = float(precut_points[:, 5].sum())
+                precut_n_points = int(len(precut_points))
+        if not has_cluster:
+            # removal_category is a FIXED string for grouping; removal_reason adds
+            # the per-interaction detail. Keeping them separate matters: folding the
+            # energy value into the grouping key makes every energy-cut row its own
+            # category and the summary table degenerates into one row per cluster.
+            if precut_n_points == 0:
+                removal_category = "no true deposits"
+                removal_reason   = "no true deposits (nothing to cut)"
+            elif min_cluster_energy is not None and precut_energy is not None and precut_energy < min_cluster_energy:
+                removal_category = "below energy cut"
+                removal_reason   = f"below energy cut ({precut_energy:.1f} < {min_cluster_energy} MeV)"
+            else:
+                removal_category = "removed by geometric cuts"
+                removal_reason   = "removed by geometric cuts (fiducial / dead area / min points)"
+
+        records.append({
+            'file_name': file_name,
+            'event': event_key,
+            'event_num': event,
+            'nu_idx': nu_idx,
+            'cluster_id': cluster_id,
+            'flavor': mc.get('particle'),
+            'vertex_x': vertex[0] if vertex else None,
+            'vertex_y': vertex[1] if vertex else None,
+            'vertex_z': vertex[2] if vertex else None,
+            'vertex_in_volume': in_volume,
+            'mc_total_energy_MeV': mc.get('total_energy_MeV'),
+            'mc_edep_MeV': mc.get('energy_MeV'),
+            'cluster_energy_MeV': cluster_energy,
+            'n_true_points': n_true_points,
+            'has_true_cluster': has_cluster,
+            'precut_energy_MeV': precut_energy,
+            'precut_n_points': precut_n_points,
+            'removal_reason': removal_reason,
+            'removal_category': removal_category,
+        })
+    return records

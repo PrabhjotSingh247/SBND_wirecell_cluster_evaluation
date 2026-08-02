@@ -68,11 +68,54 @@ def reassign_cluster_ID_true(points_5d):
         points = np.array(points)
         avg_xy = np.mean(points[:, 0])
         avg_xy = round(avg_xy, 2)
-        if points[:, 4].any() == 1:
+        if points[:, 4].any() == 1: 
             avg_xy = 9999
         points[:, 3] = avg_xy
         new_points.append(points)
     
+    points_5d_after_reassigning = np.vstack(new_points)
+    return points_5d_after_reassigning
+
+def reassign_cluster_ID_true_charge_light(points_5d):
+    """
+    nu_idx-aware version of reassign_cluster_ID_true() for the charge-light
+    matching pipeline, where points[:, 4] (q_true) already holds the actual
+    neutrino index (0=cosmic, 1/2/3/...=which neutrino interaction) rather
+    than a plain 0/1 flag -- see build_true_points_charge_light's nu_idx=
+    parameter. Cosmic clusters are reassigned exactly as in
+    reassign_cluster_ID_true() (rounded avg X). Neutrino-associated clusters
+    are reassigned to 99990 + nu_idx (99991, 99992, 99993, ...) instead of a
+    single shared 9999, so GroupClustersByID keeps each neutrino interaction
+    as its own cluster instead of merging them all together.
+
+    Kept separate from reassign_cluster_ID_true() -- that function is still
+    used by metadata.py, process_events_to_root.py, analyze_cluster_spread.py,
+    and HighStatsEvaluation_MultiFile.ipynb, none of which have per-point
+    nu_idx available or expect this ID scheme.
+    """
+    clusters = {}
+    for point in points_5d:
+        cluster_id = point[3]
+        if cluster_id not in clusters:
+            clusters[cluster_id] = []
+        clusters[cluster_id].append(point)
+
+    new_points = []
+    for cluster_id, points in clusters.items():
+        points = np.array(points)
+        avg_xy = round(np.mean(points[:, 0]), 2)
+        nu_idx_values = points[points[:, 4] > 0, 4]
+        if len(nu_idx_values) > 0:
+            # A pre-reassignment cluster_id groups points from one particle/
+            # track, which belongs to exactly one neutrino interaction --
+            # take the most common nonzero nu_idx as a defensive fallback in
+            # case that's ever not perfectly uniform within the group.
+            values, counts = np.unique(nu_idx_values, return_counts=True)
+            nu_idx = int(values[np.argmax(counts)])
+            avg_xy = 99990 + nu_idx
+        points[:, 3] = avg_xy
+        new_points.append(points)
+
     points_5d_after_reassigning = np.vstack(new_points)
     return points_5d_after_reassigning
 
@@ -377,3 +420,169 @@ def apply_deadarea_cut_true(true_points, apa, view_type="2view", output_dir=None
             print(f"Warning: Could not draw affected clusters: {e}")
 
     return np.array(filtered_points) if filtered_points else np.array([]).reshape(0, true_points.shape[1])
+
+
+# ============================================================================
+# CHARGE-LIGHT MATCHING FORMAT (additive; existing functions above are untouched)
+# ============================================================================
+# sed-sce_drift_smear_readout.json has no explicit q_true (neutrino/cosmic) flag
+# like the older true*.json files. Instead, its cluster_id is a G4 trackID whose
+# leading digit encodes the originating generator -- verified to cover 100% of
+# points across all 10 test events, no exceptions:
+#   10,000,000-19,999,999 -> neutrino-interaction trackIDs
+#   20,000,000-29,999,999 -> cosmic-ray (CORSIKA) trackIDs
+# build_true_points_charge_light() derives q_true from that namespace and
+# assembles the same 7-column [x, y, z, cluster_id, q_true, energy, time] layout
+# reassign_cluster_ID_true() already expects, so the existing reassignment /
+# selection / efficiency / purity pipeline runs unmodified on charge-light data.
+# There is no per-point true time in this format, so the time column is filled
+# with 0.0 -- apply_time_window_cut should stay disabled for charge-light data
+# until a real per-point timing source is identified.
+
+NEUTRINO_TRACKID_PREFIX = 1
+COSMIC_TRACKID_PREFIX   = 2
+
+def build_true_points_charge_light(x, y, z, cluster_id, charge, energy=None, nu_idx=None):
+    """
+    Build the standard 7-column true point array [x, y, z, cluster_id, q_true, energy, time]
+    from charge-light sed-sce_drift_smear_readout fields. energy is the per-point
+    deposited energy in MeV ('e' field) when available -- same physical quantity/units
+    as the old (non charge-light) pipeline's energy column. Falls back to the charge
+    ('q') field when energy is None or empty (older-format files that lack 'e'). Time
+    has no per-point source in this format and is filled with 0.0.
+
+    q_true: when nu_idx is provided (non-empty, newer file format), q_true is taken
+    DIRECTLY from it -- 0=cosmic, 1/2/...=which neutrino interaction, distinguishing
+    MULTIPLE neutrino interactions in the same event. Falls back to the older binary
+    cluster_id (trackID) namespace check (0=cosmic, 1=neutrino, no index) when nu_idx
+    is None or empty. Note: reassign_cluster_ID_true still merges every point with
+    q_true>0 into a single cluster_id=9999 regardless of its specific index -- q_true
+    itself (column 4) is untouched by that merge, so per-neutrino-index breakdowns
+    must read q_true directly from points rather than relying on post-reassignment
+    cluster_id/count (see DrawLabelsByNeutrinoIndex in DrawRecoTrueClusters.py).
+    """
+    trackid_prefix = np.floor_divide(cluster_id, 10_000_000).astype(int)
+    if nu_idx is not None and len(nu_idx) == len(x):
+        q_true = nu_idx.astype(float)
+    else:
+        q_true = np.where(trackid_prefix == NEUTRINO_TRACKID_PREFIX, 1.0, 0.0)
+    time_placeholder = np.zeros_like(x)
+    energy_column = energy if energy is not None and len(energy) == len(x) else charge
+    return np.column_stack((x, y, z, cluster_id, q_true, energy_column, time_placeholder))
+
+
+def apply_deadarea_cut_true_vectorized(true_points, apa, view_type="2view", output_dir=None, event=None, file_name=None):
+    """
+    Vectorized reimplementation of apply_deadarea_cut_true() for charge-light
+    matching's larger per-event point counts. The legacy function checks each
+    point against each dead-area polygon one point at a time
+    (`path.contains_points([[y, z]])` inside a `for point: for polygon:`
+    double loop) -- profiling this branch's pipeline showed ~2.1M such calls
+    for a single event, ~48% of total per-event runtime. This calls each
+    polygon's contains_points() once over ALL points at once instead.
+    Produces identical filtering/print output to apply_deadarea_cut_true()
+    (diffed against it on real event data before switching this branch over);
+    kept as a separate function rather than editing the legacy one, which
+    other notebooks/pipelines still depend on.
+    """
+    print("Applying Dead Area Cut")
+    print(f"APA: {apa}, View: {view_type}")
+
+    deadarea_base = Path(__file__).parent / "Deadareas"
+
+    if view_type == "2view":
+        deadarea_path = deadarea_base / "2viewactive_2viewdead"
+    else:
+        deadarea_path = deadarea_base / "3viewactive_1viewdead"
+
+    if apa == "APA0":
+        deadarea_file = deadarea_path / "0-channel-deadarea-apa0-face0.json"
+    else:
+        deadarea_file = deadarea_path / "0-channel-deadarea-apa1-face0.json"
+
+    if not deadarea_file.exists():
+        print(f"Warning: Dead area file not found at {deadarea_file}")
+        print("Returning points unmodified")
+        return true_points
+
+    with open(deadarea_file, 'r') as f:
+        deadarea_data = json.load(f)
+
+    polygon_paths = []
+    for shape in deadarea_data:
+        vertices = np.array([[p[0], p[1]] for p in shape])
+        polygon_paths.append(MplPath(vertices))
+
+    points_before = len(true_points)
+    yz_points = true_points[:, 1:3]
+
+    in_deadarea = np.zeros(points_before, dtype=bool)
+    for path in polygon_paths:
+        in_deadarea |= path.contains_points(yz_points)
+
+    filtered_points = true_points[~in_deadarea]
+    points_after = len(filtered_points)
+    points_removed = points_before - points_after
+
+    print(f"Number of points before dead area cut: {points_before}")
+    print(f"Number of points after dead area cut: {points_after}")
+    print(f"Points removed: {points_removed} ({100*points_removed/points_before:.1f}%)" if points_before > 0 else "")
+
+    cluster_ids = true_points[:, 3].astype(int)
+    cluster_before = {}
+    cluster_after = {}
+    for cid in np.unique(cluster_ids):
+        mask = cluster_ids == cid
+        cluster_before[int(cid)] = int(mask.sum())
+        cluster_after[int(cid)] = int((mask & ~in_deadarea).sum())
+
+    for cid in sorted(cluster_before.keys()):
+        before = cluster_before[cid]
+        after = cluster_after.get(cid, 0)
+        if after == 0:
+            print(f"  Cluster {cid}: {before} -> {after} points (REMOVED)")
+        elif after < before:
+            removed = before - after
+            pct = (removed / before) * 100
+            print(f"  Cluster {cid}: {before} -> {after} points ({removed} removed, {pct:.1f}%)")
+
+    if output_dir is not None:
+        try:
+            from DrawRecoTrueClusters import DrawPointsBeforeAfterDeadArea
+            DrawPointsBeforeAfterDeadArea(cluster_before, cluster_after, event, apa, output_dir, file_name)
+            print(f"\nDrew before/after dead area visualizations")
+        except Exception as e:
+            print(f"Warning: Could not draw before/after visualizations: {e}")
+
+    return filtered_points
+
+
+def apply_deadarea_cut_true_charge_light(true_points, view_type="2view", output_dir=None, event=None, file_name=None):
+    """
+    Applies apply_deadarea_cut_true_vectorized() to combined-APA charge-light
+    true points (see that function's docstring for why this doesn't use the
+    legacy per-point apply_deadarea_cut_true() anymore). The dead-area maps
+    are still per-APA, so this splits points by X sign (X<0 -> APA0, X>=0 ->
+    APA1 -- charge drifts to its nearest anode, not across the cathode at
+    x=0; verified against this format's continuous, non-gapped X
+    distribution) and recombines the two filtered halves. Charge-light
+    matching is not per-APA (unlike the older pipeline), so both halves share
+    the same output_dir -- no APA0/APA1 subdirectories -- and rely on the apa
+    label already embedded in each plot's filename to stay distinguishable.
+    """
+    if len(true_points) == 0:
+        return true_points
+
+    apa0_mask = true_points[:, 0] < 0
+    apa1_mask = ~apa0_mask
+
+    filtered_parts = []
+    for mask, apa in ((apa0_mask, "APA0"), (apa1_mask, "APA1")):
+        if not mask.any():
+            continue
+        filtered_parts.append(apply_deadarea_cut_true_vectorized(true_points[mask], apa, view_type, output_dir, event, file_name))
+
+    filtered_parts = [p for p in filtered_parts if len(p) > 0]
+    if not filtered_parts:
+        return np.array([]).reshape(0, true_points.shape[1])
+    return np.vstack(filtered_parts)

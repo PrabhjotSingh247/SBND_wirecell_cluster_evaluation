@@ -3003,3 +3003,87 @@ def DrawPuritySummaryPerFile(all_purity_results, input_directories_map, output_d
 
 
 
+
+def summarize_cluster_efficiency_by_energy(pair_metadata_list, all_true_metadata_list=None,
+                                           energy_threshold=500):
+    """
+    Mean efficiency below vs above an energy threshold, for the SAME cluster
+    population the efficiency_2d_1d_clusteringlevel 1D plots are drawn from:
+    _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list),
+    i.e. 1-to-1 matched true-reco pairs PLUS true clusters that never matched
+    any reco cluster, the latter entering at efficiency=0. Pass the same two
+    lists given to DrawClusterEfficiencyVsTrueEnergyPerJob and these numbers
+    describe exactly the curves in
+    efficiency_vs_true_energy_1d_clusteringlevel_job_*.png and its by-category
+    companion -- drop all_true_metadata_list and it instead describes the
+    pairs-only directory's plots.
+
+    The mean is CLUSTER-weighted (mean over every cluster on that side of the
+    threshold), not the unweighted mean of the plotted per-bin means: the 1D
+    plot's bins hold wildly different cluster counts, so averaging the bin
+    values would let a bin holding one cluster count as much as a bin holding
+    hundreds. Reading a single "average efficiency below/above X MeV" off that
+    curve by eye is really this number.
+
+    Returns a list of dicts, one for all clusters plus one per category present:
+        {'category', 'n_below', 'mean_below', 'n_above', 'mean_above', 'n_total'}
+    with mean_* None when that side has no clusters. Categories use the same
+    definitions as the by-category 1D plot (neutrino, isochronous/normal/
+    prolonged cosmic).
+    """
+    all_entries = _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list)
+    if not all_entries:
+        return []
+
+    def _in_category(metadata, category_key):
+        if category_key == 'neutrino':
+            return metadata['cluster_type'] == 'neutrino'
+        return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
+
+    def _summarize(entries, label):
+        below = [m['efficiency'] for m in entries if m['total_true_energy'] < energy_threshold]
+        above = [m['efficiency'] for m in entries if m['total_true_energy'] >= energy_threshold]
+        return {
+            'category':   label,
+            'n_total':    len(entries),
+            'n_below':    len(below),
+            'mean_below': float(np.mean(below)) if below else None,
+            'n_above':    len(above),
+            'mean_above': float(np.mean(above)) if above else None,
+        }
+
+    category_labels = {
+        'neutrino':           'Neutrino Clusters',
+        'isochronous_cosmic': 'Isochronous Cosmic',
+        'normal_cosmic':      'Normal Cosmic',
+        'prolonged_cosmic':   'Prolonged Cosmic',
+    }
+
+    records = [_summarize(all_entries, 'All Clusters')]
+    for category_key, label in category_labels.items():
+        category_entries = [m for m in all_entries if _in_category(m, category_key)]
+        if category_entries:
+            records.append(_summarize(category_entries, label))
+    return records
+
+
+def format_cluster_efficiency_by_energy(records, energy_threshold=500):
+    """
+    Render summarize_cluster_efficiency_by_energy()'s records as text lines for
+    job_summary/summary.txt. Returns [] for empty records so the caller can
+    extend() unconditionally.
+    """
+    if not records:
+        return []
+
+    lines = [
+        f"Efficiency vs True Energy (clusteringlevel 1D plots, split at {energy_threshold} MeV):",
+        "  Mean efficiency, cluster-weighted; includes unmatched true clusters at efficiency=0",
+        f"  {'category':<22} {'<'+str(energy_threshold)+' MeV':>12} {'n':>7} {'>='+str(energy_threshold)+' MeV':>13} {'n':>7}",
+    ]
+    for r in records:
+        below = f"{r['mean_below']:.4f}" if r['mean_below'] is not None else "n/a"
+        above = f"{r['mean_above']:.4f}" if r['mean_above'] is not None else "n/a"
+        lines.append(f"  {r['category']:<22} {below:>12} {r['n_below']:>7} {above:>13} {r['n_above']:>7}")
+    lines.append("")
+    return lines

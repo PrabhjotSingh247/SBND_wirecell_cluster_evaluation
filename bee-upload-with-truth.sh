@@ -16,7 +16,7 @@ set -eo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ORIGINAL_BEE_DIR="/exp/sbnd/data/users/prabhjot/wirecell_clustering/developcode/wcp-porting-validation/"
-UPLOAD="${UPLOAD_TO_BEE:-$ORIGINAL_BEE_DIR/upload-to-bee.sh}"
+UPLOAD="${UPLOAD_TO_BEE:-$HERE/upload-to-bee.sh}"
 MERGE_APA="$ORIGINAL_BEE_DIR/merge-apa.py"
 OUT_ZIP="combined.zip"
 WORK="data"

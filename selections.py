@@ -471,7 +471,8 @@ def build_true_points_charge_light(x, y, z, cluster_id, charge, energy=None, nu_
     return np.column_stack((x, y, z, cluster_id, q_true, energy_column, time_placeholder))
 
 
-def apply_deadarea_cut_true_vectorized(true_points, apa, view_type="2view", output_dir=None, event=None, file_name=None):
+def apply_deadarea_cut_true_vectorized(true_points, apa, view_type="2view", output_dir=None, event=None, file_name=None,
+                                       verbose=True):
     """
     Vectorized reimplementation of apply_deadarea_cut_true() for charge-light
     matching's larger per-event point counts. The legacy function checks each
@@ -484,9 +485,21 @@ def apply_deadarea_cut_true_vectorized(true_points, apa, view_type="2view", outp
     (diffed against it on real event data before switching this branch over);
     kept as a separate function rather than editing the legacy one, which
     other notebooks/pipelines still depend on.
+
+    verbose=False suppresses the reporting only -- the FILTERING is identical
+    either way, so the returned points do not depend on it. What it skips is
+    the per-cluster before/after tally, which is O(n_clusters x n_points)
+    (~227 clusters x ~92k points per event in this format, computed twice and
+    once per APA) and exists purely to feed the per-cluster print lines. Once
+    the prints are unwanted that loop is the dominant cost of this function --
+    the polygon test above it is vectorized and cheap. The tally IS still
+    computed when output_dir is given, since DrawPointsBeforeAfterDeadArea
+    needs it; verbose=False then suppresses just the printing. Callers that
+    want neither should pass output_dir=None as well.
     """
-    print("Applying Dead Area Cut")
-    print(f"APA: {apa}, View: {view_type}")
+    if verbose:
+        print("Applying Dead Area Cut")
+        print(f"APA: {apa}, View: {view_type}")
 
     deadarea_base = Path(__file__).parent / "Deadareas"
 
@@ -501,6 +514,8 @@ def apply_deadarea_cut_true_vectorized(true_points, apa, view_type="2view", outp
         deadarea_file = deadarea_path / "0-channel-deadarea-apa1-face0.json"
 
     if not deadarea_file.exists():
+        # Printed regardless of verbose: this is not reporting, it means the cut
+        # silently did not happen.
         print(f"Warning: Dead area file not found at {deadarea_file}")
         print("Returning points unmodified")
         return true_points
@@ -524,40 +539,48 @@ def apply_deadarea_cut_true_vectorized(true_points, apa, view_type="2view", outp
     points_after = len(filtered_points)
     points_removed = points_before - points_after
 
-    print(f"Number of points before dead area cut: {points_before}")
-    print(f"Number of points after dead area cut: {points_after}")
-    print(f"Points removed: {points_removed} ({100*points_removed/points_before:.1f}%)" if points_before > 0 else "")
+    if verbose:
+        print(f"Number of points before dead area cut: {points_before}")
+        print(f"Number of points after dead area cut: {points_after}")
+        print(f"Points removed: {points_removed} ({100*points_removed/points_before:.1f}%)" if points_before > 0 else "")
 
-    cluster_ids = true_points[:, 3].astype(int)
+    # Per-cluster before/after tally: only needed to print, or to draw. Skipping
+    # it when neither is wanted is the whole point of verbose=False -- see the
+    # docstring.
     cluster_before = {}
     cluster_after = {}
-    for cid in np.unique(cluster_ids):
-        mask = cluster_ids == cid
-        cluster_before[int(cid)] = int(mask.sum())
-        cluster_after[int(cid)] = int((mask & ~in_deadarea).sum())
+    if verbose or output_dir is not None:
+        cluster_ids = true_points[:, 3].astype(int)
+        for cid in np.unique(cluster_ids):
+            mask = cluster_ids == cid
+            cluster_before[int(cid)] = int(mask.sum())
+            cluster_after[int(cid)] = int((mask & ~in_deadarea).sum())
 
-    for cid in sorted(cluster_before.keys()):
-        before = cluster_before[cid]
-        after = cluster_after.get(cid, 0)
-        if after == 0:
-            print(f"  Cluster {cid}: {before} -> {after} points (REMOVED)")
-        elif after < before:
-            removed = before - after
-            pct = (removed / before) * 100
-            print(f"  Cluster {cid}: {before} -> {after} points ({removed} removed, {pct:.1f}%)")
+    if verbose:
+        for cid in sorted(cluster_before.keys()):
+            before = cluster_before[cid]
+            after = cluster_after.get(cid, 0)
+            if after == 0:
+                print(f"  Cluster {cid}: {before} -> {after} points (REMOVED)")
+            elif after < before:
+                removed = before - after
+                pct = (removed / before) * 100
+                print(f"  Cluster {cid}: {before} -> {after} points ({removed} removed, {pct:.1f}%)")
 
     if output_dir is not None:
         try:
             from DrawRecoTrueClusters import DrawPointsBeforeAfterDeadArea
             DrawPointsBeforeAfterDeadArea(cluster_before, cluster_after, event, apa, output_dir, file_name)
-            print(f"\nDrew before/after dead area visualizations")
+            if verbose:
+                print(f"\nDrew before/after dead area visualizations")
         except Exception as e:
             print(f"Warning: Could not draw before/after visualizations: {e}")
 
     return filtered_points
 
 
-def apply_deadarea_cut_true_charge_light(true_points, view_type="2view", output_dir=None, event=None, file_name=None):
+def apply_deadarea_cut_true_charge_light(true_points, view_type="2view", output_dir=None, event=None, file_name=None,
+                                         verbose=True):
     """
     Applies apply_deadarea_cut_true_vectorized() to combined-APA charge-light
     true points (see that function's docstring for why this doesn't use the
@@ -569,6 +592,9 @@ def apply_deadarea_cut_true_charge_light(true_points, view_type="2view", output_
     matching is not per-APA (unlike the older pipeline), so both halves share
     the same output_dir -- no APA0/APA1 subdirectories -- and rely on the apa
     label already embedded in each plot's filename to stay distinguishable.
+
+    verbose is passed straight through; see apply_deadarea_cut_true_vectorized
+    for what it does and does not affect (reporting only -- never the filtering).
     """
     if len(true_points) == 0:
         return true_points
@@ -580,7 +606,8 @@ def apply_deadarea_cut_true_charge_light(true_points, view_type="2view", output_
     for mask, apa in ((apa0_mask, "APA0"), (apa1_mask, "APA1")):
         if not mask.any():
             continue
-        filtered_parts.append(apply_deadarea_cut_true_vectorized(true_points[mask], apa, view_type, output_dir, event, file_name))
+        filtered_parts.append(apply_deadarea_cut_true_vectorized(true_points[mask], apa, view_type, output_dir, event, file_name,
+                                                                 verbose=verbose))
 
     filtered_parts = [p for p in filtered_parts if len(p) > 0]
     if not filtered_parts:

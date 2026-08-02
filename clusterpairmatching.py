@@ -12,6 +12,14 @@ def MatchTrueToReco1to1(efficiency_results, purity_results):
     efficiency_df   = pd.DataFrame(efficiency_results)
     purity_df       = pd.DataFrame(purity_results)
 
+    # purity_df carries its own 'total_true_cluster_energy' column, but only on its
+    # unmatched-sentinel rows (true_cluster_id=8888, which never merge here anyway).
+    # Left in place, pandas would silently rename both sides' colliding column to
+    # total_true_cluster_energy_x/_y on merge, and every downstream .get('total_true_cluster_energy')
+    # lookup would fall through to its default of 0. Drop it here so efficiency_df's
+    # real per-true-cluster value (the one actually wanted) survives the merge intact.
+    purity_df = purity_df.drop(columns=['total_true_cluster_energy'], errors='ignore')
+
     merged_df       = pd.merge(efficiency_df, purity_df, on=['event', 'true_cluster_id', 'reco_cluster_id'])
     matched_pairs   = merged_df[merged_df['efficiency_energy_weighted'] > 0]
 

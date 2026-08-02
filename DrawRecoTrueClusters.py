@@ -515,6 +515,149 @@ def DrawLabels(true_clusters, event, apa, PLOTDIR_EVT, file_name=None):
     plt.savefig(PLOTDIR_EVT / f"true_clusters_by_type_event{event}_apa_{apa}.png", dpi=100, bbox_inches='tight')
     plt.close()
 
+
+def DrawLabelsAggregated(cluster_type_records, output_dir, level_name, filename_prefix, apa, file_name=None,
+                         vertex_records=None):
+    """
+    Bar chart of true CLUSTER counts: Neutrino (any q_true>0, aggregated
+    across however many distinct neutrino indices are present) vs Cosmic
+    (q_true=0). Used at Event/File/Job level alike -- cluster_type_records
+    can span multiple events (see metadata.build_true_cluster_type_records()).
+
+    This is the two-bar aggregate view DrawLabels/DrawLabelPerFile/
+    DrawLabelPerJob already provide, reproduced here reading is_neutrino from
+    build_true_cluster_type_records() (q_true>0 check) instead of
+    cluster_category_results (q_true==1 exact-match check, silently wrong once
+    q_true can be a neutrino index of 2 or higher). Since
+    reassign_cluster_ID_true already merges every neutrino point into one
+    cluster_id=9999 regardless of index, this never shows more than 1
+    neutrino cluster -- for a per-neutrino-index breakdown, see
+    DrawLabelsByNuIdx instead.
+
+    Parameters:
+    - cluster_type_records: List of dicts from metadata.build_true_cluster_type_records(),
+        each with 'cluster_id', 'is_neutrino'
+    - output_dir: Output directory
+    - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
+    - apa: APA identifier (label only, e.g. "Combined")
+    - file_name: Optional input file name for title
+    - vertex_records: Optional metadata.build_neutrino_vertex_records() output; when
+        given, a leading bar shows the TOTAL true neutrino interactions from mc.json
+        (deposits or not, cut or not) alongside the surviving-cluster counts
+    """
+    if not cluster_type_records:
+        return
+
+    n_neutrino = sum(1 for r in cluster_type_records if r['is_neutrino'])
+    n_cosmic   = sum(1 for r in cluster_type_records if not r['is_neutrino'])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    if vertex_records:
+        # Neutrino bar = every true neutrino INTERACTION in mc.json (deposits or
+        # not, cut or not). Neither the depositing count nor the post-cut
+        # surviving count is shown here -- true_neutrino_breakdown_*.png splits
+        # exactly these interactions three ways, and removed_true_neutrino_info.txt
+        # records what went missing and why.
+        # NOTE the two bars are different quantities: neutrino INTERACTIONS
+        # against cosmic CLUSTERS. They are not directly comparable, which is why
+        # each bar names its source.
+        categories = ['Total true neutrinos\n(mc.json interactions)',
+                      'Cosmic clusters\n(q_true=0)']
+        counts = [len(vertex_records), n_cosmic]
+        colors = ['red', 'blue']
+    else:
+        # No vertex records (other pipelines): original neutrino/cosmic CLUSTER counts
+        categories = ['Neutrino\n(q_true>0)', 'Cosmic\n(q_true=0)']
+        counts = [n_neutrino, n_cosmic]
+        colors = ['red', 'blue']
+    bars = ax.bar(categories, counts, width=0.4, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
+
+    ax.set_ylabel('Number of Clusters', fontsize=12, fontweight='bold')
+    ax.set_xlabel('Cluster Type', fontsize=12, fontweight='bold')
+    title = f'True Clusters by Type (Aggregated): {level_name}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / f'labels_aggregated_{filename_prefix}_{apa}.png', dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawLabelsByNuIdx(cluster_type_records, output_dir, level_name, filename_prefix, apa, file_name=None):
+    """
+    Bar chart of true CLUSTER counts split by nu_idx: Cosmic (q_true=0),
+    1st/2nd/3rd/... neutrino (nu_idx=1/2/3/...). Used at Event/File/Job level
+    alike -- cluster_type_records can span multiple events.
+
+    Unlike DrawLabelsAggregated (one "any neutrino" bucket, capped at 1 per
+    event since reassign_cluster_ID_true merges every neutrino point into a
+    single cluster_id=9999), this expands cluster 9999 using
+    cluster_type_records' 'nu_idx_values' field (build_true_cluster_type_records)
+    -- one count per DISTINCT nu_idx value found, so multiple neutrino
+    interactions merged under the same cluster_id are still counted
+    separately here. Bar labels/count of bars adapt to whatever nu_idx values
+    are actually present in the data (e.g. only "1st neutrino" bars appear if
+    no event has 2+ neutrino interactions).
+
+    Parameters:
+    - cluster_type_records: List of dicts from metadata.build_true_cluster_type_records(),
+        each with 'is_neutrino', 'nu_idx_values'
+    - output_dir: Output directory
+    - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
+    - apa: APA identifier (label only, e.g. "Combined")
+    - file_name: Optional input file name for title
+    """
+    if not cluster_type_records:
+        return
+
+    n_cosmic = sum(1 for r in cluster_type_records if not r['is_neutrino'])
+    nu_idx_counts = {}
+    for r in cluster_type_records:
+        for nu_idx in r.get('nu_idx_values', []):
+            nu_idx_counts[nu_idx] = nu_idx_counts.get(nu_idx, 0) + 1
+
+    ordinal = {1: '1st', 2: '2nd', 3: '3rd'}
+    categories = ['Cosmic\n(q_true=0)']
+    counts = [n_cosmic]
+    colors = ['blue']
+    for nu_idx in sorted(nu_idx_counts):
+        label = ordinal.get(nu_idx, f'{nu_idx}th')
+        categories.append(f'{label} neutrino\n(nu_idx={nu_idx})')
+        counts.append(nu_idx_counts[nu_idx])
+        colors.append('red')
+
+    fig, ax = plt.subplots(figsize=(max(10, 2 * len(categories)), 6))
+    bars = ax.bar(categories, counts, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
+
+    ax.set_ylabel('Number of Clusters', fontsize=12, fontweight='bold')
+    ax.set_xlabel('Cluster Type', fontsize=12, fontweight='bold')
+    title = f'True Clusters by Type (By Neutrino Index): {level_name}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / f'labels_by_nu_idx_{filename_prefix}_{apa}.png', dpi=100, bbox_inches='tight')
+    plt.close()
+
+
 def _count_cluster_types(metadata_list):
     """
     Count neutrino vs cosmic true clusters, and cosmic sub-categories, from a metadata list
@@ -1078,3 +1221,483 @@ def DrawClusterBeforeAfterDeadArea(true_points_before, true_points_after, deadar
                 dpi=100, bbox_inches='tight')
     plt.close()
 
+
+# ============================================================================
+# CHARGE-LIGHT MATCHING FORMAT (additive; existing functions above are untouched)
+# ============================================================================
+
+def draw_clustering_global_clusters(all_clusters, beam_window_clusters, event, apa, output_dir, file_name=None):
+    """
+    Draw clustering-global clusters (post charge-light-matching) in XZ, YZ,
+    XY projections as a 2x3 grid of panels: row 1 = all clusters, row 2 =
+    only clusters whose associated flash (via
+    metadata.build_img_cluster_flash_metadata()) falls inside the beam
+    window. XZ/YZ put Z on the x-axis (matching DrawTrueRecoClustersXZ/YZ's
+    convention above). Event level only -- not meant to be aggregated to
+    file/job level.
+
+    Parameters:
+    - all_clusters, beam_window_clusters: dicts {cluster_id: points}, points
+        columns [x, y, z, cluster_id, charge]. Grouped by clustering-global.json's
+        own cluster_id (a different numbering scheme than img-global's cluster_id --
+        see build_img_cluster_flash_metadata in metadata.py). beam_window_clusters
+        must be a subset of all_clusters (same cluster_id keys) so both panels
+        use the same color per cluster ID.
+    - event: Event number
+    - apa: APA label (e.g. "Combined")
+    - output_dir: Output directory
+    - file_name: Optional input file name for title
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Same color for the same cluster_id in both rows, instead of each
+    # subplot's independent color cycle -- see draw_img_global_clusters in
+    # DrawRecoTrueFlashes.py for the identical rationale.
+    color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    cluster_colors = {
+        cluster_id: color_cycle[i % len(color_cycle)]
+        for i, cluster_id in enumerate(sorted(all_clusters.keys()))
+    }
+
+    # "All Clusters" row skips the per-cluster legend if there are many
+    # clusters, same reasoning as draw_img_global_clusters.
+    rows = [
+        ("All Clusters", all_clusters, len(all_clusters) <= 20),
+        ("Clusters In Beam Window", beam_window_clusters, True),
+    ]
+    # (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel)
+    views = [
+        ("XZ", 2, 0, (0, 500), (-250, 250), "z [cm]", "x [cm]"),
+        ("YZ", 2, 1, (0, 500), (-250, 250), "z [cm]", "y [cm]"),
+        ("XY", 0, 1, (-250, 250), (-250, 250), "x [cm]", "y [cm]"),
+    ]
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+
+    for row_idx, (row_label, clusters, show_legend) in enumerate(rows):
+        for col_idx, (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel) in enumerate(views):
+            ax = axes[row_idx, col_idx]
+            ax.set_xlim(xlim)
+            ax.set_ylim(ylim)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            title = f"{row_label}: Event {event}, {apa}, {view_label}"
+            if file_name:
+                title += f" ({file_name})"
+            ax.set_title(title, fontsize=10)
+
+            for cluster_id, points in clusters.items():
+                points = np.array(points)
+                color = cluster_colors[cluster_id]
+                ax.scatter(points[:, x_col], points[:, y_col], s=1, alpha=0.5, color=color)
+                if show_legend:
+                    ax.plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
+            if clusters and show_legend:
+                ax.legend(fontsize=6, loc='upper right')
+            elif clusters:
+                ax.text(0.98, 0.98, f'{len(clusters)} clusters', transform=ax.transAxes,
+                        fontsize=8, ha='right', va='top',
+                        bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"clustering_global_clusters_event{event}_{apa}.png", dpi=100)
+    plt.close()
+
+
+def DrawNeutrinoVertices(vertex_records, output_dir, level_name, filename_prefix, apa,
+                         file_name=None, x_min=None, x_max=None, y_min=None, y_max=None,
+                         z_min=None, z_max=None, volume_label="wire-readout sensitive box"):
+    """
+    2D scatter of TRUE NEUTRINO interaction vertices (mc.json), in XZ, YZ and XY
+    projections, as a 2x2 grid whose fourth panel carries the shared legend.
+    Event/File/Job level alike -- vertex_records can span any number of events
+    (metadata.build_neutrino_vertex_records).
+
+    ALL interactions are drawn -- in-volume, out-of-volume, and those that
+    deposited nothing. Colour encodes in/out of the volume, marker fill encodes
+    whether anything was deposited (open = no deposits).
+
+    Vertices are split by whether they fall inside the volume bounds, and the
+    volume itself is drawn as a rectangle in each panel, so the in/out
+    classification can be judged by eye rather than taken on trust -- the point
+    being to decide from the job-level plot which volume definition to adopt.
+    Axes auto-scale to the data (out-of-volume vertices sit far outside the
+    detector, hundreds of cm away) while always containing the box, so nothing
+    is silently clipped out of view.
+
+    Only neutrinos appear here: cosmics have no mc.json interaction vertex.
+
+    Parameters:
+    - vertex_records: List of dicts from metadata.build_neutrino_vertex_records(),
+        each with 'vertex_x', 'vertex_y', 'vertex_z', 'vertex_in_volume'
+    - output_dir: Output directory
+    - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
+    - apa: APA identifier (label only, e.g. "Combined")
+    - file_name: Optional input file name for title
+    - x_min..z_max: volume bounds to draw; the box is skipped if any is None
+    - volume_label: how the box is described in the legend
+    """
+    # ALL interactions are drawn -- in-volume and out-of-volume, including those
+    # that deposited nothing in the active volume. This is a map of where the
+    # neutrinos were, so leaving any out would misrepresent the sample. All
+    # markers are solid; COLOUR alone separates the three groups (green =
+    # in-volume, orange = out-of-volume with deposits, purple = out-of-volume
+    # with none -- the last are absent from every cluster-level plot and are
+    # itemised in removed_true_neutrino_info.txt).
+    drawn = [r for r in vertex_records
+             if r.get('vertex_x') is not None and r.get('vertex_y') is not None and r.get('vertex_z') is not None]
+    if not drawn:
+        return
+
+    def _deposited(record):
+        # A surviving cluster obviously deposited; precut_n_points catches the
+        # ones the cuts later removed (only available when
+        # build_neutrino_vertex_records was given clusters_true_precut).
+        return bool(record.get('has_true_cluster') or record.get('precut_n_points', 0) > 0)
+
+    groups = [
+        ([r for r in drawn if r.get('vertex_in_volume') is True and _deposited(r)],
+         'green', 'o', True, 'in volume, deposits'),
+        ([r for r in drawn if r.get('vertex_in_volume') is True and not _deposited(r)],
+         'green', 'o', False, 'in volume, NO deposits'),
+        ([r for r in drawn if r.get('vertex_in_volume') is not True and _deposited(r)],
+         'darkorange', '^', True, 'out of volume, deposits'),
+        # Own COLOUR, not just an open marker: these are the interactions that are
+        # invisible to the detector entirely (mc.json Edep = 0, no sed points), and
+        # where they sit relative to the volume is the thing worth seeing. Sharing
+        # orange with the depositing out-of-volume group made the two separable
+        # only by fill, which is far too subtle at this point density.
+        ([r for r in drawn if r.get('vertex_in_volume') is not True and not _deposited(r)],
+         'purple', '^', True, 'out of volume, NO deposits'),
+    ]
+    have_box = all(b is not None for b in (x_min, x_max, y_min, y_max, z_min, z_max))
+
+    # (view, x key, y key, xlabel, ylabel, box x range, box y range)
+    views = [
+        ("XZ", 'vertex_z', 'vertex_x', "z [cm]", "x [cm]", (z_min, z_max), (x_min, x_max)),
+        ("YZ", 'vertex_z', 'vertex_y', "z [cm]", "y [cm]", (z_min, z_max), (y_min, y_max)),
+        ("XY", 'vertex_x', 'vertex_y', "x [cm]", "y [cm]", (x_min, x_max), (y_min, y_max)),
+    ]
+
+    # 2x2: the three projections plus a dedicated legend panel. One shared legend
+    # at readable size beats the same three entries repeated in every panel, and
+    # the freed corner costs nothing since there are only three views.
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    panels = [axes[0, 0], axes[0, 1], axes[1, 0]]
+    legend_ax = axes[1, 1]
+    legend_handles = None
+
+    # Spell the bounds out in the legend: "in volume" is meaningless without the
+    # numbers behind it, and these are the values that decide every in/out count
+    # in this plot and the bar charts beside it.
+    if have_box:
+        box_label = (f"{volume_label}\n"
+                     f"x: [{x_min:g}, {x_max:g}] cm\n"
+                     f"y: [{y_min:g}, {y_max:g}] cm\n"
+                     f"z: [{z_min:g}, {z_max:g}] cm")
+    else:
+        box_label = volume_label
+
+    for ax, (view_label, xk, yk, xlabel, ylabel, box_x, box_y) in zip(panels, views):
+        for group, color, marker, filled, label in groups:
+            if group:
+                ax.scatter([r[xk] for r in group], [r[yk] for r in group],
+                           s=34, alpha=0.75, marker=marker,
+                           facecolors=(color if filled else 'none'), edgecolors=color,
+                           linewidths=1.4, label=f'{label} ({len(group)})')
+
+        if have_box:
+            ax.add_patch(plt.Rectangle((box_x[0], box_y[0]), box_x[1] - box_x[0], box_y[1] - box_y[0],
+                                       fill=False, edgecolor='black', linewidth=1.8, linestyle='--',
+                                       label=box_label))
+            # Always show the whole box plus the data, with a margin on the wider of the two
+            xs = [r[xk] for r in drawn] + list(box_x)
+            ys = [r[yk] for r in drawn] + list(box_y)
+        else:
+            xs = [r[xk] for r in drawn]
+            ys = [r[yk] for r in drawn]
+
+        x_pad = max((max(xs) - min(xs)) * 0.05, 10.0)
+        y_pad = max((max(ys) - min(ys)) * 0.05, 10.0)
+        ax.set_xlim(min(xs) - x_pad, max(xs) + x_pad)
+        ax.set_ylim(min(ys) - y_pad, max(ys) + y_pad)
+        ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
+        ax.set_ylabel(ylabel, fontsize=12, fontweight='bold')
+        title = f"True Neutrino Vertices: {level_name}, {apa}, {view_label}"
+        if file_name:
+            title += f" ({file_name})"
+        ax.set_title(title, fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=11)
+        if legend_handles is None:
+            legend_handles = ax.get_legend_handles_labels()
+
+    legend_ax.axis('off')
+    if legend_handles and legend_handles[0]:
+        legend_ax.legend(*legend_handles, fontsize=16, loc='center', frameon=True,
+                         title=f"True neutrino interactions: {len(drawn)}", title_fontsize=18,
+                         labelspacing=1.1, borderpad=1.0)
+
+    plt.tight_layout()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / f"true_neutrino_vertices_{filename_prefix}_{apa}.png", dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawNeutrinoVolumeCategory(vertex_records, output_dir, level_name, filename_prefix, apa, file_name=None,
+                               volume_label="wire-readout sensitive box"):
+    """
+    Bar chart of true neutrino interactions split by whether their mc.json vertex
+    falls inside the volume: In-volume vs Out-of-volume. Event/File/Job level
+    alike (metadata.build_neutrino_vertex_records records can span any number of
+    events).
+
+    Only interactions whose true cluster SURVIVED all true selections are counted,
+    so the two bars sum to the neutrino count in labels_aggregated /
+    true_cluster_info.txt for the same level.
+
+    This is a CLASSIFICATION of the neutrino sample, not a cut: nothing in the
+    pipeline selects on the vertex. The energy selection stays deposit-based
+    (apply_energy_cutoff on the summed sed point energies) exactly as before --
+    an out-of-volume interaction whose daughter deposits inside the TPC is still
+    a perfectly good cluster and is treated as one everywhere else.
+
+    Parameters:
+    - vertex_records: List of dicts from metadata.build_neutrino_vertex_records(),
+        each with 'vertex_in_volume'
+    - output_dir: Output directory
+    - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
+    - apa: APA identifier (label only, e.g. "Combined")
+    - file_name: Optional input file name for title
+    - volume_label: how the volume is described in the axis label
+    """
+    # SURVIVORS ONLY -- see DrawNeutrinoVertices for why, and
+    # removed_true_neutrino_info.txt for what was dropped.
+    surviving = [r for r in vertex_records if r.get('has_true_cluster')]
+    if not surviving:
+        return
+
+    n_in  = sum(1 for r in surviving if r.get('vertex_in_volume') is True)
+    n_out = sum(1 for r in surviving if r.get('vertex_in_volume') is False)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    categories = ['In-volume\n(vertex inside)', 'Out-of-volume\n(vertex outside)']
+    counts = [n_in, n_out]
+    bars = ax.bar(categories, counts, width=0.4, color=['green', 'darkorange'], alpha=0.7,
+                  edgecolor='black', linewidth=2)
+    for bar, count in zip(bars, counts):
+        ax.text(bar.get_x() + bar.get_width() / 2., bar.get_height(), f'{int(count)}',
+                ha='center', va='bottom', fontsize=16, fontweight='bold')
+
+    ax.set_ylabel('Number of True Neutrino Interactions', fontsize=13, fontweight='bold')
+    ax.set_xlabel(f'Interaction Vertex vs {volume_label}', fontsize=13, fontweight='bold')
+    title = f'True Neutrino Interactions by Vertex Volume: {level_name}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.tick_params(labelsize=12)
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / f'true_neutrino_vertex_volume_{filename_prefix}_{apa}.png',
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawNeutrinoFlavor(vertex_records, output_dir, level_name, filename_prefix, apa, file_name=None,
+                       volume_label="wire-readout sensitive box"):
+    """
+    Bar chart of neutrino FLAVOR (numu, nue, ... as named by mc.json's
+    interaction-vertex node) counting IN-VOLUME, CUT-SURVIVING interactions only
+    -- vertices outside the volume and interactions whose cluster the cuts
+    removed are both excluded, so this describes the flavour composition of the
+    in-detector sample that the rest of the pipeline actually evaluates.
+    Event/File/Job level alike.
+
+    Bars adapt to whatever flavours are present rather than assuming a fixed set,
+    so a flavour absent from a given event/file simply has no bar (this dataset
+    is overwhelmingly numu with a handful of nue).
+
+    Parameters:
+    - vertex_records: List of dicts from metadata.build_neutrino_vertex_records(),
+        each with 'flavor' and 'vertex_in_volume'
+    - output_dir: Output directory
+    - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
+    - apa: APA identifier (label only, e.g. "Combined")
+    - file_name: Optional input file name for title
+    - volume_label: how the volume is described in the title
+    """
+    # SURVIVORS ONLY, then in-volume -- see DrawNeutrinoVertices.
+    in_volume = [r for r in vertex_records
+                 if r.get('has_true_cluster') and r.get('vertex_in_volume') is True]
+    if not in_volume:
+        return
+
+    flavor_counts = {}
+    for r in in_volume:
+        flavor = r.get('flavor') or 'unknown'
+        flavor_counts[flavor] = flavor_counts.get(flavor, 0) + 1
+
+    flavors = sorted(flavor_counts, key=lambda f: -flavor_counts[f])
+    counts = [flavor_counts[f] for f in flavors]
+
+    color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    colors = [color_cycle[i % len(color_cycle)] for i in range(len(flavors))]
+
+    fig, ax = plt.subplots(figsize=(max(8, 2.2 * len(flavors)), 6))
+    # Default matplotlib bar width here (unlike the other neutrino bar charts):
+    # with only a couple of flavours present, narrower bars made the 1-count nue
+    # bar unreadable as a bar at all.
+    bars = ax.bar(flavors, counts, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
+    # Percentage is of the IN-VOLUME sample plotted here (len(in_volume)), which is
+    # what the bars are drawn from -- not of all interactions, and not of the
+    # surviving total. The title states that sample size so the denominator is
+    # never ambiguous.
+    for bar, count in zip(bars, counts):
+        pct = 100.0 * count / len(in_volume)
+        ax.text(bar.get_x() + bar.get_width() / 2., bar.get_height(),
+                f'{int(count)} ({pct:.1f}%)',
+                ha='center', va='bottom', fontsize=16, fontweight='bold')
+
+    ax.set_ylabel('Number of True Neutrino Interactions', fontsize=13, fontweight='bold')
+    ax.set_xlabel('Neutrino Flavor (mc.json)', fontsize=13, fontweight='bold')
+    title = f'In-Volume True Neutrino Flavor: {level_name}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(f'{title}\n(vertex inside the {volume_label}; {len(in_volume)} interactions)',
+                 fontsize=14, fontweight='bold')
+    ax.tick_params(labelsize=12)
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / f'true_neutrino_flavor_in_volume_{filename_prefix}_{apa}.png',
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawNeutrinoBreakdown(vertex_records, output_dir, level_name, filename_prefix, apa,
+                          file_name=None, energy_threshold=None):
+    """
+    Three stacked bars over EVERY mc.json interaction, each split by where the
+    interaction vertex sits (in-volume vs out-of-volume). Event/File/Job level
+    alike.
+
+      1. Total true neutrinos          -- every interaction-vertex node in
+                                          mc.json, deposits or not
+      2. ... with any deposited energy -- produced true points in the active
+                                          volume, i.e. a true cluster existed
+                                          BEFORE any cut. Equals the neutrino
+                                          cluster count SelectionAnalysis reports
+                                          at "No cuts"
+      3. Surviving the energy cut      -- its true cluster survived the true
+                                          selections; the neutrino count in
+                                          true_cluster_info.txt
+
+    Stacked rather than side by side so each bar's height is the quantity of
+    interest while the segments show what it is made of. Every segment carries
+    its own count and each bar its total, so nothing has to be read off the axis.
+
+    Bar 1 - bar 2 is the "no true deposits" category of
+    removed_true_neutrino_info.txt; bar 2 - bar 3 is what the cuts removed
+    (dominated by the energy cut). Bar 3's label names the energy threshold
+    because that is what does essentially all of the work between 2 and 3 -- the
+    geometric cuts are also applied but have been observed to remove nothing.
+
+    'any deposited energy' needs precut_n_points on the records (pass
+    clusters_true_precut to build_neutrino_vertex_records); without it bar 2
+    collapses onto bar 3.
+
+    Parameters:
+    - vertex_records: List of dicts from metadata.build_neutrino_vertex_records(),
+        each with 'vertex_in_volume' and 'has_true_cluster'
+    - output_dir: Output directory
+    - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
+    - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
+    - apa: APA identifier (label only, e.g. "Combined")
+    - file_name: Optional input file name for title
+    - energy_threshold: min_cluster_energy, named in bar 3's label; a generic
+        label is used when None
+    """
+    if not vertex_records:
+        return
+
+    def _split(records):
+        n_in = sum(1 for r in records if r.get('vertex_in_volume') is True)
+        return n_in, len(records) - n_in
+
+    def _deposited(record):
+        return bool(record.get('has_true_cluster') or record.get('precut_n_points', 0) > 0)
+
+    total_in, total_out         = _split(vertex_records)
+    deposited_in, deposited_out = _split([r for r in vertex_records if _deposited(r)])
+    surviving_in, surviving_out = _split([r for r in vertex_records if r.get('has_true_cluster')])
+
+    energy_label = (f'Surviving neutrinos with true\nneutrino energy > {energy_threshold:g} MeV'
+                    if energy_threshold is not None else
+                    'Surviving neutrinos after\nthe true energy cut')
+
+    IN_COLOR, OUT_COLOR = 'green', 'darkorange'
+    categories = ['Total true neutrinos',
+                  'Total true neutrinos with any\ndeposited energy in the detector',
+                  energy_label]
+    in_counts  = [total_in, deposited_in, surviving_in]
+    out_counts = [total_out, deposited_out, surviving_out]
+
+    # Narrow bars (half the matplotlib default): the bars carry three numbers
+    # each, so the labels want the room more than the bars do.
+    BAR_WIDTH = 0.4
+    fig, ax = plt.subplots(figsize=(13, 7))
+    bars_in  = ax.bar(categories, in_counts, width=BAR_WIDTH, color=IN_COLOR, alpha=0.8,
+                      edgecolor='black', linewidth=2, label='vertex in volume')
+    bars_out = ax.bar(categories, out_counts, width=BAR_WIDTH, bottom=in_counts, color=OUT_COLOR, alpha=0.8,
+                      edgecolor='black', linewidth=2, label='vertex out of volume')
+
+    # Segment values inside their own segment, each with its share OF THAT BAR --
+    # the composition is the point of stacking, and it shifts sharply between the
+    # bars (out-of-volume goes from two thirds of all interactions to a quarter of
+    # the survivors). Bar totals sit above the bar as plain counts: the only
+    # percentages shown are the in-volume/out-of-volume shares.
+    bar_totals = [i + o for i, o in zip(in_counts, out_counts)]
+
+    def _pct(count, denominator):
+        return f'{100.0 * count / denominator:.1f}%' if denominator else 'n/a'
+
+    for bar, count, bar_total in zip(bars_in, in_counts, bar_totals):
+        if count > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2., count / 2.,
+                    f'{count} ({_pct(count, bar_total)})',
+                    ha='center', va='center', fontsize=16, fontweight='bold', color='white')
+    for bar, count, base, bar_total in zip(bars_out, out_counts, in_counts, bar_totals):
+        if count > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2., base + count / 2.,
+                    f'{count} ({_pct(count, bar_total)})',
+                    ha='center', va='center', fontsize=16, fontweight='bold', color='white')
+    for bar, bar_total in zip(bars_in, bar_totals):
+        ax.text(bar.get_x() + bar.get_width() / 2., bar_total, f'{bar_total}',
+                ha='center', va='bottom', fontsize=18, fontweight='bold')
+
+    ax.set_ylabel('Number of True Neutrino Interactions', fontsize=15, fontweight='bold')
+    title = f'True Neutrino Breakdown: {level_name}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+    ax.set_title(title, fontsize=16, fontweight='bold')
+    ax.tick_params(labelsize=13)
+    ax.grid(True, alpha=0.3, axis='y')
+    ax.set_ylim(0, max(total_in + total_out, 1) * 1.15)
+    ax.legend(fontsize=15)
+
+    plt.tight_layout()
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / f'true_neutrino_breakdown_{filename_prefix}_{apa}.png',
+                dpi=100, bbox_inches='tight')
+    plt.close()

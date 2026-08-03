@@ -1,7 +1,7 @@
 """
 Phase A of the processing/analysis split (see project plan / CLAUDE.md).
 
-HighStatsEvaluation_MultiFile.ipynb currently redoes selections, KDTree efficiency/purity
+Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb currently redoes selections, KDTree efficiency/purity
 matching, category classification, and metadata computation from scratch every time it's
 run, plus draws ~10 plots per event - this is the reason a 10-file run takes >30 minutes,
 which won't scale to hundreds of files. This script runs that same expensive, point-cloud-
@@ -11,7 +11,7 @@ computed metadata into a single ROOT file via uproot.
 
 The per-event accumulation (accumulate_event_points, build_event_metadata) and the final
 ROOT write (write_root_file) are plain functions, not inlined in main() - so
-HighStatsEvaluation_MultiFile.ipynb can import and call them directly from inside its own
+Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb can import and call them directly from inside its own
 existing loop (reusing the clusters_true/clusters_reco/cluster_category_results/
 efficiency_results/purity_results it already computes for plotting) and get the same ROOT
 file as a side output, without recomputing anything or duplicating this logic.
@@ -66,7 +66,7 @@ from metadata import (
 )
 from variable_pca_linearity import calculate_pca_linearity
 
-# Same cut configuration and selection flags as HighStatsEvaluation_MultiFile.ipynb (cell 3),
+# Same cut configuration and selection flags as Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb (cell 3),
 # so this script reproduces identical selections/metrics, just without drawing.
 RADIUS_EFFICIENCY        = 2
 RADIUS_PURITY_XZ         = 2
@@ -172,7 +172,7 @@ def process_reco_clusters(x, y, z, cid, q):
 
 # ============================================================================
 # Reusable pieces, called both by this script's own main() and by
-# HighStatsEvaluation_MultiFile.ipynb (imported directly - see module docstring).
+# Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb (imported directly - see module docstring).
 # ============================================================================
 
 def new_points_accumulators():

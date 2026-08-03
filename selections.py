@@ -90,7 +90,7 @@ def reassign_cluster_ID_true_charge_light(points_5d):
 
     Kept separate from reassign_cluster_ID_true() -- that function is still
     used by metadata.py, process_events_to_root.py, analyze_cluster_spread.py,
-    and HighStatsEvaluation_MultiFile.ipynb, none of which have per-point
+    and Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb, none of which have per-point
     nu_idx available or expect this ID scheme.
     """
     clusters = {}

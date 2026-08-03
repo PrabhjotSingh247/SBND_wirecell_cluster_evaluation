@@ -136,6 +136,102 @@ def plot_1d_efficiency_energy(energies, efficiencies, energy_bins):
 
     return bin_centers_nonzero, mean_efficiency_per_bin
 
+
+# Styles for the single-population 1D efficiency plots below. Only two entries:
+# these are the neutrino/cosmic split, coarser than the four-way by-category
+# breakdown (neutrino + isochronous/normal/prolonged cosmic) drawn elsewhere.
+# 'neutrino' reuses the by-category plots' purple/D so the same population looks
+# the same wherever it appears.
+POPULATION_STYLES = {
+    'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple',     'marker': 'D'},
+    'cosmic':   {'label': 'Cosmic Clusters',   'color': 'darkorange', 'marker': 's'},
+}
+
+
+def _draw_1d_efficiency_single_population(energies, efficiencies, energy_bins, population,
+                                          output_dir, filename, title):
+    """
+    One 1D efficiency-vs-true-energy curve for a SINGLE population -- neutrino-only or
+    cosmic-only -- on its own canvas and its own file, alongside the "All Clusters"
+    plot each caller already draws.
+
+    Takes the caller's energy_bins rather than rebinning: the bins come from the full
+    cluster population, so the neutrino-only, cosmic-only and all-cluster curves land
+    on identical bin centres and can be read against each other directly. Rebinning per
+    population would silently shift the points and make the three plots incomparable.
+
+    Draws nothing at all when the population is empty. An empty canvas would read as
+    "efficiency is zero everywhere" rather than "there are no clusters of this kind",
+    which is the more common case at event level -- most events have no neutrino.
+    """
+    if not energies:
+        return
+
+    bin_centers, mean_efficiency = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    if len(bin_centers) == 0:
+        return
+
+    style = POPULATION_STYLES[population]
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(bin_centers, mean_efficiency, marker=style['marker'], linestyle='-',
+             linewidth=2.5, markersize=10, color=style['color'],
+             label=f"{style['label']} ({len(energies)} clusters)",
+             markeredgecolor='black', markeredgewidth=1)
+
+    plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, 3000)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+
+def _draw_1d_purity_single_population(charges, purities, charge_bins, x_max, population,
+                                      output_dir, filename, title):
+    """
+    Purity counterpart to _draw_1d_efficiency_single_population: one 1D
+    purity-vs-reco-charge curve for a SINGLE population -- neutrino-only or
+    cosmic-only -- on its own canvas and file, alongside the "All Clusters" plot
+    each caller already draws.
+
+    Takes both the caller's charge_bins AND its x_max, since the purity plots scale
+    the x-axis to the population (max(charges)*1.1) rather than using a fixed limit.
+    Re-deriving either from the subset would shift the bin centres and rescale the
+    axis, leaving three plots that look comparable but are not.
+
+    Draws nothing when the population is empty -- see the efficiency version for why
+    a blank canvas would be actively misleading here.
+    """
+    if not charges:
+        return
+
+    bin_centers, mean_purity = plot_1d_purity_charge(charges, purities, charge_bins)
+    if len(bin_centers) == 0:
+        return
+
+    style = POPULATION_STYLES[population]
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(bin_centers, mean_purity, marker=style['marker'], linestyle='-',
+             linewidth=2, markersize=10, color=style['color'],
+             label=f"{style['label']} ({len(charges)} clusters)",
+             markeredgecolor='black', markeredgewidth=1)
+
+    plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
+    plt.ylabel('Purity', fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, x_max)
+    plt.ylim(-0.05, 1.05)
+    plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+
+
 def plot_2d_purity_charge(charges, purities, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None, num_clusters=None):
     """
     Draw 2D histogram of Purity vs Reco Cluster Charge for a cluster category.
@@ -337,6 +433,25 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
     ##plt.show(block=False)
     plt.close()
 
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    if cluster_category_results is not None:
+        for _population in ('neutrino', 'cosmic'):
+            _population_keys = [key for key, data in cluster_category_results.items()
+                                if bool(data['is_neutrino']) == (_population == 'neutrino')
+                                and key in true_cluster_efficiency]
+            _population_title = f'Efficiency vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+            if file_name:
+                _population_title += f' ({file_name})'
+            _draw_1d_efficiency_single_population(
+                [true_cluster_efficiency[key]['total_energy']     for key in _population_keys],
+                [true_cluster_efficiency[key]['total_efficiency'] for key in _population_keys],
+                energy_bins, _population, output_dir,
+                f"efficiency_vs_true_energy_1d_{_population}_event_{event}_{apa}.png", _population_title)
+
     # 1D Plot 2: By category (only if cluster_category_results is provided)
     if cluster_category_results is not None:
         plt.figure(figsize=(14, 7))
@@ -494,6 +609,22 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in all_entries if m['cluster_type'] == _population]
+        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+        if file_name:
+            _population_title += f' ({file_name})'
+        _draw_1d_efficiency_single_population(
+            [m['total_true_energy'] for m in _population_entries],
+            [m['efficiency'] for m in _population_entries],
+            energy_bins, _population, output_dir,
+            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_event_{event}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -672,6 +803,25 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    if category_info_source is not None:
+        for _population in ('neutrino', 'cosmic'):
+            _population_keys = [key for key, data in category_info_source.items()
+                                if bool(data['is_neutrino']) == (_population == 'neutrino')
+                                and key in true_cluster_efficiency]
+            _population_title = f'Efficiency vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
+            if file_name:
+                _population_title += f' ({file_name})'
+            _draw_1d_efficiency_single_population(
+                [true_cluster_efficiency[key]['total_energy']     for key in _population_keys],
+                [true_cluster_efficiency[key]['total_efficiency'] for key in _population_keys],
+                energy_bins, _population, output_dir,
+                f"efficiency_vs_true_energy_1d_{_population}_file_{apa}.png", _population_title)
 
     # 1D Plot 2: By category (only if category info is available)
     if category_info_source is not None:
@@ -869,6 +1019,23 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    if category_info_source is not None:
+        for _population in ('neutrino', 'cosmic'):
+            _population_keys = [key for key, data in category_info_source.items()
+                                if bool(data['is_neutrino']) == (_population == 'neutrino')
+                                and key in true_cluster_efficiency]
+            _population_title = f'Efficiency vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
+            _draw_1d_efficiency_single_population(
+                [true_cluster_efficiency[key]['total_energy']     for key in _population_keys],
+                [true_cluster_efficiency[key]['total_efficiency'] for key in _population_keys],
+                energy_bins, _population, output_dir,
+                f"efficiency_vs_true_energy_1d_{_population}_job_{apa}.png", _population_title)
+
     # 1D Plot 2: By category (only if category info is available)
     if category_info_source is not None:
         plt.figure(figsize=(14, 7))
@@ -1008,6 +1175,22 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in all_entries if m['cluster_type'] == _population]
+        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
+        if file_name:
+            _population_title += f' ({file_name})'
+        _draw_1d_efficiency_single_population(
+            [m['total_true_energy'] for m in _population_entries],
+            [m['efficiency'] for m in _population_entries],
+            energy_bins, _population, output_dir,
+            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_file_{apa}.png", _population_title)
+
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
 
@@ -1121,6 +1304,20 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in all_entries if m['cluster_type'] == _population]
+        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
+        _draw_1d_efficiency_single_population(
+            [m['total_true_energy'] for m in _population_entries],
+            [m['efficiency'] for m in _population_entries],
+            energy_bins, _population, output_dir,
+            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_job_{apa}.png", _population_title)
+
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
 
@@ -1228,6 +1425,22 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
+        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+        if file_name:
+            _population_title += f' ({file_name})'
+        _draw_1d_efficiency_single_population(
+            [m['total_true_energy'] for m in _population_entries],
+            [m['efficiency'] for m in _population_entries],
+            energy_bins, _population, output_dir,
+            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_event_{event}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1343,6 +1556,22 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
+        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
+        if file_name:
+            _population_title += f' ({file_name})'
+        _draw_1d_efficiency_single_population(
+            [m['total_true_energy'] for m in _population_entries],
+            [m['efficiency'] for m in _population_entries],
+            energy_bins, _population, output_dir,
+            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_file_{apa}.png", _population_title)
+
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
 
@@ -1454,6 +1683,20 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same energy_bins as that plot -- built from the full
+    # population -- so all three curves share bin centres and can be overlaid or
+    # read side by side. This is the coarse two-way split; the four-way
+    # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
+        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
+        _draw_1d_efficiency_single_population(
+            [m['total_true_energy'] for m in _population_entries],
+            [m['efficiency'] for m in _population_entries],
+            energy_bins, _population, output_dir,
+            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_job_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1568,6 +1811,22 @@ def DrawPurityVsRecoChargePerEvent(pair_metadata_list, output_dir, event, apa, f
     plt.savefig(output_dir / f"purity_vs_reco_charge_1d_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same charge_bins AND same x-limit as that plot -- both
+    # derived from the full population -- so the three curves stay comparable.
+    # This is the coarse two-way split; the by_category plot keeps the finer
+    # neutrino / all-cosmic / isochronous / normal / prolonged breakdown.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
+        _population_title = f'Purity vs Reco Charge (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+        if file_name:
+            _population_title += f' ({file_name})'
+        _draw_1d_purity_single_population(
+            [m['total_reco_charge'] for m in _population_entries],
+            [m['purity'] for m in _population_entries],
+            charge_bins, max(charges)*1.1, _population, output_dir,
+            f"purity_vs_reco_charge_1d_{_population}_event_{event}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1685,6 +1944,22 @@ def _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, level
     plt.savefig(output_dir / f"purity_vs_reco_charge_1d_{filename_suffix}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
+
+    # 1D Plots: neutrino-only and cosmic-only, one canvas each, alongside the All
+    # Clusters plot above. Same charge_bins AND same x-limit as that plot -- both
+    # derived from the full population -- so the three curves stay comparable.
+    # This is the coarse two-way split; the by_category plot keeps the finer
+    # neutrino / all-cosmic / isochronous / normal / prolonged breakdown.
+    for _population in ('neutrino', 'cosmic'):
+        _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
+        _population_title = f'Purity vs Reco Charge (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - {level_name}, {num_events} events, {apa}'
+        if file_name:
+            _population_title += f' ({file_name})'
+        _draw_1d_purity_single_population(
+            [m['total_reco_charge'] for m in _population_entries],
+            [m['purity'] for m in _population_entries],
+            charge_bins, max(charges)*1.1, _population, output_dir,
+            f"purity_vs_reco_charge_1d_{_population}_{filename_suffix}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))

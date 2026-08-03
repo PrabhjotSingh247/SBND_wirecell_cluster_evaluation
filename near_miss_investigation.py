@@ -26,7 +26,7 @@ from selections import (
 from efficiency_purity_estimate import EvaluateEfficiency
 
 # ============================================================================
-# CONFIG -- same selection settings as HighStats_ChargeLightMatching_Evaluation_MultiFile.ipynb
+# CONFIG -- same selection settings as Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb
 # ============================================================================
 PARENT_DIR    = Path("Haiwang_files_charge_light_matching_MCP2025C_Fall_production")
 TARGET_FILE   = "all"   # "all" for every file subdirectory with a data/ folder, or "file0"/"file1"/...

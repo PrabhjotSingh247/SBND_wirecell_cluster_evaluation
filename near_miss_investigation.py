@@ -26,7 +26,7 @@ from selections import (
 from efficiency_purity_estimate import EvaluateEfficiency
 
 # ============================================================================
-# CONFIG -- same selection settings as HighStats_ChargeLightMatching_Evaluation_MultiFile.ipynb
+# CONFIG -- same selection settings as Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb
 # ============================================================================
 PARENT_DIR    = Path("Haiwang_files_charge_light_matching_MCP2025C_Fall_production")
 TARGET_FILE   = "all"   # "all" for every file subdirectory with a data/ folder, or "file0"/"file1"/...
@@ -164,7 +164,10 @@ def main():
                 continue
 
             x_true, y_true, z_true, id_true, q_true, real_id_true, e_true, nu_idx_true = result['true_clustering']
-            true_points = build_true_points_charge_light(x_true, y_true, z_true, id_true, q_true, energy=e_true, nu_idx=nu_idx_true)
+            # real_id_true (real_cluster_id), NOT id_true (cluster_id) -- same reason as
+            # the reco side: cluster_id is a coarser grouping that can merge physically
+            # distinct tracks, real_cluster_id is the per-track ID.
+            true_points = build_true_points_charge_light(x_true, y_true, z_true, real_id_true, q_true, energy=e_true, nu_idx=nu_idx_true)
             true_points = reassign_cluster_ID_true_charge_light(true_points)
             true_points = apply_energy_cutoff(true_points, min_cluster_energy)
             true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points, x_min, x_max, y_min, y_max, z_min, z_max)

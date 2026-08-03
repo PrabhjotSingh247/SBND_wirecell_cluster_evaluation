@@ -1,264 +1,203 @@
 # SBND Wirecell Cluster Evaluation
 
-This repository contains scripts and notebooks for evaluating the clustering performance of the Wirecell reconstruction algorithm on SBND detector data.
+This repository contains notebooks for evaluating the clustering performance of the Wirecell reconstruction algorithm on SBND detector data.
+
+Every analysis is driven from a notebook. The `.py` files at the top level are supporting modules that the notebooks import (reading, selections, efficiency/purity estimation, drawing, metadata); they are not meant to be run on their own and are not documented here.
 
 ---
 
-## Scripts Description and Usage
+## Charge-Light Matching Notebooks (current pipeline)
 
+These read the combined-APA charge-light-matching JSON format: `img-global` (reco clusters), `sed-sce_drift_smear_readout` / `sed-smear_readout` (true clusters), `mc` (particle truth tree), `op` (optical/light info). Reco is already global across APAs, so there is no per-APA/face looping.
 
-### single_cluster_eval.ipynb
-**Description:** Evaluates clustering performance metrics (efficiency and purity) for a single event by matching true and reconstructed clusters.
+### Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb
+**Description:** Full reconstruction-performance evaluation over many files and events, with **no beam-window cut applied** — the true side therefore still contains cosmic clusters alongside the neutrino ones. Runs the whole chain: selections, cluster categorisation, KDTree efficiency and purity, 1-to-1 and 1-to-many true-reco matching, metadata, and all plotting.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook single_cluster_eval.ipynb`
-2. Configure parameters in the notebook (event number, APA, radius thresholds, etc.)
-3. Run all cells to generate efficiency/purity heatmaps and comparison plots
+1. Open the notebook: `jupyter notebook Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb`
+2. Set `PARENT_DIR` to the input tree, and `files` / `events` to `"all"` or a count to limit the run
+3. Adjust the selection parameters (energy cut, fiducial ranges, matching radii, minimum point counts)
+4. Run all cells
 
-**Output:** Generates heatmaps showing efficiency and purity for true-reco cluster pairs, energy-weighted efficiency plots, and side-by-side cluster visualizations.
+**Note on the input tree:** point `PARENT_DIR` at the `*_after_deadareacut/` tree, which has the dead-area cut already applied to the true points, and leave the notebook's own dead-area cut off. Pointing it at the raw tree instead requires turning that cut back on. The two trees are deliberately named differently so they cannot be confused.
+
+**Output:** Efficiency and purity heatmaps, efficiency-vs-true-energy and purity-vs-reco-charge plots at event / file / job level, efficiency-vs-purity scatter and 2D histograms for matched pairs, per-cluster metadata, and text summaries — written under `multi_file_plots_charge_light_matching/`.
 
 ---
 
-### single_cluster_eval_optimization.ipynb
-**Description:** Optimizes single cluster evaluation parameters by testing different threshold values and radius settings to maximize reconstruction quality.
+### Evaluation_ChargeLightMatching_AfterBeamWindowCut.ipynb
+**Description:** The same evaluation with the **beam-window cut applied to the reco side**: only clustering-global clusters whose bridged flash time falls inside [0.33, 1.93] μs survive into efficiency, purity, matching, metadata, and every plot. The in-spill population is neutrino-dominated, so this is the notebook for questions about how well neutrino interactions specifically are reconstructed.
 
-**How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook single_cluster_eval_optimization.ipynb`
-2. Set the event range and parameter ranges to test
-3. Run all cells to compare performance across different configurations
+The cut is reco-side only by design. "In beam window" is not a truth quantity — true clusters carry no flash and no time — so a true-side version could only be inferred by matching to a beam-window-flashed reco cluster, folding beam timing into what would read as a truth-level selection. The true side therefore still holds its cosmic clusters, and a cosmic true cluster that goes unmatched here means "no in-spill reco cluster near it".
 
-**Output:** Summary tables and plots showing how efficiency and purity vary with different parameter choices.
+**How to run:** Same as the before-cut notebook above. Set `Apply_beam_window_cut = False` in the configuration cell to reproduce the before-cut notebook exactly.
+
+**Output:** Same plot and summary set as the before-cut notebook, written to `multi_file_plots_charge_light_matching/Evaluation_After_TimeWindowCut/` — a subdirectory of the shared charge-light tree, so the two notebooks never overwrite each other.
 
 ---
 
-### HighStatsEvaluation_MultiFile.ipynb
-**Description:** Comprehensive clustering evaluation framework that processes multiple data files simultaneously, calculating efficiency and purity statistics across events, and generating detailed 2D histograms alongside scatter plots for performance analysis.
+### SelectionAnalysis.ipynb
+**Description:** The truth-and-selections counterpart to the evaluation notebooks: what the truth contains and what each cut keeps, deliberately kept separate from reconstruction performance. Reads the same files and events with the same parameters and the same cut functions — no cut is reimplemented — and counts how many clusters survive each successive selection.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook HighStatsEvaluation_MultiFile.ipynb`
+1. Open the notebook: `jupyter notebook SelectionAnalysis.ipynb`
+2. Match `PARENT_DIR` and the selection parameters to the evaluation notebook you are comparing against
+3. Run all cells
+
+**Output:** Selection-flow bar blocks (one block per cut stage), split into cosmic clusters and neutrino interactions on the true side and a single total on the reco side, plus true-neutrino vertex records showing why interactions dropped out (no true deposits / below energy cut / geometric cuts).
+
+---
+
+## Earlier Multi-File Pipeline
+
+### Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb
+**Description:** Multi-file clustering evaluation for the original per-APA JSON format (`tru-apa*` / `*-clustering-apa*`). Detects the number of events in each input directory automatically and aggregates efficiency and purity statistics across all of them.
+
+**How to run:**
+1. Open the notebook: `jupyter notebook Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb`
 2. Configure the file list, event ranges, and analysis parameters
-3. Run all cells to process all events and generate aggregate statistics
+3. Run all cells
 
-**Features:**
-- Processes multiple data files in batch
-- Applies fiducial volume cuts for neutrino and cosmic event filtering
-- Generates 2D colz histograms (efficiency vs purity distributions)
-- Produces scatter plots showing individual cluster pair performance
-
-**Output:** Efficiency vs purity scatter plots, 2D histograms, summary tables with performance statistics, and event-by-event analysis plots.
+**Output:** Efficiency-vs-purity scatter plots, 2D colz histograms, summary tables, and event-by-event analysis plots.
 
 ---
+
+### Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut_FromROOT.ipynb
+**Description:** Reproduces every plot and the `summary.txt` of `Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb` from pre-computed cluster points and metadata stored in a ROOT file, without recomputing selections, KDTree matching, or category classification. Useful for re-plotting quickly once the expensive pass has been run.
+
+**How to run:**
+1. Generate the ROOT input first with the corresponding processing step
+2. Open the notebook: `jupyter notebook Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut_FromROOT.ipynb`
+3. Point it at the ROOT file and run all cells
+
+**Output:** PNGs mirroring the original notebook's directory structure, plus native ROOT TH1D/TH2D histograms in a single output `.root` file.
+
+---
+
+## Selection and Cut Studies
 
 ### TrueClusterPointSelection.ipynb
-**Description:** Tests and visualizes true cluster point selection by applying minimum point count cutoffs to filter out small/noise clusters.
+**Description:** Tests and visualises true cluster point selection by applying minimum point-count cutoffs to filter out small/noise clusters.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook TrueClusterPointSelection.ipynb`
-2. Adjust the min_points_threshold and min_cluster_energy parameters
-3. Run all cells to see before/after comparisons of cluster populations
+1. Open the notebook: `jupyter notebook TrueClusterPointSelection.ipynb`
+2. Adjust `min_points_threshold` and `min_cluster_energy`
+3. Run all cells to see before/after comparisons
 
-**Output:** Bar charts comparing cluster counts before/after cutoff, visualizations of removed vs kept clusters in XZ view, and detailed cluster statistics.
+**Output:** Bar charts comparing cluster counts before/after the cutoff, XZ-view visualisations of removed vs kept clusters, and cluster statistics.
 
 ---
 
 ### RecoClusterPointSelection.ipynb
-**Description:** Tests and visualizes reconstructed cluster point selection by applying minimum point count cutoffs to the reco clusters.
+**Description:** The same study on the reconstructed side — applies minimum point-count cutoffs to reco clusters.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook RecoClusterPointSelection.ipynb`
-2. Adjust the min_reco_points_threshold parameter
-3. Run all cells to analyze the effect of point cutoffs on reco clusters
+1. Open the notebook: `jupyter notebook RecoClusterPointSelection.ipynb`
+2. Adjust `min_reco_points_threshold`
+3. Run all cells
 
-**Output:** Bar charts, XZ view visualizations with removed clusters highlighted, and statistics on cluster reduction.
+**Output:** Bar charts, XZ-view visualisations with removed clusters highlighted, and statistics on cluster reduction.
 
 ---
 
-
-### ReadDrawWirecellBoundary.ipynb
-**Description:** Reads and visualizes the Wirecell detector boundary geometry to understand the active detector volume and physical constraints of the SBND TPC.
-
-**How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook ReadDrawWirecellBoundary.ipynb`
-2. Set the event number and APA selection
-3. Run all cells to display boundary visualizations
-
-**Output:** Visualization of the TPC boundaries and detector geometry showing the physical limits of the active volume for reference when analyzing fiducial cuts.
-
----
-
-### deadarea.ipynb
-**Description:** Reads and visualizes dead/inactive detector areas from JSON files to understand which regions cannot record data.
+### WirecellEnergyCuts.ipynb
+**Description:** Scans a set of true-cluster energy cuts (e.g. 5, 10, 50 MeV) for a chosen event range and APA, reading the exported xyz-coordinate text files, to see how the cluster population responds to the energy threshold.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook deadarea.ipynb`
-2. Specify the event number and APA (apa0 or apa1)
-3. Run all cells to display dead area maps
+1. Open the notebook: `jupyter notebook WirecellEnergyCuts.ipynb`
+2. Set the event range, sbndcode version, process (`nu_spill` / `cosmic_spill`), APA, and the `energy_cuts` list
+3. Run all cells
 
-**Output:** Visualization of dead areas overlaid on the detector geometry showing inactive channel regions in Y-Z projection.
+**Output:** Cluster counts and distributions for each energy cut, with an example event drawn for reference.
 
 ---
 
 ### CompareTimeWindowCorrection.ipynb
-**Description:** Analyzes the effects of time window corrections on cluster reconstruction quality and efficiency/purity metrics.
+**Description:** Compares true cluster coordinates before and after the time-window correction (old window -200 to 1600 μs vs new window -205 to 1508.5 μs) and the effect on reconstruction quality.
 
 **How to run:**
-1. Open the notebook in Jupyter: `jupyter notebook CompareTimeWindowCorrection.ipynb`
-2. Configure the event range and time window parameters
-3. Run all cells to compare performance metrics before and after corrections
+1. Open the notebook: `jupyter notebook CompareTimeWindowCorrection.ipynb`
+2. Configure the event range and time-window parameters
+3. Run all cells
 
-**Output:** Comparison plots showing efficiency and purity variations with different time window settings.
-
----
-
-## Analysis and Utility Scripts
-
-### efficiency_purity_draw.py
-**Description:** Generates visualization plots for efficiency and purity analysis results. Creates heatmaps, scatter plots, and statistical distributions.
-
-**Usage:**
-```python
-python efficiency_purity_draw.py [options]
-```
+**Output:** Comparison plots showing coordinate shifts and efficiency/purity variations between the two time windows.
 
 ---
 
-### efficiency_purity_estimate.py
-**Description:** Calculates efficiency and purity metrics for cluster matching between true and reconstructed clusters.
+## Single-Event Notebooks
 
-**Usage:**
-```python
-python efficiency_purity_estimate.py [true_clusters] [reco_clusters]
-```
+### single_cluster_eval.ipynb
+**Description:** Evaluates efficiency and purity for a single event by matching true and reconstructed clusters. The fastest way to iterate on a change before running it over many files.
 
----
+**How to run:**
+1. Open the notebook: `jupyter notebook single_cluster_eval.ipynb`
+2. Configure the event number, APA, and radius thresholds
+3. Run all cells
 
-### efficiency_purity_print.py
-**Description:** Prints formatted efficiency and purity statistics and summary tables.
-
-**Usage:**
-```python
-python efficiency_purity_print.py [results_file]
-```
+**Output:** Efficiency and purity heatmaps for true-reco cluster pairs, energy-weighted efficiency plots, and side-by-side cluster visualisations.
 
 ---
 
-### generate_summary_tables.py
-**Description:** Generates comprehensive summary tables from analysis results for reporting and documentation.
+### single_cluster_eval_optimization.ipynb
+**Description:** Sweeps thresholds and radius settings across an event range to find the parameter values that give the best reconstruction quality.
 
-**Usage:**
-```python
-python generate_summary_tables.py [input_data] [output_file]
-```
+**How to run:**
+1. Open the notebook: `jupyter notebook single_cluster_eval_optimization.ipynb`
+2. Set the event range and the parameter ranges to test
+3. Run all cells
 
----
-
-### DrawRecoTrueClusters.py
-**Description:** Visualizes true and reconstructed clusters side-by-side for visual comparison and validation.
-
-**Usage:**
-```python
-python DrawRecoTrueClusters.py [event_number] [options]
-```
+**Output:** Summary tables and plots showing how efficiency and purity vary with each parameter choice.
 
 ---
 
-### readfiles.py
-**Description:** Utility module for reading and parsing data files containing cluster information and event data.
+## Detector Geometry Notebooks
+
+### ReadDrawWirecellBoundary.ipynb
+**Description:** Reads the SBND wire-cell geometry file and extracts the detector boundaries for both APAs separately, to show the active detector volume.
+
+**How to run:**
+1. Open the notebook: `jupyter notebook ReadDrawWirecellBoundary.ipynb`
+2. Set the event number and APA selection
+3. Run all cells
+
+**Output:** Visualisation of the TPC boundaries and detector geometry — the reference for interpreting fiducial cuts.
 
 ---
 
-### selections.py
-**Description:** Defines cluster selection criteria and filtering functions for analysis workflows.
+### deadarea.ipynb
+**Description:** Reads and visualises the dead/inactive detector areas from the dead-area JSON files, showing which regions cannot record data.
 
----
+**How to run:**
+1. Open the notebook: `jupyter notebook deadarea.ipynb`
+2. Specify the event number and APA (`apa0` or `apa1`)
+3. Run all cells
 
-### clusterpairmatching.py
-**Description:** Implements algorithms for matching true clusters to reconstructed clusters based on spatial overlap and hit matching.
-
----
-
-### bee_display_link.py
-**Description:** Generates BEE (Browser Event Display) visualization links for interactive event inspection.
-
-**Usage:**
-```python
-python bee_display_link.py [event_id]
-```
-
----
-
-### printbeelink.py
-**Description:** Prints formatted BEE event display links for easy access to visualization tools.
-
-**Usage:**
-```python
-python printbeelink.py [event_list]
-```
-
----
-
-### run_bee_uploader.py
-**Description:** Automates the upload and registration of events to the BEE visualization system.
-
-**Usage:**
-```python
-python run_bee_uploader.py [event_range]
-```
-
----
-
-### analyticresults.py
-**Description:** Processes and analyzes results from clustering evaluation studies.
-
----
-
-### draw_analysis.py
-**Description:** Generates analysis-specific visualization plots and figures.
-
----
-
-## Directory Structure
-
-```
-cluster_evaluation/
-├── README.md                                    # This file
-├── jsontotext.sh                               # JSON to text conversion script
-├── *.ipynb                                     # Jupyter notebooks for analysis
-├── 24308437_0/                                 # Raw input data directory
-│   └── mabc-apa*.zip                           # Compressed clustering data
-├── out/                                        # Output directory
-│   └── 24308437_0/
-│       └── v10_06_00/
-│           └── nu_spill/
-│               ├── xyz-coordinates/            # Text files with xyz data
-│               └── plots/                      # Generated plots and analysis results
-└── deadarea.root                               # Root file with dead area data
-```
+**Output:** Dead areas overlaid on the detector geometry in Y-Z projection.
 
 ---
 
 ## Dependencies
 
-All notebooks require the following Python packages:
+All notebooks require:
 - numpy
 - matplotlib
 - pandas
 - seaborn
 - scipy (for KDTree spatial queries)
-- pathlib (standard library)
+- uproot (for reading/writing ROOT files)
 
-Install with: `pip install numpy matplotlib pandas seaborn scipy`
+Install with: `pip install numpy matplotlib pandas seaborn scipy uproot`
 
 ---
 
 ## Quick Start Workflow
 
-1. **Single event analysis:** Use `single_cluster_eval.ipynb` to test a specific event
-2. **High statistics (multi-file):** Run `HighStatsEvaluation_MultiFile.ipynb` to process all events and get overall performance metrics
-3. **Parameter optimization:** Use `single_cluster_eval_optimization.ipynb` to find best threshold values
-4. **Diagnostics:** Run `TrueClusterPointSelection.ipynb` and `RecoClusterPointSelection.ipynb` to understand cutoff effects
-5. **Event visualization:** Use `DrawRecoTrueClusters.py` for side-by-side cluster comparison
-6. **BEE display:** Use `bee_display_link.py` and `run_bee_uploader.py` for interactive event inspection
+1. **Single event first:** use `single_cluster_eval.ipynb` to sanity-check one event
+2. **What the cuts keep:** run `SelectionAnalysis.ipynb` to see the selection flow before trusting any performance number
+3. **Full evaluation:** run `Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb` over all files and events
+4. **Neutrinos only:** run `Evaluation_ChargeLightMatching_AfterBeamWindowCut.ipynb` for the in-beam-window population
+5. **Parameter tuning:** use `single_cluster_eval_optimization.ipynb`, `TrueClusterPointSelection.ipynb`, and `RecoClusterPointSelection.ipynb` to understand threshold effects
+6. **Geometry reference:** consult `ReadDrawWirecellBoundary.ipynb` and `deadarea.ipynb` when interpreting fiducial and dead-area effects
 
 ---
 

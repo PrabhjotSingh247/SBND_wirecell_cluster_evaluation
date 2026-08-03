@@ -36,7 +36,13 @@ def add_metadata_true_clusters(efficiency_results, cluster_category_results, fil
             }
 
         true_cluster_data[true_cid]['total_efficiency'] += eff['efficiency_energy_weighted']
-        true_cluster_data[true_cid]['reco_match_count'] += 1
+        # The 8888 row is EvaluateEfficiency's "this true cluster matched nothing"
+        # sentinel, not a reco cluster, so it must not count towards num_reco_matches --
+        # an unmatched true cluster has 0 matches, not 1. (The multiplicity bar chart and
+        # non_one_match_*.txt already corrected for this via total_efficiency <= 0; the
+        # count is now correct at the source, so those corrections simply agree with it.)
+        if eff['reco_cluster_id'] != 8888:
+            true_cluster_data[true_cid]['reco_match_count'] += 1
 
     # Create metadata entries for each true cluster
     metadata_list = []

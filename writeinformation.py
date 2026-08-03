@@ -284,3 +284,180 @@ def write_removed_neutrino_info(vertex_records, output_dir, filename="removed_tr
                     f"max {energies[-1]:.1f} MeV, over {len(energies)} interactions\n")
 
     return out_path
+
+
+def _split_names(output_dir, filename):
+    """
+    (combined, neutrino-only, cosmic-only) paths for a table written per cluster type:
+    efficiency_info.txt -> efficiency_info.txt, efficiency_info_neutrino.txt,
+    efficiency_info_cosmic.txt, in that directory.
+
+    Derived from the filename's stem rather than hard-coded so a caller passing a custom
+    filename still gets a matching pair of split tables next to it.
+    """
+    stem, suffix = Path(filename).stem, Path(filename).suffix
+    return (output_dir / filename,
+            output_dir / f"{stem}_neutrino{suffix}",
+            output_dir / f"{stem}_cosmic{suffix}")
+
+
+def write_efficiency_info(metadata_list, output_dir, filename="efficiency_info.txt"):
+    """
+    Write the imaginglevel efficiency_info.txt: one row per TRUE cluster, with its
+    efficiency summed over all its reco matches -- the same grouping
+    DrawEfficiencyVsTrueEnergyPerEvent/PerFile/PerJob plot, so the numbers behind
+    those plots can be read cluster by cluster instead of off a plot.
+
+    Level-agnostic -- pass one event's metadata for the event-level copy, a file's or
+    the job's for the aggregated copy. The 'event' column is what makes the aggregated
+    copies traceable back to an event, and is present at every level so the formats stay
+    identical (the event-level file is a slice of the job-level one, byte for byte).
+
+    num_reco_matches is 0 for a true cluster that matched nothing: add_metadata_true_clusters
+    excludes EvaluateEfficiency's 8888 "no match" sentinel row from the count, so an
+    unmatched cluster reads efficiency 0.0000 / 0 matches rather than 0.0000 / 1.
+
+    Parameters:
+    - metadata_list: List of dicts from add_metadata_true_clusters(), each with 'event',
+        'true_cluster_id', 'cluster_type', 'cluster_category', 'total_true_energy',
+        'total_efficiency', 'num_reco_matches'
+    - output_dir: Directory to write into (created if missing)
+    - filename: Output file name for the combined table; the neutrino-only and
+        cosmic-only tables take its stem plus _neutrino / _cosmic
+
+    Three files are written side by side -- the combined table, plus one per cluster
+    type (see _split_names), since the two populations are read for different questions:
+    the neutrino rows are the physics signal, the cosmic rows the background the
+    reconstruction also has to get right.
+
+    All are written even when there is nothing to report -- a header-only table says "no
+    clusters of this type here", whereas a missing file is indistinguishable from a
+    crashed job.
+
+    Returns:
+        Path of the combined table
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _write(path, entries):
+        with open(path, "w") as f:
+            f.write(f"{'event':<20} {'true_cluster_id':>16} {'cluster_type':<10} {'cluster_category':<16} "
+                    f"{'total_true_energy_MeV':>22} {'total_efficiency':>16} {'num_reco_matches':>16}\n")
+            # Grouped by event, then energy-ranked inside it -- the event-level file has
+            # one event so this is exactly its old ordering.
+            for m in sorted(entries, key=lambda m: (str(m['event']), -m['total_true_energy'])):
+                f.write(f"{str(m['event']):<20} {m['true_cluster_id']:>16.3f} {m['cluster_type']:<10} {m['cluster_category']:<16} "
+                        f"{m['total_true_energy']:>22.3f} {m['total_efficiency']:>16.4f} {m['num_reco_matches']:>16}\n")
+
+    all_path, neutrino_path, cosmic_path = _split_names(output_dir, filename)
+    _write(all_path, metadata_list)
+    _write(neutrino_path, [m for m in metadata_list if m['cluster_type'] == 'neutrino'])
+    _write(cosmic_path, [m for m in metadata_list if m['cluster_type'] == 'cosmic'])
+
+    return all_path
+
+
+def write_pair_efficiency_info(pair_metadata_list, output_dir, all_true_metadata_list=None,
+                               filename="efficiency_info.txt"):
+    """
+    Write the clusteringlevel efficiency_info.txt: one row per 1-to-1 matched true-reco
+    pair, carrying efficiency AND purity together -- the population
+    DrawClusterEfficiencyVsTrueEnergy* / DrawEfficiencyVsTrueEnergy_MatchedPairs_* plot.
+
+    all_true_metadata_list controls which of the two clusteringlevel directories this is:
+      - given (add_metadata_true_clusters output): true clusters that matched no reco
+        cluster are appended with reco_cluster_id N/A, efficiency 0 and matched=no --
+        the "including unmatched true clusters" table, matching the plots that take
+        all_true_metadata_list.
+      - None: matched pairs only, the "..._true_reco_pairs_only" table.
+
+    Level-agnostic, same as write_efficiency_info -- see its note on the 'event' column.
+
+    Parameters:
+    - pair_metadata_list: List of dicts from add_metadata_true_reco_pair_cluster()
+    - output_dir: Directory to write into (created if missing)
+    - all_true_metadata_list: Optional list from add_metadata_true_clusters(); when given,
+        its true clusters absent from pair_metadata_list are written as unmatched rows
+    - filename: Output file name for the combined table; the neutrino-only and
+        cosmic-only tables take its stem plus _neutrino / _cosmic
+
+    Writes the combined table plus one per cluster type, same as write_efficiency_info.
+
+    Returns:
+        Path of the combined table
+    """
+    entries = list(pair_metadata_list)
+
+    if all_true_metadata_list:
+        # Matched on (event, true_cluster_id) rather than the id alone: the same
+        # true_cluster_id (a rounded average X) recurs across events.
+        matched_keys = {(m['event'], m['true_cluster_id']) for m in pair_metadata_list}
+        entries += [
+            {'event': m['event'], 'true_cluster_id': m['true_cluster_id'], 'reco_cluster_id': None,
+             'cluster_type': m['cluster_type'], 'cluster_category': m['cluster_category'],
+             'total_true_energy': m['total_true_energy'], 'efficiency': 0.0,
+             'purity': None, 'total_reco_charge': None}
+            for m in all_true_metadata_list
+            if (m['event'], m['true_cluster_id']) not in matched_keys
+        ]
+
+    # Written even when empty -- see write_efficiency_info's note.
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _write(path, rows):
+        with open(path, "w") as f:
+            f.write(f"{'event':<20} {'true_cluster_id':>16} {'reco_cluster_id':>16} {'cluster_type':<10} {'cluster_category':<16} "
+                    f"{'total_true_energy_MeV':>22} {'efficiency':>10} {'purity':>10} {'total_reco_charge':>18} {'matched':>8}\n")
+            for m in sorted(rows, key=lambda m: (str(m['event']), -m['total_true_energy'])):
+                reco_id_str = f"{m['reco_cluster_id']:.3f}" if m['reco_cluster_id'] is not None else "N/A"
+                purity_str  = f"{m['purity']:.4f}" if m['purity'] is not None else "N/A"
+                charge_str  = f"{m['total_reco_charge']:.1f}" if m['total_reco_charge'] is not None else "N/A"
+                matched_str = "yes" if m['reco_cluster_id'] is not None else "no"
+                f.write(f"{str(m['event']):<20} {m['true_cluster_id']:>16.3f} {reco_id_str:>16} {m['cluster_type']:<10} {m['cluster_category']:<16} "
+                        f"{m['total_true_energy']:>22.3f} {m['efficiency']:>10.4f} {purity_str:>10} {charge_str:>18} {matched_str:>8}\n")
+
+    all_path, neutrino_path, cosmic_path = _split_names(output_dir, filename)
+    _write(all_path, entries)
+    _write(neutrino_path, [m for m in entries if m['cluster_type'] == 'neutrino'])
+    _write(cosmic_path, [m for m in entries if m['cluster_type'] == 'cosmic'])
+
+    return all_path
+
+
+def write_purity_info(purity_results, output_dir, filename="purity_info.txt"):
+    """
+    Write purity_info.txt: raw EvaluatePurity output, one row per RECO cluster -- matched
+    or not. Unmatched reco clusters carry the true_cluster_id=8888 / purity=-0.1 sentinel
+    and are reported as matched=no; they have no matched_reco_points/total_reco_points, so
+    those columns read N/A for them.
+
+    Level-agnostic, same as write_efficiency_info -- see its note on the 'event' column.
+
+    Parameters:
+    - purity_results: List of dicts from EvaluatePurity(), each with 'event',
+        'reco_cluster_id', 'true_cluster_id', 'purity', 'total_reco_cluster_charge'
+    - output_dir: Directory to write into (created if missing)
+    - filename: Output file name
+
+    Written even when empty -- see write_efficiency_info's note.
+
+    Returns:
+        Path written
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / filename
+
+    with open(out_path, "w") as f:
+        f.write(f"{'event':<20} {'reco_cluster_id':>16} {'true_cluster_id':>16} {'purity':>10} {'total_reco_charge':>18} "
+                f"{'matched_reco_points':>20} {'total_reco_points':>18} {'matched':>8}\n")
+        for p in sorted(purity_results, key=lambda p: (str(p['event']), -p['total_reco_cluster_charge'])):
+            matched = p['true_cluster_id'] != 8888
+            mrp = p.get('matched_reco_points', 'N/A')
+            trp = p.get('total_reco_points', 'N/A')
+            f.write(f"{str(p['event']):<20} {p['reco_cluster_id']:>16.3f} {p['true_cluster_id']:>16.3f} {p['purity']:>10.4f} "
+                    f"{p['total_reco_cluster_charge']:>18.1f} {str(mrp):>20} {str(trp):>18} {('yes' if matched else 'no'):>8}\n")
+
+    return out_path

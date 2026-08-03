@@ -1,6 +1,6 @@
 """
 Phase B per-file worker (see project plan): runs the Event-Level + File-Level plotting
-pipeline for ONE file, so HighStatsAnalysis_FromROOT.ipynb can dispatch one of these per
+pipeline for ONE file, so Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut_FromROOT.ipynb can dispatch one of these per
 CPU core via concurrent.futures.ProcessPoolExecutor instead of processing files serially.
 
 Profiling Phase B on a single file (8 events) showed its runtime is ~70% matplotlib

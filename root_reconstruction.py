@@ -1,6 +1,6 @@
 """
 Phase B helper (see project plan): reconstructs the in-memory shapes
-HighStatsEvaluation_MultiFile.ipynb's plotting code expects - clusters_true/clusters_reco
+Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb's plotting code expects - clusters_true/clusters_reco
 point dicts, cluster_category_results, matched_info, and the true/reco/pair metadata lists -
 from the Phase A ROOT file (process_events_to_root.py), so efficiency_purity_draw.py and
 DrawRecoTrueClusters.py can be called unmodified with reconstructed arguments instead of

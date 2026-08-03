@@ -90,7 +90,7 @@ def reassign_cluster_ID_true_charge_light(points_5d):
 
     Kept separate from reassign_cluster_ID_true() -- that function is still
     used by metadata.py, process_events_to_root.py, analyze_cluster_spread.py,
-    and HighStatsEvaluation_MultiFile.ipynb, none of which have per-point
+    and Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb, none of which have per-point
     nu_idx available or expect this ID scheme.
     """
     clusters = {}
@@ -445,7 +445,15 @@ COSMIC_TRACKID_PREFIX   = 2
 def build_true_points_charge_light(x, y, z, cluster_id, charge, energy=None, nu_idx=None):
     """
     Build the standard 7-column true point array [x, y, z, cluster_id, q_true, energy, time]
-    from charge-light sed-sce_drift_smear_readout fields. energy is the per-point
+    from charge-light sed-sce_drift_smear_readout fields.
+
+    cluster_id: callers in the charge-light pipeline pass the file's REAL_CLUSTER_ID,
+    not its cluster_id -- cluster_id is a coarser grouping that can merge physically
+    distinct tracks, real_cluster_id is the per-track ID (same convention as the reco
+    side). The two are identical in every sed-smear file in the current tree. Note the
+    trackID-prefix fallback below assumes whichever ID is passed lives in the
+    trackID namespace, which holds for both.
+ energy is the per-point
     deposited energy in MeV ('e' field) when available -- same physical quantity/units
     as the old (non charge-light) pipeline's energy column. Falls back to the charge
     ('q') field when energy is None or empty (older-format files that lack 'e'). Time

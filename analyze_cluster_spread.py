@@ -47,7 +47,7 @@ from selections import (
 )
 from efficiency_purity_estimate import EvaluateEfficiency
 
-# Same cut configuration as HighStatsEvaluation_MultiFile.ipynb (cell 3), so the
+# Same cut configuration as Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb (cell 3), so the
 # diagnostic reflects the cluster shapes a removal cut would actually see.
 MIN_CLUSTER_ENERGY       = 10
 MIN_TRUE_POINTS_CUTOFF   = 200

@@ -5,8 +5,15 @@ from matplotlib.lines import Line2D
 from pathlib import Path
 from scipy.spatial import KDTree
 
-def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
-    """Draw true and reco clusters in XZ projection for comparison."""
+def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
+                             filename_stem="all_clusters_reco_true", true_label="True clusters"):
+    """Draw true and reco clusters in XZ projection for comparison.
+
+    filename_stem / true_label exist so the same drawer can produce a SUBSET view of the
+    same event: pass a filtered true_clusters plus a distinct stem and left-panel label
+    (see DrawNeutrinoRecoClusters). Defaults reproduce the original all-clusters plot
+    exactly, so existing callers are unaffected.
+    """
     marker_size = 1
     view = "XZ"
 
@@ -17,7 +24,7 @@ def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     axes[0].set_ylim(-250, 250)
     axes[0].set_xlabel("z [cm]")
     axes[0].set_ylabel("x [cm]")
-    title = "True clusters: Event " + str(event) + ", " + apa + ", " + view
+    title = true_label + ": Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
     axes[0].set_title(title)
@@ -29,7 +36,8 @@ def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDI
         scatter = axes[0].scatter(true_z_cluster, true_x_cluster, s=marker_size, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[0].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
-    axes[0].legend()
+    if true_clusters:
+        axes[0].legend()
 
     # Second subplot - Reco clusters
     axes[1].set_xlim(axes[0].get_xlim())
@@ -48,15 +56,23 @@ def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDI
         scatter = axes[1].scatter(reco_z_cluster, reco_x_cluster, s=1, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[1].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
-    axes[1].legend()
+    if predicted_clusters:
+        axes[1].legend()
 
     plt.tight_layout()
-    plt.savefig(PLOTDIR_EVT / f"all_clusters_reco_true_event{event}_apa_{apa}_{view}.png")
+    plt.savefig(PLOTDIR_EVT / f"{filename_stem}_event{event}_apa_{apa}_{view}.png")
    # plt.show(block=False)
     plt.close()
 
-def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
-    """Draw true and reco clusters in YZ projection for comparison."""
+def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
+                             filename_stem="all_clusters_reco_true", true_label="True clusters"):
+    """Draw true and reco clusters in YZ projection for comparison.
+
+    filename_stem / true_label exist so the same drawer can produce a SUBSET view of the
+    same event: pass a filtered true_clusters plus a distinct stem and left-panel label
+    (see DrawNeutrinoRecoClusters). Defaults reproduce the original all-clusters plot
+    exactly, so existing callers are unaffected.
+    """
     marker_size = 1
     view = "YZ"
 
@@ -67,7 +83,7 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     axes[0].set_ylim(-250, 250)
     axes[0].set_xlabel("z [cm]")
     axes[0].set_ylabel("y [cm]")
-    title = "True clusters: Event " + str(event) + ", " + apa + ", " + view
+    title = true_label + ": Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
     axes[0].set_title(title)
@@ -79,7 +95,8 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
         scatter = axes[0].scatter(true_z_cluster, true_y_cluster, s=marker_size, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[0].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
-    axes[0].legend()
+    if true_clusters:
+        axes[0].legend()
 
     # Second subplot - Reco clusters
     axes[1].set_xlim(axes[0].get_xlim())
@@ -98,15 +115,23 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
         scatter = axes[1].scatter(reco_z_cluster, reco_y_cluster, s=1, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[1].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
-    axes[1].legend()
+    if predicted_clusters:
+        axes[1].legend()
 
     plt.tight_layout()
-    plt.savefig(PLOTDIR_EVT / f"all_clusters_reco_true_event{event}_apa_{apa}_{view}.png")
+    plt.savefig(PLOTDIR_EVT / f"{filename_stem}_event{event}_apa_{apa}_{view}.png")
    # plt.show(block=False)
     plt.close()
 
-def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
-    """Draw true and reco clusters in XY projection for comparison."""
+def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
+                             filename_stem="all_clusters_reco_true", true_label="True clusters"):
+    """Draw true and reco clusters in XY projection for comparison.
+
+    filename_stem / true_label exist so the same drawer can produce a SUBSET view of the
+    same event: pass a filtered true_clusters plus a distinct stem and left-panel label
+    (see DrawNeutrinoRecoClusters). Defaults reproduce the original all-clusters plot
+    exactly, so existing callers are unaffected.
+    """
     marker_size = 1
     view = "XY"
 
@@ -117,7 +142,7 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
     axes[0].set_ylim(-250, 250)
     axes[0].set_xlabel("x [cm]")
     axes[0].set_ylabel("y [cm]")
-    title = "True clusters: Event " + str(event) + ", " + apa + ", " + view
+    title = true_label + ": Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
     axes[0].set_title(title)
@@ -129,7 +154,8 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
         scatter = axes[0].scatter(true_x_cluster, true_y_cluster, s=marker_size, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[0].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
-    axes[0].legend()
+    if true_clusters:
+        axes[0].legend()
 
     # Second subplot - Reco clusters
     axes[1].set_xlim(axes[0].get_xlim())
@@ -148,12 +174,42 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
         scatter = axes[1].scatter(reco_x_cluster, reco_y_cluster, s=1, alpha=0.5)
         color = scatter.get_facecolor()[0]
         axes[1].plot([], [], color=color, label=f'Cluster {cluster_id:.0f}')
-    axes[1].legend()
+    if predicted_clusters:
+        axes[1].legend()
 
     plt.tight_layout()
-    plt.savefig(PLOTDIR_EVT / f"all_clusters_reco_true_event{event}_apa_{apa}_{view}.png")
+    plt.savefig(PLOTDIR_EVT / f"{filename_stem}_event{event}_apa_{apa}_{view}.png")
    # plt.show(block=False)
     plt.close()
+
+def DrawNeutrinoRecoClusters(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
+    """
+    The same three XZ/YZ/XY true-vs-reco panels as DrawTrueRecoClusters{XZ,YZ,XY}, but with
+    the left panel restricted to the TRUE NEUTRINO clusters of the event. The right panel is
+    unchanged -- the full set of selected (beam-window) reco clusters -- so the pair answers
+    "which of the reconstructed clusters is the neutrino, and did anything reconstruct it"
+    without the cosmic tracks covering the picture.
+
+    Written as a wrapper rather than three more drawers: it calls the same functions with a
+    filtered true_clusters and its own filename stem, so the two sets can never drift apart
+    in axes, limits or styling.
+
+    Neutrino clusters are selected on q_true>0 (column 4 = nu_idx: 0=cosmic, 1/2/...=which
+    interaction), not on the 99990+nu_idx cluster_id, so this stays correct for any pipeline
+    whose true points carry q_true, whatever its ID scheme.
+
+    Files: neutrino_clusters_reco_true_event{event}_apa_{apa}_{XZ,YZ,XY}.png
+
+    An event with no true neutrino still gets its three plots, with an empty left panel --
+    that is a real and interesting state (nothing to find), not a reason to skip the plot.
+    """
+    neutrino_clusters = {cid: pts for cid, pts in true_clusters.items()
+                         if np.any(np.array(pts)[:, 4] > 0)}
+
+    for draw in (DrawTrueRecoClustersXZ, DrawTrueRecoClustersYZ, DrawTrueRecoClustersXY):
+        draw(neutrino_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=file_name,
+             filename_stem="neutrino_clusters_reco_true", true_label="True neutrino clusters")
+
 
 def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, output_dir, event, apa, file_name=None,
                                     radius_efficiency=1, min_recopoints_threshold=5):
@@ -464,7 +520,11 @@ def DrawLabels(true_clusters, event, apa, PLOTDIR_EVT, file_name=None):
         q_true_values = points[:, 4]  # q_true column
         q_true = int(q_true_values[0]) if len(q_true_values) > 0 else 0
 
-        if q_true == 1:
+        # q_true>0, NOT q_true==1: q_true carries nu_idx in the charge-light pipeline
+        # (0=cosmic, 1/2/3/...=which neutrino interaction), so ==1 would count only the
+        # first interaction of an event as neutrino. Equivalent to ==1 for the legacy
+        # pipelines' plain 0/1 flag.
+        if q_true > 0:
             neutrino_clusters.append(cluster_id)
         else:
             cosmic_clusters.append(cluster_id)
@@ -472,7 +532,7 @@ def DrawLabels(true_clusters, event, apa, PLOTDIR_EVT, file_name=None):
     # Create figure with bar plot
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    categories = ['Neutrino\n(q_true=1)', 'Cosmic\n(q_true=0)']
+    categories = ['Neutrino\n(q_true>0)', 'Cosmic\n(q_true=0)']
     counts = [len(neutrino_clusters), len(cosmic_clusters)]
     colors = ['red', 'blue']
 
@@ -1692,8 +1752,14 @@ def DrawNeutrinoBreakdown(vertex_records, output_dir, level_name, filename_prefi
     ax.set_title(title, fontsize=16, fontweight='bold')
     ax.tick_params(labelsize=13)
     ax.grid(True, alpha=0.3, axis='y')
-    ax.set_ylim(0, max(total_in + total_out, 1) * 1.15)
-    ax.legend(fontsize=15)
+    # Headroom for the legend. The bars are non-increasing left to right by
+    # construction (surviving subset of deposited subset of total), so the legend's
+    # upper-right corner sits over the SHORTEST bar -- 1.35 keeps the tallest bar and
+    # its total label below the legend box even in the worst case, where all three
+    # bars are equal. 1.15 was enough for the bar tops but let the legend land on the
+    # third bar's total label.
+    ax.set_ylim(0, max(total_in + total_out, 1) * 1.35)
+    ax.legend(fontsize=15, loc='upper right', framealpha=0.95)
 
     plt.tight_layout()
     output_dir = Path(output_dir)

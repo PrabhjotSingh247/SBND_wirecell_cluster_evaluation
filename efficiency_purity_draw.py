@@ -5,8 +5,42 @@ from matplotlib.patches import Rectangle
 import seaborn as sns
 from pathlib import Path
 
+def _draw_empty_placeholder(message, title, output_path, xlabel=None, ylabel=None):
+    """
+    Save a plot-shaped placeholder saying why there is nothing to draw.
+
+    An event can legitimately contain no true-reco match at all -- e.g. with the
+    beam-window cut on, an event whose reco clusters are all out of spill leaves
+    every true cluster unmatched (efficiency 0, reco id 8888). That is a real
+    result, not an error, so the plot for it is still written: a missing file is
+    indistinguishable from a crashed job when scanning an output tree.
+    """
+    plt.figure(figsize=(10, 8))
+    plt.text(0.5, 0.5, message, ha='center', va='center', fontsize=13, wrap=True)
+    plt.title(title)
+    if xlabel:
+        plt.xlabel(xlabel)
+    if ylabel:
+        plt.ylabel(ylabel)
+    plt.xticks([])
+    plt.yticks([])
+    plt.savefig(output_path)
+    plt.close()
+
+
 def plot_efficiency_heatmap(efficiency_results, event, apa, output_dir, file_name=None):
     """Plot energy-weighted efficiency values as a heatmap for visual inspection of cluster matching."""
+    output_path = output_dir / f"efficiency_energy_weighted_evt_{event}_{apa}.png"
+    title = f"Energy-Weighted Efficiency: Event {event}, {apa}"
+    if file_name:
+        title += f" ({file_name})"
+
+    # No efficiency rows at all (no true cluster survived the cuts)
+    if not efficiency_results:
+        _draw_empty_placeholder("No true clusters in this event", title, output_path,
+                                "Reco Cluster ID", "True Cluster ID")
+        return
+
     df = pd.DataFrame(efficiency_results)
     efficiency_matrix = df.pivot_table(
         index='true_cluster_id',
@@ -18,22 +52,39 @@ def plot_efficiency_heatmap(efficiency_results, event, apa, output_dir, file_nam
     # avoid to draw reco cluster if it's id is 8888 (sentinel for unmatched)
     efficiency_matrix = efficiency_matrix.loc[:, efficiency_matrix.columns != 8888]
 
+    # Every true cluster went unmatched, so 8888 was the only column and the matrix
+    # is now empty -- seaborn's heatmap raises on a zero-size array. Draw the
+    # placeholder instead of failing the whole job.
+    if efficiency_matrix.empty or efficiency_matrix.shape[1] == 0:
+        _draw_empty_placeholder(
+            f"No true-reco matches in this event\n({len(df['true_cluster_id'].unique())} true cluster(s), all unmatched, efficiency = 0)",
+            title, output_path, "Reco Cluster ID", "True Cluster ID")
+        return
+
     plt.figure(figsize=(10, 8))
     sns.heatmap(efficiency_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
                 xticklabels=[f"{int(x):d}" for x in efficiency_matrix.columns],
                 yticklabels=[f"{int(y):d}" for y in efficiency_matrix.index])
-    title = f"Energy-Weighted Efficiency: Event {event}, {apa}"
-    if file_name:
-        title += f" ({file_name})"
     plt.title(title)
     plt.xlabel("Reco Cluster ID")
     plt.ylabel("True Cluster ID")
-    plt.savefig(output_dir / f"efficiency_energy_weighted_evt_{event}_{apa}.png")
+    plt.savefig(output_path)
     plt.close()
     ##plt.show(block=False)
 
 def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     """Plot purity values as a heatmap for visual inspection of cluster matching."""
+    output_path = output_dir / f"purity_evt_{event}_{apa}.png"
+    title = f"Purity: Event {event}, {apa}"
+    if file_name:
+        title += f" ({file_name})"
+
+    # No purity rows at all -- no reco cluster survived the cuts (see EvaluatePurity)
+    if not purity_results:
+        _draw_empty_placeholder("No reco clusters in this event", title, output_path,
+                                "Reco Cluster ID", "True Cluster ID")
+        return
+
     df = pd.DataFrame(purity_results)
     purity_matrix = df.pivot_table(
         index='true_cluster_id',
@@ -45,17 +96,22 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     # avoid to draw reco cluster if it's id is 8888 (sentinel for unmatched)
     purity_matrix = purity_matrix.loc[:, purity_matrix.columns != 8888]
 
+    # Same zero-size guard as the efficiency heatmap: every reco cluster unmatched
+    # (true_cluster_id=8888) leaves nothing to draw.
+    if purity_matrix.empty or purity_matrix.shape[1] == 0:
+        _draw_empty_placeholder(
+            f"No true-reco matches in this event\n({len(df['reco_cluster_id'].unique())} reco cluster(s), all unmatched)",
+            title, output_path, "Reco Cluster ID", "True Cluster ID")
+        return
+
     plt.figure(figsize=(10, 8))
     sns.heatmap(purity_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
                 xticklabels=[f"{int(x):d}" for x in purity_matrix.columns],
                 yticklabels=[f"{int(y):d}" for y in purity_matrix.index])
-    title = f"Purity: Event {event}, {apa}"
-    if file_name:
-        title += f" ({file_name})"
     plt.title(title)
     plt.xlabel("Reco Cluster ID")
     plt.ylabel("True Cluster ID")
-    plt.savefig(output_dir / f"purity_evt_{event}_{apa}.png")
+    plt.savefig(output_path)
     plt.close()
     ##plt.show(block=False)
 
@@ -2120,7 +2176,13 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
       - Neutrino + Cosmic-by-type: one overlaid scatter plot (4 colors) + separate colz per category
       - Cosmic-by-type only (isochronous/normal/prolonged): one overlaid scatter plot (3 colors)
     """
-    if not pair_metadata_list:
+    # Nothing to draw only when there are no pairs AND no unmatched true clusters. An
+    # event with zero 1-to-1 pairs (e.g. no reco cluster survived the beam-window cut)
+    # still has something to show in the "including unmatched" variant: every true
+    # cluster goes in the no-match box at efficiency 0. The "excluding unmatched"
+    # variant passes all_true_metadata_list=None and still returns here, as before.
+    # Every inner helper already accepts empty `entries` with non-empty `unmatched_entries`.
+    if not pair_metadata_list and not all_true_metadata_list:
         return
 
     def _in_category(metadata, category_key):

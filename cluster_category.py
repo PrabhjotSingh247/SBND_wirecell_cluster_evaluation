@@ -61,8 +61,13 @@ def cluster_category(clusters_true, output_dir=None, event=None, apa=None, file_
         z_vals = points[:, 2]
         q_true = points[0, 4]  # Get q_true from first point (same for all points in cluster)
 
-        # Determine if neutrino (q_true=1) or cosmic (q_true=0)
-        is_neutrino = (q_true == 1)
+        # Determine if neutrino (q_true>0) or cosmic (q_true=0).
+        # q_true>0, NOT q_true==1: in the charge-light pipeline q_true carries
+        # sed-smear's nu_idx (0=cosmic, 1/2/3/...=which neutrino interaction), so an
+        # exact ==1 test silently labels the second and later neutrino interactions of
+        # an event as cosmic and then hands them a cosmic track_type. For the legacy
+        # pipelines, where q_true is a plain 0/1 flag, >0 and ==1 are equivalent.
+        is_neutrino = (q_true > 0)
 
         if is_neutrino:
             # Neutrino clusters: always categorize as "normal"

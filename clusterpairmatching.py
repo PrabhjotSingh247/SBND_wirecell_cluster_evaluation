@@ -9,6 +9,14 @@ def MatchTrueToReco1to1(efficiency_results, purity_results):
     with the highest efficiency is selected as the match.
     (No reco-side deduplication: a single reco cluster may end up paired with more than one true cluster.)
     """
+    # An event can legitimately have no efficiency or no purity rows at all -- e.g.
+    # with the beam-window cut on, an event with zero in-spill reco clusters gives
+    # EvaluatePurity nothing to loop over. pd.DataFrame([]) has NO columns, so the
+    # merge below would raise KeyError: 'event' instead of returning "no pairs".
+    if not efficiency_results or not purity_results:
+        print("Found 0 matched pairs of true and reco clusters (1-to-1)")
+        return []
+
     efficiency_df   = pd.DataFrame(efficiency_results)
     purity_df       = pd.DataFrame(purity_results)
 
@@ -40,6 +48,12 @@ def MatchTruetoReco_OneToMany(all_purity_results, all_eff_results):
     For each true cluster, finds all reco clusters with non-zero efficiency.
     Returns a list of dictionaries with true cluster and its matched reco clusters.
     """
+    # Same empty-input guard as MatchTrueToReco1to1: an empty result list becomes a
+    # column-less DataFrame and the merge would raise KeyError: 'event'.
+    if not all_purity_results or not all_eff_results:
+        print("Found 0 true clusters with matched reco clusters (1-to-many)")
+        return []
+
     purity_df       = pd.DataFrame(all_purity_results)
     efficiency_df   = pd.DataFrame(all_eff_results)
 

@@ -11,7 +11,7 @@ spread_cluster_analysis/
 Haiwang_test_file_charge_light_matching/
 Haiwang_test_file_charge_light_matching_moreinfo/
 Haiwang_files_charge_light_matching_MCP2025C_Fall_production/
-Haiwang_files_charge_light_matching_MCP2025C_Fall_production/
+Haiwang_files_charge_light_matching_MCP2025C_Fall_production_after_deadareacut/
 
 # Output files
 *.root

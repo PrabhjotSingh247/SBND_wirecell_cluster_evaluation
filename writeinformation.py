@@ -191,7 +191,13 @@ def write_removed_neutrino_info(vertex_records, output_dir, filename="removed_tr
     Grouped and summarised by removal_reason, since the categories call for
     different responses: "no true deposits" is a genuinely invisible interaction
     (nothing to recover), while "below energy cut" is a threshold choice and
-    "removed by geometric cuts" is a fiducial/dead-area effect.
+    "removed by geometric cuts" is a fiducial/min-points effect.
+
+    The dead-area cut is not among those geometric cuts: it runs upstream, in
+    preprocess_deadarea_cut.py, so an interaction whose only deposits fell inside a
+    dead channel region arrives here already empty and is reported as "no true
+    deposits" -- which is what it is, since those points could never have been
+    reconstructed. See build_neutrino_vertex_records' docstring.
     """
     removed = [r for r in vertex_records if not r.get('has_true_cluster')]
     if not removed:

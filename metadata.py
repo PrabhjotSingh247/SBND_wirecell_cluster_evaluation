@@ -629,8 +629,20 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
     different follow-up. removal_reason names the energy cut specifically when
     min_cluster_energy is given and the pre-cut energy falls below it; anything
     that had enough energy and still vanished is attributed to the geometric
-    cuts (fiducial / dead area / min-points). Records that survived carry
+    cuts (fiducial / min-points). Records that survived carry
     removal_reason=None.
+
+    NOTE on the dead-area cut: it is no longer one of the geometric cuts counted
+    here. It is applied upstream by preprocess_deadarea_cut.py, before this
+    pipeline sees the data, so clusters_true_precut is ALREADY dead-area-filtered
+    and a dead-area removal can never appear as a removal_reason. That is
+    deliberate rather than a gap: points inside a dead channel region could never
+    have been reconstructed, so they are not "cut" in any meaningful sense -- they
+    are outside the measurable volume, and "no true deposits" is the honest
+    description of an interaction that only ever deposited there. If you point the
+    pipeline back at a raw tree with Apply_deadarea_cut=True, the cut moves back to
+    the end of the chain and dead-area removals fold into the geometric category
+    again.
 
     Parameters:
     - mc_records: flatten_mc_tree(result['mc']) output
@@ -693,8 +705,10 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
                 removal_category = "below energy cut"
                 removal_reason   = f"below energy cut ({precut_energy:.1f} < {min_cluster_energy} MeV)"
             else:
+                # No "dead area" here: it is applied upstream, before this pipeline
+                # sees the data -- see the docstring's NOTE.
                 removal_category = "removed by geometric cuts"
-                removal_reason   = "removed by geometric cuts (fiducial / dead area / min points)"
+                removal_reason   = "removed by geometric cuts (fiducial / min points)"
 
         records.append({
             'file_name': file_name,

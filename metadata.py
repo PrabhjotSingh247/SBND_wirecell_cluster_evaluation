@@ -2,6 +2,9 @@ import numpy as np
 from pathlib import Path
 from scipy.spatial import KDTree
 
+from variable_pca_linearity import calculate_pca_linearity
+from DrawRecoTrueFlashes import BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US
+
 def add_metadata_true_clusters(efficiency_results, cluster_category_results, file_name, event, apa, view, event_key=None):
     """
     Create metadata for each true cluster.
@@ -327,6 +330,355 @@ def categorize_extra_reco_clusters(clusters_true, clusters_reco, purity_results,
             row['min_dist']     = best_min_dist
             row['mean_nn_dist'] = best_mean_dist
             row['dx'], row['dy'], row['dz'] = best_offset
+
+        rows.append(row)
+
+    return rows
+
+
+# ============================================================================
+# UNMATCHED TRUE NEUTRINO CLUSTER INVESTIGATION (additive)
+# ============================================================================
+# The mirror image of categorize_extra_reco_clusters above: that one asks "why
+# are there MORE selected reco clusters than true neutrinos", this one asks
+# "why do FEWER true neutrinos find a reco match than exist" (job-wide: 72 true
+# neutrinos, only 61 of them in a 1-to-1 pair). See
+# investigate_unmatched_true_neutrinos.py.
+
+
+def _beam_window_offset_us(flash_time):
+    """
+    Signed distance from flash_time to the beam window, in us: 0.0 inside,
+    negative if the flash is early (before BEAM_WINDOW_MIN_US), positive if late
+    (after BEAM_WINDOW_MAX_US). Magnitude is what separates "the neutrino sat
+    just outside the spill" from "charge-light matching handed this cluster a
+    cosmic's flash tens of us away".
+    """
+    if flash_time < BEAM_WINDOW_MIN_US:
+        return float(flash_time - BEAM_WINDOW_MIN_US)
+    if flash_time > BEAM_WINDOW_MAX_US:
+        return float(flash_time - BEAM_WINDOW_MAX_US)
+    return 0.0
+
+
+def _true_reco_overlap_metrics(true_points, reco_points, radius_efficiency, min_recopoints_threshold):
+    """
+    Energy-weighted overlap of one true cluster with one reco cluster, at two
+    strictnesses, from a single KDTree pass.
+
+    Returns (strict, relaxed):
+      - strict : EXACTLY EvaluateEfficiency's efficiency_energy_weighted -- the
+        energy fraction of the true cluster whose points have MORE than
+        min_recopoints_threshold reco points within radius_efficiency. This is
+        the quantity MatchTrueToReco1to1 needs to be > 0 for a pair to form, so
+        strict == 0 means "this reco cluster cannot match this true cluster".
+      - relaxed : the same energy fraction but requiring only >=1 reco point
+        within radius_efficiency. relaxed > 0 while strict == 0 is the signature
+        of a broken/sparse reconstruction -- reco charge IS sitting on the true
+        neutrino, just never densely enough to clear the neighbor threshold.
+    """
+    true_points = np.asarray(true_points)
+    true_energies = true_points[:, 5]
+    total_true_energy = true_energies.sum()
+    if total_true_energy <= 0:
+        return 0.0, 0.0
+
+    tree = KDTree(np.asarray(reco_points)[:, :3])
+    neighbor_counts = np.fromiter(
+        (len(n) for n in tree.query_ball_point(true_points[:, :3], r=radius_efficiency)),
+        dtype=int, count=len(true_points))
+
+    strict  = true_energies[neighbor_counts > min_recopoints_threshold].sum() / total_true_energy
+    relaxed = true_energies[neighbor_counts > 0].sum() / total_true_energy
+    return float(strict), float(relaxed)
+
+
+def _true_reco_yz_overlap_metrics(true_points, reco_points, radius_efficiency):
+    """
+    Same energy-weighted overlap as _true_reco_overlap_metrics' `relaxed`, but
+    computed in the YZ PROJECTION ONLY -- X is dropped entirely.
+
+    This is the charge-light X-mis-assignment test. Charge-light matching sets a
+    cluster's drift coordinate from its matched flash time and touches nothing
+    else, so a wrong flash moves the reco cluster in X while leaving Y and Z
+    exactly where they were. A true cluster with ZERO 3D overlap but healthy YZ
+    overlap can therefore only be separated from its reco by a displacement along
+    X -- which is the fingerprint, with no distance threshold needed to see it.
+
+    Measured in BOTH directions, because a one-sided YZ overlap is easy to fake:
+    a long cosmic track crossing the YZ region of a small neutrino blob covers
+    ~100% of that blob while only ~1% of the track lies on it. That is a
+    coincidental crossing, not a drift-shifted reconstruction of the neutrino.
+    Requiring both fractions to be high is the same efficiency/purity pairing
+    EvaluateEfficiency/EvaluatePurity already use, applied to the YZ projection.
+
+    Returns (yz_overlap, yz_reco_frac, dx_mean):
+      - yz_overlap : energy fraction of the TRUE cluster with >=1 reco point
+        within radius_efficiency in YZ (the efficiency-like direction)
+      - yz_reco_frac : fraction of the RECO cluster's points lying within
+        radius_efficiency of a true point in YZ (the purity-like direction --
+        this is what a passing cosmic track fails)
+      - dx_mean : mean (reco_x - true_x) over the overlapping true points, each
+        against its nearest-in-YZ reco point -- how far the reco sits from the
+        truth along the drift direction. None when nothing overlaps in YZ.
+    """
+    true_points = np.asarray(true_points)
+    reco_points = np.asarray(reco_points)
+    true_energies = true_points[:, 5]
+    total_true_energy = true_energies.sum()
+    if total_true_energy <= 0:
+        return 0.0, 0.0, None
+
+    true_yz = true_points[:, 1:3]
+    reco_yz = reco_points[:, 1:3]
+
+    dists, idx = KDTree(reco_yz).query(true_yz)
+    within = dists <= radius_efficiency
+    yz_overlap = true_energies[within].sum() / total_true_energy
+
+    reco_dists, _ = KDTree(true_yz).query(reco_yz)
+    yz_reco_frac = float((reco_dists <= radius_efficiency).mean())
+
+    if not within.any():
+        return float(yz_overlap), yz_reco_frac, None
+
+    dx_mean = float((reco_points[idx[within], 0] - true_points[within, 0]).mean())
+    return float(yz_overlap), yz_reco_frac, dx_mean
+
+
+# Minimum YZ overlap -- required of BOTH directions (true-side and reco-side, see
+# _true_reco_yz_overlap_metrics) -- for a zero-3D-overlap true neutrino to be
+# called an X-mis-assignment rather than simply unreconstructed. The ONLY tunable
+# knob in this diagnosis: the YZ-vs-3D contrast itself needs no threshold, but a
+# stray point or two lining up in projection, or a cosmic track merely crossing
+# the neutrino's YZ region, shouldn't earn the label. Raw yz_overlap /
+# yz_reco_frac / yz_dx are written to the .txt regardless, so the call can always
+# be second-guessed per row.
+YZ_ALIGNED_MIN_OVERLAP = 0.1
+
+
+def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, clusters_reco_all,
+                                         reco_provenance, beam_window_real_ids, flash_times_by_real_id,
+                                         matched_pairs, file_name, event, apa="Combined", event_key=None,
+                                         radius_efficiency=2, min_recopoints_threshold=5):
+    """
+    Categorize every TRUE NEUTRINO cluster in one event by whether it found a
+    1-to-1 reco match and, if not, why not.
+
+    The diagnosis works by re-running the overlap test against the FULL
+    pre-beam-window-cut reco set (clusters_reco_all) and asking how far up the
+    chain the true neutrino got before it dropped out. MatchTrueToReco1to1 does
+    argmax-per-true-cluster with no reco-side deduplication, so unlike the reco
+    side there is no "lost the 1-to-1 slot to a competitor" failure mode here:
+    a true cluster is unmatched if and only if NO selected reco cluster reaches
+    efficiency_energy_weighted > 0 against it.
+
+    Categories (a true neutrino gets exactly one, tested in this order):
+      - matched: this true neutrino IS in a MatchTrueToReco1to1 pair. Not a
+        failure -- carried in the returned rows so one list describes all of
+        them, same as categorize_extra_reco_clusters' 'matched_winner'.
+      - reco_outside_beam_window: a reco cluster in the FULL set reaches
+        efficiency > 0 against this true neutrino, but it was removed by the
+        beam-window cut because its charge-light-matched flash sits outside
+        [BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US]. winner_flash_time and
+        winner_flash_offset_us (signed distance to the nearest window edge)
+        separate the two physical readings: a small offset is a neutrino
+        genuinely just outside the spill, a large one is a charge-light
+        mis-assignment that handed this cluster a cosmic's flash.
+        (The true side of these files carries no per-point time -- see
+        build_true_points_charge_light's time_placeholder -- so the matched
+        flash time is the only in-band handle on "was this neutrino in the beam
+        window", and these two causes are distinguished by offset size rather
+        than by an independent truth time.)
+      - reco_no_flash_match: same as above -- a reco cluster in the full set
+        WOULD have matched -- but charge-light matching attached no flash to it
+        at all, so the beam-window ID filter dropped it for having no time.
+        A pure charge-light failure, distinct from a timing failure.
+      - broken_or_sparse_reco: no reco cluster in the full set reaches
+        efficiency > 0, yet reco points DO sit on the true neutrino
+        (best_relaxed_overlap > 0). The reconstruction is there but fragmented
+        or too sparse to clear min_recopoints_threshold -- the "highly
+        scattered / broken neutrino" case. n_overlapping_reco_clusters says how
+        badly it is split up.
+      - no_reco_overlap_x_shift: no 3D overlap either, BUT a reco cluster still
+        lines up with this neutrino in the YZ projection (yz_overlap >=
+        YZ_ALIGNED_MIN_OVERLAP). Charge-light matching sets a cluster's drift
+        coordinate from its flash time and touches nothing else, so overlapping
+        in YZ while missing in 3D means the separation is purely along X --
+        the signature of a wrong flash. yz_dx is how far the reco sits from the
+        truth along the drift direction.
+      - no_reco_overlap: not a single reco point in the full set lands within
+        radius_efficiency of this true neutrino, in 3D or in YZ -- the neutrino
+        was simply never reconstructed. nearest_reco_* / min_dist / dx,dy,dz
+        come from a KDTree search against every reco cluster in the event (same
+        technique as categorize_extra_reco_clusters' no_true_overlap block,
+        true-centric here) and are filled for this category and the one above.
+      - unexplained: defensive only. A reco cluster that IS in the selected set
+        reaches efficiency > 0 yet no pair formed -- impossible given the
+        matching code above, so it would signal that this script and the
+        notebook pipeline have drifted apart rather than a physics effect.
+
+    Args:
+        clusters_true: dict {true_cluster_id: points} for this event
+        clusters_reco_selected: dict {reco_cluster_id: points}, AFTER the
+            beam-window cut -- the set MatchTrueToReco1to1 actually saw
+        clusters_reco_all: dict {reco_cluster_id: points}, the same event's reco
+            clusters BEFORE the beam-window cut (superset of the above, sharing
+            its cluster IDs -- see _group_reco_with_provenance in the driver)
+        reco_provenance: dict {reco_cluster_id: [clustering real_cluster_id, ...]}
+            linking each grouped reco cluster back to the raw IDs the flash
+            records and the beam-window cut are keyed on
+        beam_window_real_ids: set of clustering real_cluster_ids that passed the
+            beam-window cut
+        flash_times_by_real_id: dict {clustering real_cluster_id: [flash_time_us, ...]}
+            from build_img_cluster_flash_metadata; a real_cluster_id absent here
+            had no flash attached by charge-light matching
+        matched_pairs: MatchTrueToReco1to1() output for this event
+        file_name, event, apa: same convention as add_metadata_true_clusters
+        event_key: full event key like "file1_0" (constructed if None)
+        radius_efficiency, min_recopoints_threshold: must be the SAME values the
+            driver passed to EvaluateEfficiency, or the strict overlap recomputed
+            here won't reproduce the matching it is trying to explain
+
+    Returns:
+        List of dicts, one per TRUE NEUTRINO cluster in clusters_true (cosmic
+        true clusters are skipped entirely).
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+
+    matched_true_ids = {pair['true_cluster_id'] for pair in matched_pairs}
+    beam_window_real_ids = set(beam_window_real_ids)
+
+    rows = []
+    for true_cid, true_points in clusters_true.items():
+        if not _is_neutrino_true_cluster_id(true_cid):
+            continue
+
+        true_points = np.asarray(true_points)
+        extent = true_points[:, :3].max(axis=0) - true_points[:, :3].min(axis=0)
+
+        row = {
+            'file_name': file_name,
+            'event': event_key,
+            'event_num': event,
+            'apa': apa,
+            'true_cluster_id': true_cid,
+            'category': None,
+            'n_true_points': len(true_points),
+            'total_true_energy': float(true_points[:, 5].sum()),
+            'linearity': calculate_pca_linearity(true_points),
+            'extent_x': float(extent[0]), 'extent_y': float(extent[1]), 'extent_z': float(extent[2]),
+            'matched_reco_cluster_id': None,
+            'efficiency': None,
+            # Best overlap found anywhere in the PRE-cut reco set, at both strictnesses.
+            'best_strict_reco_cluster_id': None,
+            'best_strict_overlap': 0.0,
+            'best_relaxed_reco_cluster_id': None,
+            'best_relaxed_overlap': 0.0,
+            'n_overlapping_reco_clusters': 0,
+            'n_overlapping_in_beam_window': 0,
+            # Filled for reco_outside_beam_window / reco_no_flash_match.
+            'winner_in_beam_window': None,
+            'winner_flash_time': None,
+            'winner_flash_offset_us': None,
+            # Filled for no_reco_overlap / no_reco_overlap_x_shift.
+            'nearest_reco_cluster_id': None,
+            'min_dist': None,
+            'mean_nn_dist': None,
+            'dx': None, 'dy': None, 'dz': None,
+            # YZ-projection (charge-light X-mis-assignment) test, same rows.
+            'yz_best_reco_cluster_id': None,
+            'yz_overlap': None,
+            'yz_reco_frac': None,
+            'yz_dx': None,
+        }
+
+        if true_cid in matched_true_ids:
+            pair = next(p for p in matched_pairs if p['true_cluster_id'] == true_cid)
+            row['category'] = 'matched'
+            row['matched_reco_cluster_id'] = pair['reco_cluster_id']
+            row['efficiency'] = pair['efficiency_energy_weighted']
+            rows.append(row)
+            continue
+
+        # --- Unmatched: re-test against every PRE-cut reco cluster ---
+        for reco_cid, reco_points in clusters_reco_all.items():
+            strict, relaxed = _true_reco_overlap_metrics(true_points, reco_points,
+                                                          radius_efficiency, min_recopoints_threshold)
+            if relaxed > 0:
+                row['n_overlapping_reco_clusters'] += 1
+                if any(rid in beam_window_real_ids for rid in reco_provenance.get(reco_cid, [])):
+                    row['n_overlapping_in_beam_window'] += 1
+            if strict > row['best_strict_overlap']:
+                row['best_strict_overlap'] = strict
+                row['best_strict_reco_cluster_id'] = reco_cid
+            if relaxed > row['best_relaxed_overlap']:
+                row['best_relaxed_overlap'] = relaxed
+                row['best_relaxed_reco_cluster_id'] = reco_cid
+
+        if row['best_strict_overlap'] > 0:
+            winner_cid    = row['best_strict_reco_cluster_id']
+            winner_reals  = reco_provenance.get(winner_cid, [])
+            winner_flashes = [t for rid in winner_reals for t in flash_times_by_real_id.get(rid, [])]
+            row['winner_in_beam_window'] = winner_cid in clusters_reco_selected
+
+            if row['winner_in_beam_window']:
+                row['category'] = 'unexplained'
+            elif not winner_flashes:
+                row['category'] = 'reco_no_flash_match'
+            else:
+                row['category'] = 'reco_outside_beam_window'
+                # Report the flash that came CLOSEST to the window: with several
+                # flashes on one cluster (cathode crossings, re-merged fragments)
+                # the near miss is the informative one, not an arbitrary pick.
+                offsets = [_beam_window_offset_us(t) for t in winner_flashes]
+                best_i = int(np.argmin(np.abs(offsets)))
+                row['winner_flash_time']      = winner_flashes[best_i]
+                row['winner_flash_offset_us'] = offsets[best_i]
+
+        elif row['best_relaxed_overlap'] > 0:
+            row['category'] = 'broken_or_sparse_reco'
+
+        else:
+            row['category'] = 'no_reco_overlap'
+            if clusters_reco_all:
+                true_xyz = true_points[:, :3]
+                best_cid, best_min, best_mean, best_offset = None, np.inf, None, None
+                for reco_cid, reco_points in clusters_reco_all.items():
+                    tree = KDTree(np.asarray(reco_points)[:, :3])
+                    dists, idx = tree.query(true_xyz)
+                    d = dists.min()
+                    if d < best_min:
+                        nearest_reco_pts = np.asarray(reco_points)[idx, :3]
+                        best_cid, best_min = reco_cid, d
+                        best_mean   = dists.mean()
+                        best_offset = (nearest_reco_pts - true_xyz).mean(axis=0)
+                row['nearest_reco_cluster_id'] = best_cid
+                row['min_dist']     = float(best_min)
+                row['mean_nn_dist'] = float(best_mean)
+                row['dx'], row['dy'], row['dz'] = (float(v) for v in best_offset)
+
+                # Charge-light X-mis-assignment test: with 3D overlap already
+                # known to be zero, any cluster that still lines up in YZ can
+                # only be displaced along X -- the one coordinate charge-light
+                # matching sets. Candidates are ranked by the WEAKER of the two
+                # directions, so a long cosmic track that merely crosses the
+                # neutrino's YZ region (high true-side, negligible reco-side)
+                # cannot win over a genuinely co-located cluster.
+                best_balance = -1.0
+                for reco_cid, reco_points in clusters_reco_all.items():
+                    yz_overlap, yz_reco_frac, yz_dx = _true_reco_yz_overlap_metrics(
+                        true_points, reco_points, radius_efficiency)
+                    balance = min(yz_overlap, yz_reco_frac)
+                    if balance > best_balance:
+                        best_balance = balance
+                        row['yz_overlap']   = yz_overlap
+                        row['yz_reco_frac'] = yz_reco_frac
+                        row['yz_dx']        = yz_dx
+                        row['yz_best_reco_cluster_id'] = reco_cid
+                if best_balance >= YZ_ALIGNED_MIN_OVERLAP:
+                    row['category'] = 'no_reco_overlap_x_shift'
 
         rows.append(row)
 

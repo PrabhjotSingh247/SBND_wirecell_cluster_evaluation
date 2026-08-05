@@ -390,3 +390,105 @@ def draw_img_global_clusters(all_clusters, flash_clusters, beam_window_clusters,
     plt.tight_layout()
     plt.savefig(output_dir / f"img_global_clusters_event{event}_{apa}.png", dpi=100)
     plt.close()
+
+
+def draw_unmatched_neutrino_flash_times(neutrino_rows, output_dir, apa, level_name, filename_prefix,
+                                         file_name=None):
+    """
+    Flash-time distribution of the 'reco_outside_beam_window' cases from
+    metadata.categorize_unmatched_true_neutrinos(): for each true neutrino that
+    lost its reco partner to the beam-window cut, the flash time of the reco
+    cluster that WOULD have matched it. Shows, in one picture, whether those
+    neutrinos sat just outside the spill or whether charge-light matching handed
+    their cluster a wildly out-of-time (cosmic) flash.
+
+    Level-agnostic like the writers in writeinformation.py -- pass one event's
+    rows for the event-level copy, a whole file's or job's for the aggregated one.
+
+    Two stacked panels, following draw_flashes' existing coarse/fine convention
+    above, because these flash times span hundreds of us while the interesting
+    near-misses sit tens of ns from the window edge -- one linear axis cannot
+    show both:
+      TOP    : full range, bins of BEAM_WINDOW_WIDTH_US aligned to the window edge
+      BOTTOM : zoomed to [-2, 4] us, bins of FINE_BIN_WIDTH_US
+    Both mark the beam window with the same gold axvspan used everywhere else in
+    this module, with its numeric limits spelled out in the legend.
+
+    Parameters:
+    - neutrino_rows: list of dicts from categorize_unmatched_true_neutrinos()
+    - output_dir, apa, level_name, filename_prefix, file_name: same convention as draw_flashes
+
+    Saved as unmatched_neutrino_flash_times_{filename_prefix}_{apa}.png.
+    No-op (returns without writing) if no row is category 'reco_outside_beam_window'.
+    """
+    flash_times = [r['winner_flash_time'] for r in neutrino_rows
+                    if r['category'] == 'reco_outside_beam_window' and r['winner_flash_time'] is not None]
+    if not flash_times:
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Every one of these is out of the window by construction (that is what the
+    # category means), so the informative split is near-miss vs. grossly out --
+    # counted here at the zoom panel's edge rather than at the window's.
+    n_near = sum(1 for t in flash_times if -2 <= t <= 4)
+    n_far  = len(flash_times) - n_near
+
+    beam_window_label = (f'beam window: {BEAM_WINDOW_MIN_US} - {BEAM_WINDOW_MAX_US} us '
+                         f'(width {BEAM_WINDOW_WIDTH_US:.2f} us)')
+
+    title = f'Flash Time of Would-Have-Matched Reco (beam-window losses): {level_name}, {apa}'
+    if file_name:
+        title += f' ({file_name})'
+
+    fig, (ax_coarse, ax_fine) = plt.subplots(2, 1, figsize=(11, 11))
+
+    def _count_axis(ax, counts):
+        """Counts are small integers here (often all 1), where matplotlib's
+        autoscale produces a meaningless 0.96-1.05 y-range. Anchor at 0 and tick
+        in whole clusters instead."""
+        top = max(int(counts.max()), 1)
+        ax.set_ylim(0, top + 0.5)
+        ax.set_yticks(range(0, top + 1))
+
+    # TOP -- full range. Same scatter-at-nonzero-bin-centers approach as
+    # draw_flashes: with a handful of entries spread over hundreds of us, a bar
+    # histogram would be almost entirely empty bins.
+    coarse_edges = _aligned_bin_edges(min(flash_times), max(flash_times), BEAM_WINDOW_WIDTH_US, BEAM_WINDOW_MIN_US)
+    coarse_counts, coarse_edges = np.histogram(flash_times, bins=coarse_edges)
+    coarse_centers = (coarse_edges[:-1] + coarse_edges[1:]) / 2
+    nonzero = coarse_counts > 0
+    ax_coarse.scatter(coarse_centers[nonzero], coarse_counts[nonzero], s=60,
+                      color='steelblue', edgecolor='black', alpha=0.8,
+                      label=f'would-have-matched reco (n={len(flash_times)})')
+    ax_coarse.axvspan(BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US, color='gold', alpha=0.25, label=beam_window_label)
+    ax_coarse.set_xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
+    ax_coarse.set_ylabel('Number of Clusters', fontsize=12, fontweight='bold')
+    ax_coarse.set_title(f'{title}\n(full range, bins of {BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold')
+    ax_coarse.grid(True, linestyle='--', alpha=0.3)
+    _count_axis(ax_coarse, coarse_counts)
+    ax_coarse.legend(fontsize=9)
+
+    # BOTTOM -- zoomed to the same [-2, 4] us as draw_flashes' fine panel, where
+    # the near-misses (tens of ns outside the edge) become readable.
+    fine_edges = _aligned_bin_edges(-2, 4, FINE_BIN_WIDTH_US, BEAM_WINDOW_MIN_US)
+    fine_counts, fine_edges = np.histogram(flash_times, bins=fine_edges)
+    fine_centers = (fine_edges[:-1] + fine_edges[1:]) / 2
+    nonzero = fine_counts > 0
+    ax_fine.scatter(fine_centers[nonzero], fine_counts[nonzero], s=60,
+                    color='steelblue', edgecolor='black', alpha=0.8,
+                    label=f'in view: {n_near}, outside [-2, 4] us: {n_far}')
+    ax_fine.axvspan(BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US, color='gold', alpha=0.25, label=beam_window_label)
+    ax_fine.set_xlim(-2, 4)
+    ax_fine.set_xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
+    ax_fine.set_ylabel('Number of Clusters', fontsize=12, fontweight='bold')
+    ax_fine.set_title(f'Zoom on the beam window (bins of {FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold')
+    ax_fine.grid(True, linestyle='--', alpha=0.3)
+    _count_axis(ax_fine, fine_counts)
+    ax_fine.legend(fontsize=9)
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f'unmatched_neutrino_flash_times_{filename_prefix}_{apa}.png',
+                dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()

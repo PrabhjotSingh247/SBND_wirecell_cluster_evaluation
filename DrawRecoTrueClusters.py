@@ -1960,3 +1960,274 @@ def DrawExtraRecoCategoryBreakdown(categorized_rows, n_true_neutrinos, output_di
     plt.savefig(output_dir / f"extra_reco_category_breakdown_{filename_prefix}_{num_events}events_{apa}.png",
                 dpi=100, bbox_inches='tight')
     plt.close()
+
+
+# ============================================================================
+# UNMATCHED TRUE NEUTRINO CLUSTER INVESTIGATION (additive)
+# ============================================================================
+# The true-side mirror of the extra-reco drawers above. Category colors are
+# deliberately DISJOINT from _EXTRA_RECO_CATEGORY_COLORS' green/orange/blue/red
+# so the two investigations' plots can sit side by side without a color
+# suggesting a relationship that isn't there -- except 'matched', which reuses
+# the same green as 'matched_winner' because it is the same set of pairs seen
+# from the other side.
+_UNMATCHED_TRUE_NU_CATEGORY_ORDER = ['matched', 'reco_outside_beam_window', 'reco_no_flash_match',
+                                      'broken_or_sparse_reco', 'no_reco_overlap_x_shift',
+                                      'no_reco_overlap', 'unexplained']
+_UNMATCHED_TRUE_NU_CATEGORY_COLORS = {
+    'matched':                  'green',
+    'reco_outside_beam_window': '#d62728',
+    'reco_no_flash_match':      '#9467bd',
+    'broken_or_sparse_reco':    '#ff7f0e',
+    # Both no_reco_overlap variants share a hue family (they are the same
+    # observation, split by whether YZ still lines up), with the charge-light
+    # one darker so it reads as the more specific diagnosis of the pair.
+    'no_reco_overlap_x_shift':  '#0d7c8c',
+    'no_reco_overlap':          '#17becf',
+    'unexplained':              '#7f7f7f',
+}
+_UNMATCHED_TRUE_NU_CATEGORY_LABELS = {
+    'matched':                  'Matched',
+    'reco_outside_beam_window': 'Reco outside\nbeam window',
+    'reco_no_flash_match':      'Reco has\nno flash',
+    'broken_or_sparse_reco':    'Broken /\nsparse reco',
+    'no_reco_overlap_x_shift':  'No 3D overlap,\nYZ aligns (X shift)',
+    'no_reco_overlap':          'No reco\noverlap',
+    'unexplained':              'Unexplained',
+}
+
+
+# Categories where one specific reco cluster is the evidence for the diagnosis,
+# and the row field holding its ID. For these, and only these, that single reco
+# cluster is drawn in gray alongside the true cluster (see
+# DrawUnmatchedTrueNeutrinos):
+#   - the two beam-window losses: the cluster that WOULD have matched, which the
+#     cut removed -- without it the plot cannot separate "cut on timing" from
+#     "never reconstructed"
+#   - no_reco_overlap_x_shift: the cluster that lines up in YZ but not in 3D.
+#     Drawing it IS the argument -- it sits on the neutrino in the YZ panel and
+#     visibly apart from it in XZ/XY, which is what a drift-only displacement
+#     looks like.
+# The rest have no such cluster: broken_or_sparse_reco has no single cluster that
+# would have matched, and plain no_reco_overlap has nothing nearby in any view.
+_EVIDENCE_RECO_ID_FIELD = {
+    'reco_outside_beam_window': 'best_strict_reco_cluster_id',
+    'reco_no_flash_match':      'best_strict_reco_cluster_id',
+    'no_reco_overlap_x_shift':  'yz_best_reco_cluster_id',
+}
+_EVIDENCE_RECO_LABEL = {
+    'reco_outside_beam_window': 'would have matched',
+    'reco_no_flash_match':      'would have matched',
+    'no_reco_overlap_x_shift':  'YZ-aligned with',
+}
+
+
+def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_dir, file_name=None,
+                                clusters_reco_all=None):
+    """
+    Draw ONLY the true NEUTRINO clusters that found no reco match for one event,
+    in XZ/YZ/XY projections side by side, colored by
+    metadata.categorize_unmatched_true_neutrinos() category -- the spatial
+    counterpart to unmatched_true_neutrino_info.txt
+    (writeinformation.write_unmatched_true_neutrino_info), and the true-side
+    mirror of DrawExtraRecoClusters above. Matched true neutrinos, cosmic true
+    clusters, and the event's reco clusters at large are all deliberately NOT
+    drawn, so the flagged clusters stand alone instead of being lost against the
+    rest of the event. Same view/axis conventions as the other drawers here (Z
+    on the x-axis for XZ/YZ).
+
+    The ONE exception is the reco cluster that would have matched: for the
+    _WOULD_HAVE_MATCHED_CATEGORIES rows, whose whole diagnosis is that reco
+    charge WAS sitting on the neutrino and the beam-window cut (or a missing
+    flash) removed it, that single cluster is drawn in gray underneath. Without
+    it the plot cannot distinguish "cut on timing" from "never reconstructed",
+    which is the entire question for those categories. No other reco cluster is
+    drawn.
+
+    Every legend entry carries a cluster ID -- the true cluster's, and the gray
+    reco cluster's -- so anything flagged here can be found again in the other
+    per-event plots and in the .txt tables (the same ID appears in
+    unmatched_true_neutrino_info.txt's ovl_reco_id column).
+
+    Parameters:
+    - clusters_true: dict {true_cluster_id: points} for this event
+    - neutrino_rows: this event's rows from categorize_unmatched_true_neutrinos()
+    - event, apa, output_dir, file_name: same convention as the other event-level drawers
+    - clusters_reco_all: dict {reco_cluster_id: points} of the PRE-beam-window-cut reco
+        clusters, used ONLY to look up the would-have-matched clusters by ID. Omit it
+        (or pass None) to draw the true clusters alone.
+
+    Saved as unmatched_true_neutrinos_event{event}_{apa}.png (one file, 3 panels).
+    No-op (returns without writing) if the event has no unmatched true neutrino.
+    """
+    unmatched_category = {r['true_cluster_id']: r['category'] for r in neutrino_rows
+                           if r['category'] != 'matched'}
+    if not unmatched_category:
+        return
+
+    # reco_cluster_id -> (true cluster it relates to, how). Keyed by reco ID so one
+    # cluster implicated by two flagged neutrinos is drawn (and labelled) once.
+    evidence_reco = {}
+    if clusters_reco_all:
+        for r in neutrino_rows:
+            id_field = _EVIDENCE_RECO_ID_FIELD.get(r['category'])
+            if id_field is None:
+                continue
+            reco_cid = r.get(id_field)
+            if reco_cid in clusters_reco_all:
+                evidence_reco.setdefault(reco_cid,
+                                          (r['true_cluster_id'], _EVIDENCE_RECO_LABEL[r['category']]))
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel)
+    views = [
+        ("XZ", 2, 0, (0, 500), (-250, 250), "z [cm]", "x [cm]"),
+        ("YZ", 2, 1, (0, 500), (-250, 250), "z [cm]", "y [cm]"),
+        ("XY", 0, 1, (-250, 250), (-250, 250), "x [cm]", "y [cm]"),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(20, 6.5))
+
+    for col_idx, (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel) in enumerate(views):
+        ax = axes[col_idx]
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        title = f"Unmatched true neutrinos: Event {event}, {apa}, {view_label}"
+        if file_name:
+            title += f" ({file_name})"
+        ax.set_title(title, fontsize=11)
+
+        # Gray reco first, so the true cluster it failed to match sits on top of it.
+        # Drawn with a LARGER marker than the true points (s=6 vs s=1): where the
+        # two coincide -- which for these categories is the whole point -- an
+        # equal-sized gray layer is completely hidden by the true cluster painted
+        # over it, so the overlap has to read as a gray halo around the true points.
+        for reco_cid, (true_cid, relation) in sorted(evidence_reco.items()):
+            reco_points = np.array(clusters_reco_all[reco_cid])
+            ax.scatter(reco_points[:, x_col], reco_points[:, y_col], s=6, alpha=0.5, color='gray')
+            ax.plot([], [], color='gray',
+                    label=f"Reco cluster {reco_cid:.3f} ({relation} {true_cid:.0f})")
+
+        for true_cid, category in sorted(unmatched_category.items()):
+            points = np.array(clusters_true[true_cid])
+            color = _UNMATCHED_TRUE_NU_CATEGORY_COLORS[category]
+            ax.scatter(points[:, x_col], points[:, y_col], s=1, alpha=0.8, color=color)
+            # Invisible zero-length line to carry the legend entry -- same trick
+            # used by DrawTrueRecoClustersXZ/YZ/XY and DrawExtraRecoClusters
+            # above -- so each cluster's ID is readable directly off the plot,
+            # not just its category color.
+            label = _UNMATCHED_TRUE_NU_CATEGORY_LABELS[category].replace('\n', ' ')
+            ax.plot([], [], color=color, label=f"True cluster {true_cid:.0f} ({label})")
+        ax.legend(fontsize=8, loc='upper right')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"unmatched_true_neutrinos_event{event}_{apa}.png", dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawUnmatchedTrueNeutrinoBreakdown(neutrino_rows, n_selected_reco, output_dir, apa, level_name, filename_prefix,
+                                        file_name=None):
+    """
+    Three bar charts stacked top to bottom -- event level, file level, or job
+    level (same neutrino_rows list works at any level, one event's rows or many
+    events' concatenated together, same convention as the writers in
+    writeinformation.py). The true-side mirror of
+    DrawExtraRecoCategoryBreakdown above.
+
+    TOP    : total true neutrino clusters vs. total reco clusters selected (beam
+             window, post cuts) vs. how many actually form a 1-to-1 true-reco
+             pair -- the SAME three bars, same colors, as the extra-reco
+             investigation's top panel, so the two studies read against a shared
+             baseline (job-wide: 72 true neutrinos, 88 selected reco, 61 pairs).
+    MIDDLE : those true neutrinos split into just Matched vs. Not matched -- the
+             plain headline number (72 - 61 = 11) the bottom panel then explains.
+    BOTTOM : the Not-matched bucket broken down by
+             metadata.categorize_unmatched_true_neutrinos() reason -- WHY those
+             true neutrinos found no reco.
+
+    Parameters:
+    - neutrino_rows: list of dicts from categorize_unmatched_true_neutrinos() --
+        one event's for the event-level copy, many events' concatenated for the
+        file/job-level copy
+    - n_selected_reco: count of reco clusters surviving the beam-window cut over
+        that same scope (the top panel's middle bar; the driver counts
+        clusters_reco entries)
+    - output_dir, apa, level_name, filename_prefix, file_name: same convention
+        as DrawExtraRecoCategoryBreakdown
+    """
+    if not neutrino_rows and not n_selected_reco:
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    num_events = len(set(r['event'] for r in neutrino_rows)) if neutrino_rows else 1
+    n_true_neutrinos = len(neutrino_rows)
+    n_matched   = sum(1 for r in neutrino_rows if r['category'] == 'matched')
+    n_unmatched = n_true_neutrinos - n_matched
+
+    fig, (ax_top, ax_middle, ax_bottom) = plt.subplots(3, 1, figsize=(10, 17))
+
+    # TOP: deliberately identical bars/colors to DrawExtraRecoCategoryBreakdown's
+    # top panel -- same violet/magenta, and the matched green reused for the
+    # pair count -- since it is the same comparison viewed from the true side.
+    top_labels = ['True Neutrinos', 'Reco Clusters\n(selected)', 'Matched Pairs\n(1-to-1)']
+    top_counts = [n_true_neutrinos, n_selected_reco, n_matched]
+    top_colors = ['#4a3aa7', '#e87ba4', _UNMATCHED_TRUE_NU_CATEGORY_COLORS['matched']]
+    bars_top = ax_top.bar(top_labels, top_counts, color=top_colors, alpha=0.85, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars_top, top_counts):
+        height = bar.get_height()
+        ax_top.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                    ha='center', va='bottom', fontsize=14, fontweight='bold')
+    ax_top.set_ylabel('Count', fontsize=12, fontweight='bold')
+    title_top = f'True Neutrinos vs Selected Reco - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title_top += f' ({file_name})'
+    ax_top.set_title(title_top, fontsize=13, fontweight='bold')
+    ax_top.grid(True, alpha=0.3, axis='y')
+
+    # MIDDLE: matched vs. not matched. Neutral gray for "Not matched" -- reads as
+    # "explained below" rather than as any one of the bottom panel's specific
+    # reasons, matching the extra-reco breakdown's treatment of "Extra".
+    middle_labels = ['Matched', 'Not matched']
+    middle_counts = [n_matched, n_unmatched]
+    middle_colors = [_UNMATCHED_TRUE_NU_CATEGORY_COLORS['matched'], '#898781']
+    bars_middle = ax_middle.bar(middle_labels, middle_counts, color=middle_colors, alpha=0.85, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars_middle, middle_counts):
+        height = bar.get_height()
+        ax_middle.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                       ha='center', va='bottom', fontsize=14, fontweight='bold')
+    ax_middle.set_ylabel('Number of True Neutrino Clusters', fontsize=12, fontweight='bold')
+    title_middle = f'True Neutrinos: Matched vs Not Matched - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title_middle += f' ({file_name})'
+    ax_middle.set_title(title_middle, fontsize=13, fontweight='bold')
+    ax_middle.grid(True, alpha=0.3, axis='y')
+
+    # BOTTOM: the Not-matched bucket broken down by reason ('matched' excluded --
+    # it is not a failure, and is already shown on its own in the middle panel).
+    unmatched_categories = [cat for cat in _UNMATCHED_TRUE_NU_CATEGORY_ORDER if cat != 'matched']
+    bottom_counts = [sum(1 for r in neutrino_rows if r['category'] == cat) for cat in unmatched_categories]
+    bottom_labels = [_UNMATCHED_TRUE_NU_CATEGORY_LABELS[cat] for cat in unmatched_categories]
+    bottom_colors = [_UNMATCHED_TRUE_NU_CATEGORY_COLORS[cat] for cat in unmatched_categories]
+    bars_bottom = ax_bottom.bar(bottom_labels, bottom_counts, color=bottom_colors, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars_bottom, bottom_counts):
+        height = bar.get_height()
+        ax_bottom.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                       ha='center', va='bottom', fontsize=14, fontweight='bold')
+    ax_bottom.set_ylabel('Number of True Neutrino Clusters', fontsize=12, fontweight='bold')
+    ax_bottom.set_xlabel('Reason', fontsize=12, fontweight='bold')
+    title_bottom = f'Unmatched True Neutrinos by Reason - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title_bottom += f' ({file_name})'
+    ax_bottom.set_title(title_bottom, fontsize=13, fontweight='bold')
+    ax_bottom.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"unmatched_true_neutrino_breakdown_{filename_prefix}_{num_events}events_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()

@@ -102,7 +102,13 @@ TRUE_VARIABLE_SPECS = SPATIAL_VARIABLE_SPECS + [
 ]
 
 # Per-side drawing style. Colour identifies the side everywhere: reco red, true
-# black. Statistical uncertainties (sqrt(N) per bin) are drawn on the TRUE side.
+# black.
+#
+# NO statistical error bars are drawn (draw_errors=False everywhere). The reco
+# and true histograms are built from the SAME events -- the same interactions
+# seen two ways -- so their bin counts are not independent Poisson draws, and
+# sqrt(N) bars would suggest an independence the two sides do not have. The
+# machinery is still in _plot_histogram for a case where it is warranted.
 #
 # _KIND_STYLE is for a plot showing ONE population on its own (the reco/ and
 # true/ set directories): each is a step line, since nothing else shares the axes.
@@ -110,18 +116,18 @@ _KIND_STYLE = {
     'reco': {'color': 'red',   'linestyle': ':', 'linewidth': 2.2, 'marker': 'o',
              'draw_line': True, 'draw_markers': False, 'draw_errors': False},
     'true': {'color': 'black', 'linestyle': '-', 'linewidth': 1.8, 'marker': 'o',
-             'draw_line': True, 'draw_markers': False, 'draw_errors': True},
+             'draw_line': True, 'draw_markers': False, 'draw_errors': False},
 }
 
 # _COMPARISON_STYLE is for the reco-vs-true overlay, where the two are drawn on
-# the SAME axes: reco stays a dotted line, but true becomes points. The two
-# distributions coincide bin-for-bin wherever reconstruction worked, and two
-# lines of the same kind simply overwrite each other there -- points sit on a
-# line and keep that overlap readable as agreement.
+# the SAME axes: both are step lines, reco red and dotted, true black and solid.
+# The two coincide bin-for-bin wherever reconstruction worked, so the SOLID one
+# is drawn first and the broken one on top of it (see _draw_onto) -- otherwise
+# the last line drawn simply erases the other and one curve looks absent.
 _COMPARISON_STYLE = {
     'reco': dict(_KIND_STYLE['reco']),
-    'true': {'color': 'black', 'linestyle': '-', 'linewidth': 1.6, 'marker': 'o',
-             'draw_line': False, 'draw_markers': True, 'draw_errors': True},
+    'true': {'color': 'black', 'linestyle': '-', 'linewidth': 2.0, 'marker': 'o',
+             'draw_line': True, 'draw_markers': False, 'draw_errors': False},
 }
 
 _KIND_COLOR = {kind: style['color'] for kind, style in _KIND_STYLE.items()}
@@ -344,82 +350,53 @@ def build_true_cluster_variable_records(clusters_true, file_name, event, event_k
 #     select_reco_records_matched_to_true_neutrino(...), ...)
 # ============================================================================
 
-def select_reco_records_matched_to_true_neutrino(reco_records, pair_metadata_list,
-                                                 nu_idx=None, vertex_records=None,
-                                                 require_vertex_in_volume=False):
+# The two populations every plot family can be drawn for, and their directories.
+# 'all'   -- every selected reco cluster and every true cluster. The two sides
+#            are different objects: the reco side holds clusters with no true
+#            counterpart, the true side holds clusters that were never
+#            reconstructed, and their counts need not agree.
+# 'pairs' -- only the 1-to-1 matched true-reco pairs whose true side is a
+#            neutrino: the same physical objects seen twice, so a difference
+#            between the sides is a reconstruction effect rather than a
+#            difference of population.
+VERSION_DIRNAME = {
+    'all':   'all_true_all_selected_reco_clusters',
+    'pairs': 'pair_true_reco_clusters',
+}
+
+
+def select_matched_pair_records(reco_records, true_records, pair_metadata_list):
     """
-    Keep only the reco clusters that are the 1-to-1 match of a TRUE NEUTRINO
-    cluster.
+    Narrow both sides to the 1-to-1 matched pairs whose TRUE side is a neutrino
+    cluster: the reco clusters that were matched, and the true clusters they
+    were matched to.
 
-    The pairing is not recomputed here: it is read off the same
-    clusterpairmatching.MatchTrueToReco1to1 -> metadata.add_metadata_true_reco_pair_cluster
-    records the evaluation notebook already produced, so a reco cluster appears
-    in this selection if and only if the evaluation called it that true
-    neutrino's best match.
+    The pairing is not recomputed here -- it is read off the same
+    clusterpairmatching.MatchTrueToReco1to1 ->
+    metadata.add_metadata_true_reco_pair_cluster records the notebooks already
+    produce, so a cluster appears here if and only if the evaluation put it in a
+    pair.
 
-    Parameters:
-    - reco_records: from build_reco_cluster_variable_records()
-    - pair_metadata_list: from metadata.add_metadata_true_reco_pair_cluster(),
-        each with 'event' (event_key), 'true_cluster_id', 'reco_cluster_id'
-    - nu_idx: keep only pairs of this neutrino interaction index (true cluster
-        99990+nu_idx); None keeps every neutrino interaction
-    - vertex_records / require_vertex_in_volume: with require_vertex_in_volume=True,
-        additionally require that interaction's mc.json vertex to be inside the
-        volume bounds build_neutrino_vertex_records was given. Interactions whose
-        vertex_in_volume is None (unknown -- no bounds passed, or no vertex) are
-        NOT kept, so the selection never silently widens.
+    Both sides are keyed on (event, cluster_id), so a cluster is kept only if
+    THAT event's pairing contains it -- an id repeating across events cannot
+    pull in the wrong cluster.
 
-    Returns:
-        The subset of reco_records matched as described (same record dicts).
+    Returns (reco_subset, true_subset). Their lengths agree up to the rare case
+    of one reco cluster being the best match for two different true clusters,
+    which MatchTrueToReco1to1 permits (it deduplicates on the true side only).
     """
-    if not reco_records or not pair_metadata_list:
-        return []
+    reco_keys, true_keys = set(), set()
+    for pair in (pair_metadata_list or []):
+        if nu_idx_from_true_cluster_id(pair.get('true_cluster_id')) is None:
+            continue                                   # cosmic true cluster
+        reco_keys.add((pair['event'], _cluster_key(pair['reco_cluster_id'])))
+        true_keys.add((pair['event'], _cluster_key(pair['true_cluster_id'])))
 
-    in_volume_by_event_nu = {
-        (r['event'], r['nu_idx']): r.get('vertex_in_volume')
-        for r in (vertex_records or []) if r.get('nu_idx') is not None
-    }
-
-    selected_keys = set()
-    for pair in pair_metadata_list:
-        pair_nu_idx = nu_idx_from_true_cluster_id(pair.get('true_cluster_id'))
-        if pair_nu_idx is None:
-            continue                                  # cosmic true cluster
-        if nu_idx is not None and pair_nu_idx != nu_idx:
-            continue
-        if require_vertex_in_volume:
-            if in_volume_by_event_nu.get((pair['event'], pair_nu_idx)) is not True:
-                continue
-        selected_keys.add((pair['event'], _cluster_key(pair['reco_cluster_id'])))
-
-    return [r for r in reco_records
-            if (r['event'], _cluster_key(r['reco_cluster_id'])) in selected_keys]
-
-
-def select_records_in_single_neutrino_events(records, cluster_type_records, n_neutrinos=1):
-    """
-    Keep only records from events containing exactly n_neutrinos true neutrino
-    clusters (default 1).
-
-    The count comes from metadata.build_true_cluster_type_records: since
-    reassign_cluster_ID_true_charge_light keeps each neutrino interaction as its
-    own true cluster (99990+nu_idx), counting neutrino clusters in an event IS
-    counting neutrinos in that event. It is a POST-CUT count -- an interaction
-    the selections removed is not counted, matching what the rest of this
-    pipeline calls that event's neutrino content.
-
-    Works on reco records and true records alike -- both carry the same 'event'
-    key.
-    """
-    if not records or not cluster_type_records:
-        return []
-
-    n_neutrinos_by_event = {}
-    for record in cluster_type_records:
-        n_neutrinos_by_event[record['event']] = n_neutrinos_by_event.get(record['event'], 0) + int(bool(record['is_neutrino']))
-
-    keep_events = {event for event, count in n_neutrinos_by_event.items() if count == n_neutrinos}
-    return [r for r in records if r['event'] in keep_events]
+    reco_subset = [r for r in (reco_records or [])
+                   if (r['event'], _cluster_key(r['reco_cluster_id'])) in reco_keys]
+    true_subset = [r for r in (true_records or [])
+                   if (r['event'], _cluster_key(r['true_cluster_id'])) in true_keys]
+    return reco_subset, true_subset
 
 
 def select_true_neutrino_records(true_records, nu_idx=None, in_volume_only=False,
@@ -477,6 +454,14 @@ def _bin_edges(values, fixed_range, n_bins, bin_width=None):
     if bin_width:
         low  = np.floor(float(np.min(values)) / bin_width) * bin_width
         high = np.ceil(float(np.max(values)) / bin_width) * bin_width
+        # A width-binned variable here is a physical magnitude -- an energy, a
+        # charge -- that starts at zero, and zero is a meaningful end of its
+        # axis rather than an arbitrary edge. Start the axis there whenever the
+        # data is non-negative, so two selections with different minima are
+        # binned identically and neither begins part-way up its own range.
+        # (Anything with negative values keeps the snapped data range.)
+        if low > 0:
+            low = 0.0
         if high <= low:                      # every value in one bin
             high = low + bin_width
         return np.arange(low, high + bin_width / 2, bin_width)
@@ -665,6 +650,11 @@ def draw_cluster_variable_distributions(records, output_dir, level_name, filenam
         has_legend = key == 'flash_time'
         if has_legend:
             ax.axvspan(BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US, color='gold', alpha=0.25, label='beam-window')
+        # Axis spans exactly the bins, with none of matplotlib's default padding:
+        # for a variable that starts at zero (an energy, a charge) the padding put
+        # the axis into negative values the quantity cannot take. Variables with a
+        # fixed range are unaffected -- the edges ARE that range.
+        ax.set_xlim(edges[0], edges[-1])
         _finish_axes(ax, f'{label} [{unit}]',
                      title=f'{kind.capitalize()} {label}: {title_suffix}', legend=has_legend)
         ax.text(0.98, 0.98, _stats_text(values), transform=ax.transAxes,
@@ -674,8 +664,13 @@ def draw_cluster_variable_distributions(records, output_dir, level_name, filenam
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close(fig)
 
-    # Overview: every variable in one figure, for scanning a selection at a glance.
+    # Overview: every variable in one figure, for scanning a selection at a
+    # glance. Skipped for a single variable, where it would be a second copy of
+    # the plot just written rather than an overview of anything.
     n_vars = len(variables)
+    if n_vars < 2:
+        return
+
     n_cols = 2 if n_vars > 1 else 1
     n_rows = int(np.ceil(n_vars / n_cols))
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(8 * n_cols, 5 * n_rows), squeeze=False)
@@ -686,9 +681,11 @@ def draw_cluster_variable_distributions(records, output_dir, level_name, filenam
             ax.text(0.5, 0.5, f'no {key} values', transform=ax.transAxes, ha='center', va='center')
             ax.set_axis_off()
             continue
-        _plot_histogram(ax, values, _bin_edges(values, fixed_range, n_bins, bin_width), **style)
+        panel_edges = _bin_edges(values, fixed_range, n_bins, bin_width)
+        _plot_histogram(ax, values, panel_edges, **style)
         if key == 'flash_time':
             ax.axvspan(BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US, color='gold', alpha=0.25)
+        ax.set_xlim(panel_edges[0], panel_edges[-1])
         _finish_axes(ax, f'{label} [{unit}]', title=label)
         ax.text(0.98, 0.98, _stats_text(values), transform=ax.transAxes,
                 fontsize=_STATS_BOX_FONTSIZE, family='monospace', ha='right', va='top',
@@ -790,13 +787,23 @@ def draw_reco_true_comparison(reco_records, true_records, output_dir, level_name
         # and the true side as a bare point, neither of which is what the plot
         # shows.
         handles, labels = [], []
-        for side_label, records, side_style in sides:
+        # Drawn back to front -- true (solid) first, reco (dotted) on top -- so
+        # that where the two agree exactly the broken line stays visible over
+        # the solid one instead of being covered by it.
+        for side_label, records, side_style in reversed(sides):
             values = _values_for(records, key)
             if not values:
                 continue
             _plot_histogram(ax, values, edges, **side_style)
             handles.append(_legend_handle(ax, side_style))
             labels.append(f'{side_label}: N={len(values)}, mean={np.mean(values):.1f}')
+        # Legend back in reco-then-true order, whatever order they were drawn in.
+        handles, labels = handles[::-1], labels[::-1]
+        # The x axis spans exactly the bins, with none of matplotlib's default
+        # padding: for a variable that starts at zero (an energy, a charge) the
+        # padding put the axis into negative values that the quantity cannot
+        # take. Variables with a fixed range keep it -- the edges ARE that range.
+        ax.set_xlim(edges[0], edges[-1])
         # No stats box on these axes -- the entry count and mean of each side
         # are in its legend label -- so the legend takes the upper left and the
         # headroom _finish_axes adds keeps it off the curves.
@@ -815,8 +822,12 @@ def draw_reco_true_comparison(reco_records, true_records, output_dir, level_name
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close(fig)
 
-    # Overview: all compared variables in one figure.
+    # Overview: all compared variables in one figure. Skipped for a single
+    # variable -- see the note in draw_cluster_variable_distributions.
     n_vars = len(variables)
+    if n_vars < 2:
+        return
+
     n_cols = 2 if n_vars > 1 else 1
     n_rows = int(np.ceil(n_vars / n_cols))
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(8 * n_cols, 5 * n_rows), squeeze=False)
@@ -836,114 +847,82 @@ def draw_reco_true_comparison(reco_records, true_records, output_dir, level_name
     plt.close(fig)
 
 
-def draw_all_reco_true_variable_sets(reco_records, true_records, pair_metadata_list,
-                                     cluster_type_records, vertex_records,
-                                     output_dir, level_name, filename_prefix, apa,
-                                     file_name=None, second_nu_idx=2, first_nu_idx=1):
+def draw_all_reco_true_variable_sets(reco_records, true_records, output_dir,
+                                     level_name, filename_prefix, apa, file_name=None,
+                                     reco_label='all selected reco clusters',
+                                     true_label='all true neutrino clusters (in and out of volume)'):
     """
-    Draw every reco and true variable set for ONE aggregation level into
-    output_dir/reco/<set>/ and output_dir/true/<set>/, plus the reco-vs-true
-    overlay into output_dir/reco_true_comparison/.
+    Draw ONE reco population, ONE true population and their comparison for a
+    single aggregation level:
 
-    Called identically at event, file and job level -- just pass that level's
-    records (an event's, a file's, or the whole job's). All five reco sets are
-    drawn from the SAME reco_records; they differ only in which subset of it
-    each keeps, so the first set is always the superset of the rest.
+      reco/                  every record in reco_records
+      true/                  the NEUTRINO clusters among true_records, in and
+                             out of volume together
+      reco_true_comparison/  the two overlaid in the same bins
 
-    RECO sets (output_dir/reco/):
-      01_all_selected_clusters       every reco cluster that survived the
-                                     selections, i.e. the exact population the
-                                     efficiency/purity evaluation scores
-      02_matched_to_true_neutrino    only the reco clusters that are the 1-to-1
-                                     match of a true NEUTRINO cluster
-      03_single_neutrino_events      set 02, restricted to events containing
-                                     exactly one true neutrino -- there the
-                                     neutrino's reco cluster is unambiguous
-      04_neutrino_index_2            set 02, restricted to the SECOND neutrino
-                                     interaction (nu_idx=2, true cluster 99992)
-      05_neutrino_index_1_in_volume  set 02, restricted to the FIRST neutrino
-                                     interaction (nu_idx=1) whose mc.json vertex
-                                     lies inside the volume bounds
+    Deliberately one selection per side. Earlier versions split the reco side
+    five ways (matched-to-neutrino, single-neutrino events, nu_idx=2, nu_idx=1
+    in volume) and the true side three (in volume, out of volume, both), which
+    made it easy to compare two directories that did not describe the same
+    clusters. The population being drawn is now named once, by the directory
+    this is called into -- see draw_all_reco_true_variable_sets_versions.
 
-    TRUE sets (output_dir/true/), split by which side of the volume boundary
-    the interaction's mc.json vertex falls on:
-      in_volume_neutrinos            vertex inside the volume bounds
-      out_of_volume_neutrinos        vertex outside the volume bounds -- the
-                                     interaction happened outside the wire-readout
-                                     sensitive box but still deposited a surviving
-                                     cluster inside it
-      all_neutrinos_in_and_out_volume
-                                     the two above together, i.e. every true
-                                     neutrino cluster. Its count can exceed
-                                     in + out by clusters whose vertex_in_volume
-                                     is unknown (None): both one-sided sets drop
-                                     those rather than guessing a side.
-
-    COMPARISON (output_dir/reco_true_comparison/): avg X/Y/Z of the reco and
-    true populations overlaid in the same bins -- reco set 01 (every selected
-    reco cluster) against every true neutrino cluster (in and out of volume).
-
-    Sets 04 and 05 are legitimately empty in most runs (most events have one
-    neutrino, and not every first neutrino is in volume) -- an empty set still
-    writes its text table saying "0 clusters", so an empty directory always
-    means the code did not run.
-
-    Parameters:
-    - reco_records / true_records: from build_reco_cluster_variable_records() /
-        build_true_cluster_variable_records()
-    - pair_metadata_list: from metadata.add_metadata_true_reco_pair_cluster()
-    - cluster_type_records: from metadata.build_true_cluster_type_records()
-    - vertex_records: from metadata.build_neutrino_vertex_records()
-    - output_dir, level_name, filename_prefix, apa, file_name: as in
-        draw_cluster_variable_distributions()
-    - second_nu_idx / first_nu_idx: the interaction indices sets 04 and 05 select
+    Called identically at event, file and job level.
     """
     output_dir = Path(output_dir)
-    reco_dir = output_dir / "reco"
-    true_dir = output_dir / "true"
 
-    matched_to_neutrino = select_reco_records_matched_to_true_neutrino(reco_records, pair_metadata_list)
+    draw_cluster_variable_distributions(
+        reco_records, output_dir / 'reco', level_name, filename_prefix, apa,
+        file_name=file_name, kind='reco', selection_label=reco_label)
 
-    reco_sets = [
-        ("01_all_selected_clusters", "all selected reco clusters", reco_records),
-        ("02_matched_to_true_neutrino", "1-to-1 matched to a true neutrino cluster", matched_to_neutrino),
-        ("03_single_neutrino_events", "1-to-1 matched to a true neutrino, events with exactly 1 neutrino",
-         select_records_in_single_neutrino_events(matched_to_neutrino, cluster_type_records, n_neutrinos=1)),
-        (f"04_neutrino_index_{second_nu_idx}", f"1-to-1 matched to true neutrino nu_idx={second_nu_idx}",
-         select_reco_records_matched_to_true_neutrino(reco_records, pair_metadata_list, nu_idx=second_nu_idx)),
-        (f"05_neutrino_index_{first_nu_idx}_in_volume",
-         f"1-to-1 matched to true neutrino nu_idx={first_nu_idx}, vertex in volume",
-         select_reco_records_matched_to_true_neutrino(reco_records, pair_metadata_list, nu_idx=first_nu_idx,
-                                                     vertex_records=vertex_records,
-                                                     require_vertex_in_volume=True)),
-    ]
+    true_neutrinos = select_true_neutrino_records(true_records)
+    draw_cluster_variable_distributions(
+        true_neutrinos, output_dir / 'true', level_name, filename_prefix, apa,
+        file_name=file_name, kind='true', selection_label=true_label)
 
-    for dirname, selection_label, records in reco_sets:
-        draw_cluster_variable_distributions(
-            records, reco_dir / dirname, level_name, filename_prefix, apa,
-            file_name=file_name, kind="reco", selection_label=selection_label)
-
-    true_sets = [
-        ("in_volume_neutrinos", "true neutrino clusters, vertex in volume",
-         select_true_neutrino_records(true_records, in_volume_only=True)),
-        ("out_of_volume_neutrinos", "true neutrino clusters, vertex out of volume",
-         select_true_neutrino_records(true_records, out_of_volume_only=True)),
-        ("all_neutrinos_in_and_out_volume", "true neutrino clusters, vertex in and out of volume",
-         select_true_neutrino_records(true_records)),
-    ]
-
-    for dirname, selection_label, records in true_sets:
-        draw_cluster_variable_distributions(
-            records, true_dir / dirname, level_name, filename_prefix, apa,
-            file_name=file_name, kind="true", selection_label=selection_label)
-
-    # RECO vs TRUE (output_dir/reco_true_comparison/): the two populations
-    # overlaid in the same bins -- reco set 01 (every selected reco cluster)
-    # against every true neutrino cluster, in and out of volume alike.
     draw_reco_true_comparison(
-        reco_records, select_true_neutrino_records(true_records),
-        output_dir / "reco_true_comparison", level_name, filename_prefix, apa,
-        file_name=file_name)
+        reco_records, true_neutrinos, output_dir / 'reco_true_comparison',
+        level_name, filename_prefix, apa, file_name=file_name,
+        reco_label=f'reco ({reco_label})', true_label=f'true ({true_label})')
+
+
+def draw_all_reco_true_variable_sets_versions(reco_records, true_records, pair_metadata_list,
+                                              output_dir, level_name, filename_prefix, apa,
+                                              file_name=None):
+    """
+    Draw the reco / true / comparison tree TWICE, once per population, into
+    output_dir/<version>/ -- see VERSION_DIRNAME.
+
+      all_true_all_selected_reco_clusters/
+          every selected reco cluster against every true neutrino cluster (in
+          and out of volume together). What the experiment actually has:
+          nothing selects pairs without truth. The two sides are different
+          objects and their counts need not agree.
+
+      pair_true_reco_clusters/
+          the reco clusters that were 1-to-1 matched to a true neutrino, and
+          the true neutrino clusters they were matched to. The same physical
+          objects seen twice, so a bin-by-bin difference is a reconstruction
+          effect rather than the two samples containing different things.
+
+    One selection per side in each, so any two directories being compared
+    describe the same clusters.
+    """
+    output_dir = Path(output_dir)
+
+    draw_all_reco_true_variable_sets(
+        reco_records, true_records, output_dir / VERSION_DIRNAME['all'],
+        level_name, filename_prefix, apa, file_name=file_name)
+
+    paired_reco, paired_true = select_matched_pair_records(
+        reco_records, true_records, pair_metadata_list)
+    draw_all_reco_true_variable_sets(
+        paired_reco, paired_true, output_dir / VERSION_DIRNAME['pairs'],
+        level_name, filename_prefix, apa, file_name=file_name,
+        reco_label='reco clusters of 1-to-1 true-reco pairs',
+        true_label='true neutrino clusters of 1-to-1 true-reco pairs')
+
+    return {'all': (reco_records, true_records), 'pairs': (paired_reco, paired_true)}
 
 
 def _write_cluster_variable_info(records, output_dir, kind, id_key, variables,

@@ -1767,3 +1767,196 @@ def DrawNeutrinoBreakdown(vertex_records, output_dir, level_name, filename_prefi
     plt.savefig(output_dir / f'true_neutrino_breakdown_{filename_prefix}_{apa}.png',
                 dpi=100, bbox_inches='tight')
     plt.close()
+
+
+# ============================================================================
+# EXTRA (UNMATCHED) RECO CLUSTER INVESTIGATION (additive)
+# ============================================================================
+# Categories match metadata.categorize_extra_reco_clusters() -- see its
+# docstring for what each one means.
+_EXTRA_RECO_CATEGORY_ORDER = ['matched_winner', 'fragment_of_neutrino', 'matched_cosmic_only', 'no_true_overlap']
+_EXTRA_RECO_CATEGORY_COLORS = {
+    'matched_winner':       'green',
+    'fragment_of_neutrino': 'orange',
+    'matched_cosmic_only':  'blue',
+    'no_true_overlap':      'red',
+}
+_EXTRA_RECO_CATEGORY_LABELS = {
+    'matched_winner':       'Matched (winner)',
+    'fragment_of_neutrino': 'Fragment of neutrino',
+    'matched_cosmic_only':  'Matched cosmic only',
+    'no_true_overlap':      'No true overlap',
+}
+
+
+def DrawExtraRecoClusters(clusters_reco, categorized_rows, event, apa, output_dir, file_name=None):
+    """
+    Draw ONLY the "extra" (non-"matched_winner") reco clusters for one event,
+    in XZ/YZ/XY projections side by side, colored by
+    metadata.categorize_extra_reco_clusters() category -- the spatial
+    counterpart to extra_reco_info.txt (writeinformation.write_extra_reco_info).
+    True clusters and matched_winner reco clusters are deliberately NOT drawn,
+    so the extra clusters stand alone rather than being lost against the rest
+    of the event. Same view/axis conventions as draw_clustering_global_clusters
+    above (Z on the x-axis for XZ/YZ).
+
+    Parameters:
+    - clusters_reco: dict {reco_cluster_id: points} for this event
+    - categorized_rows: this event's rows from categorize_extra_reco_clusters()
+    - event, apa, output_dir, file_name: same convention as the other event-level drawers
+
+    Saved as extra_reco_clusters_event{event}_{apa}.png (one file, 3 panels).
+    No-op (returns without writing) if the event has no extra reco cluster.
+    """
+    extra_reco_category = {r['reco_cluster_id']: r['category'] for r in categorized_rows
+                            if r['category'] != 'matched_winner'}
+    if not extra_reco_category:
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel)
+    views = [
+        ("XZ", 2, 0, (0, 500), (-250, 250), "z [cm]", "x [cm]"),
+        ("YZ", 2, 1, (0, 500), (-250, 250), "z [cm]", "y [cm]"),
+        ("XY", 0, 1, (-250, 250), (-250, 250), "x [cm]", "y [cm]"),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(20, 6.5))
+
+    for col_idx, (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel) in enumerate(views):
+        ax = axes[col_idx]
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        title = f"Extra reco clusters: Event {event}, {apa}, {view_label}"
+        if file_name:
+            title += f" ({file_name})"
+        ax.set_title(title, fontsize=11)
+
+        for reco_cid, category in sorted(extra_reco_category.items()):
+            points = np.array(clusters_reco[reco_cid])
+            color = _EXTRA_RECO_CATEGORY_COLORS[category]
+            ax.scatter(points[:, x_col], points[:, y_col], s=1, alpha=0.6, color=color)
+            # Invisible zero-length line to carry the legend entry -- same
+            # trick used by DrawTrueRecoClustersXZ/YZ/XY and
+            # draw_clustering_global_clusters above -- so each cluster's ID is
+            # readable directly off the plot, not just its category color.
+            ax.plot([], [], color=color, label=f"Cluster {reco_cid:.0f} ({_EXTRA_RECO_CATEGORY_LABELS[category]})")
+        ax.legend(fontsize=8, loc='upper right')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"extra_reco_clusters_event{event}_{apa}.png", dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+def DrawExtraRecoCategoryBreakdown(categorized_rows, n_true_neutrinos, output_dir, apa, level_name, filename_prefix,
+                                    file_name=None):
+    """
+    Three bar charts stacked top to bottom -- event level, file level, or job
+    level (same categorized_rows list works at any level, one event's rows or
+    many events' concatenated together, same convention as the writers in
+    writeinformation.py).
+
+    TOP    : total true neutrino clusters vs. total reco clusters selected (beam
+             window, post cuts) vs. how many of those actually form a 1-to-1
+             true-reco pair (the "matched_winner" count, same quantity and same
+             color as the middle panel's first bar) -- the "72 true neutrinos vs
+             88 reco clusters" comparison that motivated this investigation,
+             plus the pair count so equal true/reco totals don't read as "every
+             true matched every reco".
+    MIDDLE : those selected reco clusters split into just Matched (the 1-to-1
+             winners) vs. Extra (everything else) -- the plain headline number
+             the bottom panel then explains.
+    BOTTOM : the Extra bucket broken down by metadata.categorize_extra_reco_clusters()
+             reason (fragment_of_neutrino / matched_cosmic_only / no_true_overlap)
+             -- WHY those reco clusters are "extra".
+
+    Parameters:
+    - categorized_rows: list of dicts from categorize_extra_reco_clusters() --
+        one event's for the event-level copy, many events' concatenated for the
+        file/job-level copy
+    - n_true_neutrinos: count of true neutrino clusters over that same scope
+        (the driver script counts clusters_true entries with
+        cluster_id >= metadata.NEUTRINO_CLUSTER_ID_BASE)
+    - output_dir, apa, level_name, filename_prefix, file_name: same convention
+        as _draw_neutrino_cosmic_bar
+    """
+    if not categorized_rows and not n_true_neutrinos:
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    num_events = len(set(r['event'] for r in categorized_rows)) if categorized_rows else 1
+    n_matched_pairs = sum(1 for r in categorized_rows if r['category'] == 'matched_winner')
+    n_extra = len(categorized_rows) - n_matched_pairs
+
+    fig, (ax_top, ax_middle, ax_bottom) = plt.subplots(3, 1, figsize=(10, 17))
+
+    # TOP: true neutrinos vs. total selected reco clusters vs. actual 1-to-1 pairs.
+    # Violet and magenta are picked to sit clear of the bottom panel's
+    # green/orange/blue/red category colors; the third bar deliberately REUSES
+    # the middle/bottom panels' matched_winner green, since "Matched Pairs"
+    # here and "Matched" there are the same quantity -- color follows the
+    # entity, so the panels visually link on that one shared number.
+    top_labels = ['True Neutrinos', 'Reco Clusters\n(selected)', 'Matched Pairs\n(1-to-1)']
+    top_counts = [n_true_neutrinos, len(categorized_rows), n_matched_pairs]
+    top_colors = ['#4a3aa7', '#e87ba4', _EXTRA_RECO_CATEGORY_COLORS['matched_winner']]
+    bars_top = ax_top.bar(top_labels, top_counts, color=top_colors, alpha=0.85, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars_top, top_counts):
+        height = bar.get_height()
+        ax_top.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                    ha='center', va='bottom', fontsize=14, fontweight='bold')
+    ax_top.set_ylabel('Count', fontsize=12, fontweight='bold')
+    title_top = f'True Neutrinos vs Selected Reco - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title_top += f' ({file_name})'
+    ax_top.set_title(title_top, fontsize=13, fontweight='bold')
+    ax_top.grid(True, alpha=0.3, axis='y')
+
+    # MIDDLE: matched vs. extra. Neutral gray for "Extra" -- reads as "explained
+    # below" rather than any one of the bottom panel's specific reasons, and
+    # stays clearly distinct from that panel's orange/blue/red (a gold/amber
+    # here sat too close to the bottom panel's orange "Fragment of neutrino").
+    middle_labels = ['Matched\n(winner)', 'Extra']
+    middle_counts = [n_matched_pairs, n_extra]
+    middle_colors = [_EXTRA_RECO_CATEGORY_COLORS['matched_winner'], '#898781']
+    bars_middle = ax_middle.bar(middle_labels, middle_counts, color=middle_colors, alpha=0.85, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars_middle, middle_counts):
+        height = bar.get_height()
+        ax_middle.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                       ha='center', va='bottom', fontsize=14, fontweight='bold')
+    ax_middle.set_ylabel('Number of Reco Clusters', fontsize=12, fontweight='bold')
+    title_middle = f'Selected Reco: Matched vs Extra - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title_middle += f' ({file_name})'
+    ax_middle.set_title(title_middle, fontsize=13, fontweight='bold')
+    ax_middle.grid(True, alpha=0.3, axis='y')
+
+    # BOTTOM: the Extra bucket broken down by reason (matched_winner excluded --
+    # it's not "extra", and is already shown on its own in the middle panel).
+    extra_categories = [cat for cat in _EXTRA_RECO_CATEGORY_ORDER if cat != 'matched_winner']
+    bottom_counts = [sum(1 for r in categorized_rows if r['category'] == cat) for cat in extra_categories]
+    bottom_labels = [_EXTRA_RECO_CATEGORY_LABELS[cat] for cat in extra_categories]
+    bottom_colors = [_EXTRA_RECO_CATEGORY_COLORS[cat] for cat in extra_categories]
+    bars_bottom = ax_bottom.bar(bottom_labels, bottom_counts, color=bottom_colors, alpha=0.7, edgecolor='black', linewidth=2)
+    for bar, count in zip(bars_bottom, bottom_counts):
+        height = bar.get_height()
+        ax_bottom.text(bar.get_x() + bar.get_width() / 2., height, f'{int(count)}',
+                       ha='center', va='bottom', fontsize=14, fontweight='bold')
+    ax_bottom.set_ylabel('Number of Reco Clusters', fontsize=12, fontweight='bold')
+    ax_bottom.set_xlabel('Reason', fontsize=12, fontweight='bold')
+    title_bottom = f'Extra Reco Clusters by Reason - {level_name}, {num_events} events, {apa}'
+    if file_name:
+        title_bottom += f' ({file_name})'
+    ax_bottom.set_title(title_bottom, fontsize=13, fontweight='bold')
+    ax_bottom.grid(True, alpha=0.3, axis='y')
+    plt.setp(ax_bottom.get_xticklabels(), rotation=15, ha='right')
+
+    plt.tight_layout()
+    plt.savefig(output_dir / f"extra_reco_category_breakdown_{filename_prefix}_{num_events}events_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()

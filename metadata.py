@@ -1,5 +1,6 @@
 import numpy as np
 from pathlib import Path
+from scipy.spatial import KDTree
 
 def add_metadata_true_clusters(efficiency_results, cluster_category_results, file_name, event, apa, view, event_key=None):
     """
@@ -195,6 +196,141 @@ def add_metadata_reco_clusters(purity_results, file_name, event, apa, view, even
         metadata_list.append(metadata)
 
     return metadata_list
+
+
+# ============================================================================
+# EXTRA (UNMATCHED) RECO CLUSTER INVESTIGATION (additive)
+# ============================================================================
+# Neutrino true clusters carry cluster_id >= 99990 in the charge-light pipeline
+# (see reassign_cluster_ID_true_charge_light in selections.py, 99990 + nu_idx).
+# This threshold check is the same pattern already used by
+# EnergyReconstruction/draw_energy_reconstruction.py and
+# AnalysisDistributions_Reco_True/draw_variables.py to split neutrino vs cosmic
+# matched pairs, reused here instead of taking cluster_category_results as an
+# extra dependency.
+NEUTRINO_CLUSTER_ID_BASE = 99990
+
+
+def _is_neutrino_true_cluster_id(true_cluster_id):
+    return true_cluster_id is not None and true_cluster_id >= NEUTRINO_CLUSTER_ID_BASE
+
+
+def categorize_extra_reco_clusters(clusters_true, clusters_reco, purity_results, matched_pairs,
+                                    file_name, event, apa="Combined", event_key=None):
+    """
+    Categorize every reco cluster in one event by why it is (or isn't) the 1-to-1
+    match of a true neutrino cluster -- built to explain why the number of reco
+    clusters surviving the beam-window cut exceeds the number of true neutrino
+    clusters (see investigate_extra_reco_clusters.py).
+
+    Categories:
+      - matched_winner: this reco cluster IS the MatchTrueToReco1to1 winner for a
+        true NEUTRINO cluster. Not "extra" -- this is the intended 1-to-1 match.
+      - fragment_of_neutrino: purity > 0 (from purity_results) against a true
+        neutrino cluster, but a DIFFERENT reco cluster won that true cluster's
+        1-to-1 slot. clusterpairmatching.MatchTrueToReco1to1 keeps only the
+        highest-efficiency reco per true cluster, so the others read as "extra"
+        here even though they genuinely overlap the neutrino.
+      - matched_cosmic_only: purity > 0 only against cosmic true cluster(s),
+        never a neutrino -- correctly reconstructed in-spill cosmic activity,
+        not a bug, but still inflates the total reco-in-beam-window count.
+      - no_true_overlap: EvaluatePurity's true_cluster_id=8888 sentinel row --
+        zero spatial overlap with any true cluster. nearest_true_cluster_id /
+        nearest_true_is_neutrino / min_dist / mean_nn_dist / dx,dy,dz are filled
+        in via a KDTree nearest-neighbor search of this reco cluster's points
+        against every true cluster in the event (same technique as
+        near_miss_investigation.py's find_near_miss_rows, but reco-centric), so
+        a small min_dist (especially a small dx, the drift/X direction) reads as
+        an X-mis-assignment candidate, while a large offset suggests a
+        genuinely spurious/noise cluster. No hard distance threshold is
+        imposed -- callers sort by min_dist instead.
+
+    Args:
+        clusters_true: dict {true_cluster_id: points} for this event
+        clusters_reco: dict {reco_cluster_id: points} for this event
+        purity_results: EvaluatePurity() output for this event
+        matched_pairs: MatchTrueToReco1to1() output for this event
+        file_name, event, apa: same convention as add_metadata_true_clusters
+        event_key: full event key like "file1_0" (constructed if None)
+
+    Returns:
+        List of dicts, one per reco cluster in clusters_reco.
+    """
+    if event_key is None:
+        event_key = f"{file_name}_{event}"
+
+    winner_reco_ids = {pair['reco_cluster_id'] for pair in matched_pairs
+                        if _is_neutrino_true_cluster_id(pair['true_cluster_id'])}
+
+    # reco_cluster_id -> [(true_cluster_id, purity), ...] over every non-sentinel match
+    reco_true_matches = {}
+    for p in purity_results:
+        if p['true_cluster_id'] == 8888:
+            continue
+        reco_true_matches.setdefault(p['reco_cluster_id'], []).append((p['true_cluster_id'], p['purity']))
+
+    true_trees = {cid: KDTree(np.array(pts)[:, :3]) for cid, pts in clusters_true.items()}
+
+    rows = []
+    for reco_cid, reco_points in clusters_reco.items():
+        reco_points = np.array(reco_points)
+        total_reco_charge = np.sum(reco_points[:, 4])
+        matches = reco_true_matches.get(reco_cid, [])
+
+        if reco_cid in winner_reco_ids:
+            category = 'matched_winner'
+        elif matches:
+            category = 'fragment_of_neutrino' if any(_is_neutrino_true_cluster_id(tid) for tid, _ in matches) \
+                else 'matched_cosmic_only'
+        else:
+            category = 'no_true_overlap'
+
+        row = {
+            'file_name': file_name,
+            'event': event_key,
+            'event_num': event,
+            'apa': apa,
+            'reco_cluster_id': reco_cid,
+            'category': category,
+            'total_reco_charge': total_reco_charge,
+            'matched_true_cluster_id': None,
+            'purity': None,
+            'num_true_matches': len(matches),
+            'nearest_true_cluster_id': None,
+            'nearest_true_is_neutrino': None,
+            'min_dist': None,
+            'mean_nn_dist': None,
+            'dx': None, 'dy': None, 'dz': None,
+        }
+
+        if matches:
+            # Best (highest-purity) true match, kept for reference/lookup even
+            # when it's not the 1-to-1 winner.
+            best_true_id, best_purity = max(matches, key=lambda t: t[1])
+            row['matched_true_cluster_id'] = best_true_id
+            row['purity'] = best_purity
+
+        if category == 'no_true_overlap' and true_trees:
+            reco_xyz = reco_points[:, :3]
+            best_true_id, best_min_dist, best_mean_dist, best_offset = None, np.inf, None, None
+            for true_cid, tree in true_trees.items():
+                dists, idx = tree.query(reco_xyz)
+                d = dists.min()
+                if d < best_min_dist:
+                    nearest_true_pts = np.array(clusters_true[true_cid])[idx, :3]
+                    best_true_id      = true_cid
+                    best_min_dist     = d
+                    best_mean_dist    = dists.mean()
+                    best_offset       = (reco_xyz - nearest_true_pts).mean(axis=0)
+            row['nearest_true_cluster_id']  = best_true_id
+            row['nearest_true_is_neutrino'] = _is_neutrino_true_cluster_id(best_true_id)
+            row['min_dist']     = best_min_dist
+            row['mean_nn_dist'] = best_mean_dist
+            row['dx'], row['dy'], row['dz'] = best_offset
+
+        rows.append(row)
+
+    return rows
 
 
 def add_single_metadata(metadata_list, field_name, value_lookup,

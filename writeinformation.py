@@ -461,3 +461,86 @@ def write_purity_info(purity_results, output_dir, filename="purity_info.txt"):
                     f"{p['total_reco_cluster_charge']:>18.1f} {str(mrp):>20} {str(trp):>18} {('yes' if matched else 'no'):>8}\n")
 
     return out_path
+
+
+_EXTRA_RECO_CATEGORY_ORDER = ['fragment_of_neutrino', 'matched_cosmic_only', 'no_true_overlap']
+
+
+def write_extra_reco_info(categorized_rows, output_dir, filename="extra_reco_info.txt"):
+    """
+    Write extra_reco_info.txt: one row per "extra" reco cluster -- every row from
+    metadata.categorize_extra_reco_clusters() EXCEPT category=='matched_winner'
+    (the reco cluster that IS the 1-to-1 match of a true neutrino cluster, i.e.
+    not "extra"). See categorize_extra_reco_clusters' docstring for what each
+    category means.
+
+    Level-agnostic, same as the other writers in this module -- pass one event's
+    rows for the event-level copy, or a whole file's/job's for the aggregated one.
+
+    Rows are grouped by category (fragment_of_neutrino, matched_cosmic_only,
+    no_true_overlap, in that order) and sorted by ascending min_dist within
+    no_true_overlap -- the near-miss candidates (small min_dist, especially a
+    small dx = drift/X direction, a possible charge-light X-mis-assignment) sort
+    to the top of that block.
+
+    Parameters:
+    - categorized_rows: List of dicts from metadata.categorize_extra_reco_clusters()
+    - output_dir: Directory to write into (created if missing)
+    - filename: Output file name
+
+    Returns:
+        Path written, or None if there was nothing to write
+    """
+    extra_rows = [r for r in categorized_rows if r['category'] != 'matched_winner']
+    if not extra_rows:
+        return None
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / filename
+
+    def _fmt(value, spec='.2f'):
+        return format(value, spec) if value is not None else "n/a"
+
+    def _sort_key(r):
+        cat_rank = _EXTRA_RECO_CATEGORY_ORDER.index(r['category'])
+        return (cat_rank, r['min_dist'] if r['min_dist'] is not None else -1)
+
+    with open(out_path, "w") as f:
+        f.write(f"{'='*170}\n")
+        f.write("EXTRA (NON-WINNER) RECO CLUSTERS\n")
+        f.write(f"{'='*170}\n")
+        f.write("fragment_of_neutrino : overlaps a true neutrino cluster (purity>0) but a different reco\n")
+        f.write("                       cluster won that true cluster's 1-to-1 match (MatchTrueToReco1to1)\n")
+        f.write("matched_cosmic_only  : overlaps only cosmic true cluster(s), never a neutrino\n")
+        f.write("no_true_overlap      : zero spatial overlap with any true cluster (EvaluatePurity's 8888\n")
+        f.write("                       sentinel); nearest_true_* / min_dist / dx,dy,dz come from a KDTree\n")
+        f.write("                       search against every true cluster in the event -- small min_dist\n")
+        f.write("                       (esp. small dx) is an X-mis-assignment candidate, large min_dist\n")
+        f.write("                       suggests a genuinely spurious/noise cluster\n")
+        f.write(f"{'='*170}\n\n")
+
+        f.write(f"{'file':<8} {'event':<14} {'reco_id':>12} {'category':<22} {'charge':>12} "
+                f"{'matched_true_id':>16} {'purity':>8} {'n_true_matches':>15} "
+                f"{'nearest_true_id':>16} {'nearest_is_nu':>14} {'min_dist_cm':>12} {'mean_nn_cm':>11} "
+                f"{'dx_cm':>8} {'dy_cm':>8} {'dz_cm':>8}\n")
+        for r in sorted(extra_rows, key=_sort_key):
+            f.write(f"{r['file_name']:<8} {str(r['event']):<14} {r['reco_cluster_id']:>12.3f} {r['category']:<22} "
+                    f"{r['total_reco_charge']:>12.1f} {_fmt(r['matched_true_cluster_id'], '.0f'):>16} "
+                    f"{_fmt(r['purity'], '.4f'):>8} {r['num_true_matches']:>15} "
+                    f"{_fmt(r['nearest_true_cluster_id'], '.0f'):>16} {str(r['nearest_true_is_neutrino']):>14} "
+                    f"{_fmt(r['min_dist']):>12} {_fmt(r['mean_nn_dist']):>11} "
+                    f"{_fmt(r['dx']):>8} {_fmt(r['dy']):>8} {_fmt(r['dz']):>8}\n")
+
+        f.write(f"\n{'='*170}\n")
+        f.write("SUMMARY BY CATEGORY\n")
+        f.write(f"{'='*170}\n")
+        n_winner = sum(1 for r in categorized_rows if r['category'] == 'matched_winner')
+        f.write(f"{'matched_winner (not extra)':<30} {n_winner:>8}\n")
+        for cat in _EXTRA_RECO_CATEGORY_ORDER:
+            n = sum(1 for r in extra_rows if r['category'] == cat)
+            f.write(f"{cat:<30} {n:>8}\n")
+        f.write(f"{'-'*40}\n")
+        f.write(f"{'TOTAL reco clusters':<30} {len(categorized_rows):>8}\n")
+
+    return out_path

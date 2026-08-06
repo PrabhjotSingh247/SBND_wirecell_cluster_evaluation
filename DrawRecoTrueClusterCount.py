@@ -4,10 +4,11 @@ CLUSTERS survive each successive selection, drawn as horizontal bar blocks --
 one block per cut stage, top block = before any cut, each block below it the
 cumulative result of one more cut.
 
-True side (truth information available) draws three bars per block: Total,
-Cosmic, Neutrino. Reco side draws one bar per block (Total only) -- reco has no
-neutrino/cosmic label, that distinction simply doesn't exist before truth
-matching, so it is deliberately NOT invented here.
+True side (truth information available) draws three separate bars per block:
+Cosmic clusters, neutrino interactions with the vertex in the volume, and
+neutrino interactions with the vertex out of it. Reco side draws one bar per
+block (Total only) -- reco has no neutrino/cosmic label, that distinction simply
+doesn't exist before truth matching, so it is deliberately NOT invented here.
 
 Both drawers take an already-tallied list of stage dicts, so the counting logic
 (which lives in the notebook, next to the cuts themselves) stays separate from
@@ -132,11 +133,13 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
                                  include_geometry_cuts=True, file_name=None):
     """
     True-side selection flow: one horizontal block per cut stage, top block =
-    before any cut. Each block has two bars -- Cosmic, and Neutrino split by
-    where the interaction vertex sits (in-volume / out-of-volume, stacked in
-    different colours).
+    before any cut. Each block has three SEPARATE bars -- Cosmic, Neutrinos with
+    the interaction vertex in the volume, and Neutrinos with the vertex out of
+    it. The two neutrino bars are drawn side by side rather than stacked into one
+    bar, so each one's length is read directly off the axis instead of by
+    subtracting the segment below it.
 
-    The two bars count DIFFERENT things on purpose:
+    The bars count DIFFERENT things on purpose:
       cosmic   = cosmic CLUSTERS surviving that stage (from the sed true points)
       neutrino = true neutrino INTERACTIONS from mc.json. At the no-cut stage
                  that is every interaction -- in-volume, out-of-volume, and those
@@ -162,13 +165,13 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
         return
 
     COSMIC_COLOR, IN_COLOR, OUT_COLOR = 'blue', 'green', 'darkorange'
-    block_span = 3.0          # two bars plus a gap, in bar-height units
+    block_span = 4.0          # three bars plus a gap, in bar-height units
     bar_height = 1.0
 
-    max_count = max(max(r.get('cosmic', 0), r.get('neutrino_in', 0) + r.get('neutrino_out', 0))
+    max_count = max(max(r.get('cosmic', 0), r.get('neutrino_in', 0), r.get('neutrino_out', 0))
                     for r in records)
 
-    fig, ax = plt.subplots(figsize=(13, max(5.5, 2.2 * len(records) + 1.2)))
+    fig, ax = plt.subplots(figsize=(13, max(5.5, 2.8 * len(records) + 1.2)))
     # SYMLOG x axis: cosmics run to ~20k while neutrinos are tens, so on a linear
     # scale the neutrino bar is an invisible sliver. Symlog rather than log
     # because a stage can legitimately hold zero of a category and a log axis
@@ -179,8 +182,12 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
     for block_idx, record in enumerate(records):
         center = block_idx * block_span
         block_centers.append(center)
-        cosmic_y   = center - bar_height / 2.0
-        neutrino_y = center + bar_height / 2.0
+        # Three bars, top to bottom in drawing order: cosmic, neutrino in-volume,
+        # neutrino out-of-volume (the y axis is inverted below, so the smaller y
+        # ends up on top).
+        cosmic_y = center - bar_height
+        in_y     = center
+        out_y    = center + bar_height
 
         n_cosmic = record.get('cosmic', 0)
         n_in     = record.get('neutrino_in', 0)
@@ -189,10 +196,10 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
         ax.barh(cosmic_y, n_cosmic, height=bar_height * 0.85, color=COSMIC_COLOR, alpha=0.7,
                 edgecolor='black', linewidth=1.5,
                 label='Cosmic clusters' if block_idx == 0 else None)
-        ax.barh(neutrino_y, n_in, height=bar_height * 0.85, color=IN_COLOR, alpha=0.8,
+        ax.barh(in_y, n_in, height=bar_height * 0.85, color=IN_COLOR, alpha=0.8,
                 edgecolor='black', linewidth=1.5,
                 label='Neutrinos, vertex in volume' if block_idx == 0 else None)
-        ax.barh(neutrino_y, n_out, left=n_in, height=bar_height * 0.85, color=OUT_COLOR, alpha=0.8,
+        ax.barh(out_y, n_out, height=bar_height * 0.85, color=OUT_COLOR, alpha=0.8,
                 edgecolor='black', linewidth=1.5,
                 label='Neutrinos, vertex out of volume' if block_idx == 0 else None)
 
@@ -203,15 +210,15 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
 
         ax.text(_x_text(n_cosmic), cosmic_y, f'{n_cosmic}',
                 va='center', ha='left', fontsize=13, fontweight='bold')
-        # in/out shares are of THIS stage's neutrino total, so they sum to 100%
-        # and the composition shift between stages is readable directly.
+        # Each neutrino bar carries its share of THIS stage's neutrino total, so
+        # the two shares sum to 100% and the composition shift between stages is
+        # readable directly even though the bars are no longer stacked.
         n_nu = n_in + n_out
-        if n_nu > 0:
-            nu_label = (f'{n_nu}  [{n_in} in ({100.0 * n_in / n_nu:.1f}%), '
-                        f'{n_out} out ({100.0 * n_out / n_nu:.1f}%)]')
-        else:
-            nu_label = '0'
-        ax.text(_x_text(n_nu), neutrino_y, nu_label,
+        in_label  = f'{n_in} ({100.0 * n_in / n_nu:.1f}% of {n_nu} nu)' if n_nu > 0 else '0'
+        out_label = f'{n_out} ({100.0 * n_out / n_nu:.1f}% of {n_nu} nu)' if n_nu > 0 else '0'
+        ax.text(_x_text(n_in), in_y, in_label,
+                va='center', ha='left', fontsize=13, fontweight='bold')
+        ax.text(_x_text(n_out), out_y, out_label,
                 va='center', ha='left', fontsize=13, fontweight='bold')
 
     for center in block_centers[1:]:
@@ -233,8 +240,8 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
     # in-axes corner would collide, but empty space added above the top block will
     # not. The extra 0.35 block-span keeps a visible gap between the legend box
     # and the first pair of bars.
-    half_bar     = bar_height * 0.5 + bar_height * 0.85 * 0.5
-    legend_space = block_span * 0.95
+    half_bar     = bar_height + bar_height * 0.85 * 0.5
+    legend_space = block_span * 0.7
     ax.invert_yaxis()
     ax.set_ylim(block_centers[-1] + half_bar + 0.3, -half_bar - legend_space)
 

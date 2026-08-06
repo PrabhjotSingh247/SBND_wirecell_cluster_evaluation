@@ -3424,3 +3424,174 @@ def format_cluster_efficiency_by_energy(records, energy_threshold=500):
         lines.append(f"  {r['category']:<22} {below:>12} {r['n_below']:>7} {above:>13} {r['n_above']:>7}")
     lines.append("")
     return lines
+
+
+# ============================================================================
+# IN-VOLUME vs OUT-OF-VOLUME COMPARISON (job level)
+# ============================================================================
+# The two neutrino populations of the in/out-of-volume evaluation split, overlaid
+# on ONE canvas so they can be compared directly instead of by flipping between
+# two output roots. Everything else about that split renders each population into
+# its own directory; these two drawers are the only place the curves meet.
+#
+# Both take records that were computed ONCE against the full true and reco
+# populations and merely filtered by vertex volume (see
+# metadata.filter_records_by_volume) -- nothing here recomputes an efficiency or a
+# purity, so a curve drawn here is the same curve as in that population's own
+# directory, on shared bins.
+#
+# SHARED BINNING is the point of these functions: bins and x-limit are derived
+# from the two populations COMBINED. Letting each population bin itself would put
+# the curves on different bin centres and different axes -- two plots that look
+# comparable and are not.
+
+VOLUME_COMPARISON_STYLES = {
+    'in':  {'label': 'Vertex in volume',     'color': 'green',      'marker': 'o'},
+    'out': {'label': 'Vertex out of volume', 'color': 'darkorange', 'marker': 's'},
+}
+
+
+def DrawClusterEfficiencyVsTrueEnergy_VolumeComparison(populations, output_dir, apa,
+                                                       level_name="Job Level", file_name=None,
+                                                       n_bins=15):
+    """
+    Clusteringlevel 1D efficiency-vs-true-energy curves for the in-volume and
+    out-of-volume true neutrinos, overlaid on one canvas.
+
+    "Clusteringlevel" means the same population DrawClusterEfficiencyVsTrueEnergyPerJob
+    uses: the 1-to-1 matched pairs PLUS the true clusters that matched nothing,
+    entered at efficiency 0 via _combine_pairs_with_unmatched -- so a neutrino that
+    reconstructed to nothing counts against its population's efficiency instead of
+    quietly leaving the plot.
+
+    Parameters:
+    - populations: ordered list of (key, pair_metadata_list, all_true_metadata_list),
+      key being 'in' or 'out' (VOLUME_COMPARISON_STYLES)
+    - output_dir: Output directory
+    - apa: APA identifier (label only)
+    - level_name: Title label (this is a job-level plot; the parameter is here so
+      the same drawer can serve another level if that is ever wanted)
+    - file_name: Optional input file name for the title
+    - n_bins: Energy bins across the combined population
+
+    Writes efficiency_vs_true_energy_1d_clusteringlevel_in_vs_out_volume_{apa}.png
+    and does nothing at all if neither population has an entry.
+    """
+    resolved = []
+    for key, pair_metadata_list, all_true_metadata_list in populations:
+        entries = _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list)
+        resolved.append((key, entries))
+
+    all_energies = [m['total_true_energy'] for _, entries in resolved for m in entries]
+    if not all_energies:
+        return None
+
+    energy_bins = np.linspace(0, max(all_energies) * 1.1, n_bins + 1)
+
+    plt.figure(figsize=(12, 6))
+    drawn_any = False
+    for key, entries in resolved:
+        if not entries:
+            continue
+        style = VOLUME_COMPARISON_STYLES[key]
+        energies     = [m['total_true_energy'] for m in entries]
+        efficiencies = [m['efficiency'] for m in entries]
+        bin_centers, mean_efficiency = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+        if len(bin_centers) == 0:
+            continue
+        drawn_any = True
+        plt.plot(bin_centers, mean_efficiency, marker=style['marker'], linestyle='-',
+                 linewidth=2.5, markersize=9, color=style['color'],
+                 label=f"{style['label']} ({len(entries)} clusters, mean {np.mean(efficiencies):.3f})",
+                 markeredgecolor='black', markeredgewidth=1)
+
+    if not drawn_any:
+        plt.close()
+        return None
+
+    plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
+    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    title = (f'Efficiency vs True Energy (1D, ClusteringLevel) - True Neutrinos, '
+             f'In vs Out of Volume - {level_name}, {apa}')
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, 3000)
+    plt.ylim(-0.05, 1.05)
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_in_vs_out_volume_{apa}.png"
+    plt.savefig(out_path, dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+    return out_path
+
+
+def DrawPurityVsRecoCharge_VolumeComparison(populations, output_dir, apa,
+                                            level_name="Job Level", file_name=None,
+                                            n_bins=15):
+    """
+    1D purity-vs-reco-charge curves for the in-volume and out-of-volume true
+    neutrinos, overlaid on one canvas. Counterpart to
+    DrawClusterEfficiencyVsTrueEnergy_VolumeComparison above.
+
+    Purity comes from the 1-to-1 matched pairs only: an unmatched true neutrino has
+    no reco cluster and therefore no purity to plot (it is in the efficiency plot at
+    0, which is where that failure belongs). The purity values themselves were
+    computed against the FULL reco population, so they still measure the cosmic
+    contamination of the matched reco cluster.
+
+    Parameters:
+    - populations: ordered list of (key, pair_metadata_list), key 'in' or 'out'
+    - output_dir, apa, level_name, file_name, n_bins: as above
+
+    Writes purity_vs_reco_charge_1d_in_vs_out_volume_{apa}.png.
+    """
+    all_charges = [m['total_reco_charge'] for _, pairs in populations for m in pairs]
+    if not all_charges:
+        return None
+
+    x_max       = max(all_charges) * 1.1
+    charge_bins = np.linspace(0, x_max, n_bins + 1)
+
+    plt.figure(figsize=(12, 6))
+    drawn_any = False
+    for key, pairs in populations:
+        if not pairs:
+            continue
+        style    = VOLUME_COMPARISON_STYLES[key]
+        charges  = [m['total_reco_charge'] for m in pairs]
+        purities = [m['purity'] for m in pairs]
+        bin_centers, mean_purity = plot_1d_purity_charge(charges, purities, charge_bins)
+        if len(bin_centers) == 0:
+            continue
+        drawn_any = True
+        plt.plot(bin_centers, mean_purity, marker=style['marker'], linestyle='-',
+                 linewidth=2.5, markersize=9, color=style['color'],
+                 label=f"{style['label']} ({len(pairs)} pairs, mean {np.mean(purities):.3f})",
+                 markeredgecolor='black', markeredgewidth=1)
+
+    if not drawn_any:
+        plt.close()
+        return None
+
+    plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
+    plt.ylabel('Purity', fontsize=12, fontweight='bold')
+    title = (f'Purity vs Reco Charge (1D) - True Neutrinos, In vs Out of Volume - '
+             f'{level_name}, {apa}')
+    if file_name:
+        title += f' ({file_name})'
+    plt.title(title, fontsize=12, fontweight='bold')
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.xlim(0, x_max)
+    plt.ylim(-0.05, 1.05)
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / f"purity_vs_reco_charge_1d_in_vs_out_volume_{apa}.png"
+    plt.savefig(out_path, dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.close()
+    return out_path

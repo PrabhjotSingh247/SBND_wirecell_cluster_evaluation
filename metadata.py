@@ -1226,3 +1226,77 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
             'removal_category': removal_category,
         })
     return records
+
+
+def build_neutrino_volume_map(vertex_records):
+    """
+    {(event_key, cluster_id): 'in' | 'out'} for the true neutrino interactions in
+    build_neutrino_vertex_records' output, so any record list keyed by
+    (event, true cluster id) can be split by where the interaction vertex sits.
+
+    The key is exact, not spatial: reassign_cluster_ID_true_charge_light gives
+    interaction nu_idx the cluster_id 99990+nu_idx, and that same id is what
+    efficiency/purity/metadata records carry as 'true_cluster_id'.
+
+    Interactions whose vertex_in_volume is None -- no vertex in mc.json, or no
+    volume bounds passed to build_neutrino_vertex_records -- are LEFT OUT rather
+    than guessed into one side, so they fall out of both subsets instead of
+    silently inflating one.
+
+    COSMIC clusters never appear here: they have no mc.json interaction and hence
+    no vertex record. Filtering by this map therefore keeps true neutrinos only,
+    which is exactly what the in/out-of-volume evaluation roots want.
+
+    Parameters:
+    - vertex_records: build_neutrino_vertex_records output (one dict per
+      interaction), at any aggregation level -- event, file or job
+
+    Returns:
+        Dict {(event_key, cluster_id): 'in'|'out'}
+    """
+    volume_map = {}
+    for record in vertex_records or []:
+        cluster_id = record.get('cluster_id')
+        in_volume  = record.get('vertex_in_volume')
+        if cluster_id is None or in_volume is None:
+            continue
+        volume_map[(record['event'], cluster_id)] = 'in' if in_volume else 'out'
+    return volume_map
+
+
+def filter_records_by_volume(records, volume_map, volume, id_key='true_cluster_id'):
+    """
+    The records belonging to one vertex-volume population, for re-rendering an
+    already-computed evaluation per population without recomputing anything.
+
+    Nothing is recalculated here: efficiency, purity and every matching decision
+    were made against the FULL true and reco populations, and this only selects
+    which of those finished records a given output root shows. In particular the
+    reco side is never cut -- a purity value kept here still reflects the cosmic
+    contamination in its reco cluster, which is the number worth reading.
+
+    Parameters:
+    - records: any list of dicts carrying an 'event' key and a true-cluster id
+    - volume_map: build_neutrino_volume_map output
+    - volume: 'all' (returns the list unchanged), 'in', or 'out'
+    - id_key: the record's true-cluster id field -- 'true_cluster_id' for
+      efficiency / purity / metadata / pair / 1-to-many records, 'cluster_id' for
+      build_true_cluster_type_records and build_neutrino_vertex_records output
+
+    Returns:
+        A new list (the input is never mutated)
+
+    Note which rows disappear for volume='in'/'out', both deliberately:
+      - cosmic true clusters, which have no vertex record at all
+      - EvaluatePurity's unmatched-reco rows (true_cluster_id=8888), which
+        describe reco clusters that touched no true cluster and so belong to
+        neither volume
+    An unmatched true NEUTRINO is kept: EvaluateEfficiency's unmatched row is
+    keyed by the neutrino's own cluster id (only its reco_cluster_id is the 8888
+    sentinel), so a neutrino that reconstructed to nothing stays in the
+    efficiency denominator at 0.
+    """
+    if volume == 'all':
+        return list(records or [])
+    return [r for r in (records or [])
+            if volume_map.get((r.get('event'), r.get(id_key))) == volume]

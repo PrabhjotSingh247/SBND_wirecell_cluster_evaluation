@@ -1079,6 +1079,111 @@ def build_true_cluster_type_records(clusters_true, file_name, event, event_key=N
     return records
 
 
+# Charged leptons that identify a charged-current interaction, by the flavor of
+# neutrino they imply. mc.json writes particle names, not PDG codes, so these are
+# matched by name; both charges are listed since an anti-neutrino produces the
+# positive one.
+CC_LEPTONS_BY_FLAVOR = {
+    'numu': ('mu-', 'mu+'),
+    'nue':  ('e-', 'e+'),
+}
+
+
+def classify_neutrino_interaction(daughter_particles, flavor=None):
+    """
+    Charged-current / neutral-current classification of one neutrino interaction
+    from the INTERACTING NEUTRINO'S FLAVOR together with the particles in its
+    FIRST list of daughters -- the direct children of the mc.json
+    interaction-vertex node, i.e. what came straight out of the interaction, not
+    what those products later decayed into.
+
+    The rule:
+      - a numu interaction with a muon (mu-/mu+) among the direct daughters
+                                                          -> numu CC
+      - a nue interaction with an electron (e-/e+) there   -> nue CC
+      - no muon and no electron there                      -> NC
+
+    A CC label therefore needs the charged lepton to MATCH the incident flavor:
+    the charged lepton of a charged-current interaction is the partner of the
+    neutrino that made it, so a muon in a nue event (or an electron in a numu
+    event) is not that partner and cannot make the interaction CC.
+
+    That leaves one more case the three bullets do not name: a charged lepton
+    present, but of the wrong flavor. It is classified NC -- no CC lepton of the
+    interacting flavor was produced, so the neutrino carried on -- and flagged
+    with lepton_flavor_mismatch=True, naming the offending particle in
+    mismatched_lepton, so the case stays visible instead of being folded silently
+    into the NC pile. It is real physics rather than a parse error: the one
+    instance in the current dataset is a numu event whose daughters are
+    e+, gamma, neutron, neutron, numu -- an outgoing numu (the NC signature) with
+    a positron from the photon. Under the previous, flavor-blind rule that same
+    interaction was called nue CC.
+
+    With flavor=None (older mc.json files carry no flavor on the root node) the
+    flavor test cannot run, so the rule falls back to the lepton alone -- muon ->
+    numu CC, electron -> nue CC -- and sets flavor_known=False to say the result
+    was not flavor-checked.
+
+    Parameters:
+    - daughter_particles: iterable of particle-name strings, the direct daughters
+    - flavor: the root node's neutrino species ('numu', 'nue', 'anumu', ...)
+
+    Returns:
+        Dict with
+          interaction_type       : 'CC' or 'NC'
+          interaction_channel    : 'numu_CC', 'nue_CC' or 'NC'
+          primary_lepton         : the charged lepton that made it CC, else None
+          lepton_flavor_mismatch : True when a charged lepton was present but of
+                                   the wrong flavor (so the interaction is NC)
+          mismatched_lepton      : that lepton's name, else None
+          flavor_known           : False when no flavor was available to test
+    """
+    names = list(daughter_particles or [])
+
+    # The charged lepton present for each flavor, if any.
+    lepton_by_flavor = {
+        candidate: next((n for n in names if n in leptons), None)
+        for candidate, leptons in CC_LEPTONS_BY_FLAVOR.items()
+    }
+
+    flavor_text  = "" if flavor is None else str(flavor)
+    flavor_known = flavor is not None
+
+    if flavor_known:
+        # Substring, not equality: the flavor string can carry an anti-neutrino
+        # prefix/suffix ('anumu', 'numubar') that still names the same flavor.
+        # 'nue' is not a substring of 'numu', so the two never cross-match.
+        matching_flavors = [c for c in CC_LEPTONS_BY_FLAVOR if c in flavor_text]
+    else:
+        # No flavor to test against: fall back to the lepton alone, muon first so
+        # that an interaction with both is numu CC.
+        matching_flavors = list(CC_LEPTONS_BY_FLAVOR)
+
+    for candidate in matching_flavors:
+        lepton = lepton_by_flavor.get(candidate)
+        if lepton is not None:
+            return {
+                'interaction_type': 'CC',
+                'interaction_channel': f'{candidate}_CC',
+                'primary_lepton': lepton,
+                'lepton_flavor_mismatch': False,
+                'mismatched_lepton': None,
+                'flavor_known': flavor_known,
+            }
+
+    # NC: no charged lepton of the interacting flavor. A lepton of ANOTHER flavor
+    # may still be present -- kept visible rather than dropped (see docstring).
+    mismatched_lepton = next((lepton for lepton in lepton_by_flavor.values() if lepton is not None), None)
+    return {
+        'interaction_type': 'NC',
+        'interaction_channel': 'NC',
+        'primary_lepton': None,
+        'lepton_flavor_mismatch': mismatched_lepton is not None,
+        'mismatched_lepton': mismatched_lepton,
+        'flavor_known': flavor_known,
+    }
+
+
 def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, event_key=None,
                                   x_min=None, x_max=None, y_min=None, y_max=None,
                                   z_min=None, z_max=None,
@@ -1098,6 +1203,14 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
     not a track), in the same cm frame as the true points -- verified by
     measuring in-volume vertices against their own cluster's deposits (agreement
     to ~0.03-0.13 cm).
+
+    CC/NC: interaction_type / interaction_channel / primary_lepton /
+    lepton_flavor_mismatch / mismatched_lepton come from
+    classify_neutrino_interaction, applied to this interaction's flavor and its
+    FIRST list of daughters (the direct children of the vertex node, also
+    recorded as daughter_particles / n_daughters). A numu with a muon there is
+    numu CC, a nue with an electron is nue CC, no muon and no electron is NC; a
+    charged lepton of the OTHER flavor is NC with the mismatch flag set.
 
     ENERGY -- read this before using any energy from here:
       - cluster_energy_MeV is the TRUE cluster energy summed from the
@@ -1157,12 +1270,26 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
     bounds = (x_min, x_max, y_min, y_max, z_min, z_max)
     have_bounds = all(b is not None for b in bounds)
 
+    # First list of daughters, per interaction: the DIRECT children of each
+    # vertex node (parent_trackid == that node's trackid), which is what the
+    # CC/NC rule reads. Grandchildren are deliberately not folded in -- a muon
+    # from a pion decay several steps down says nothing about the interaction.
+    daughters_by_parent = {}
+    for mc in mc_records:
+        parent_trackid = mc.get('parent_trackid')
+        if parent_trackid is not None:
+            daughters_by_parent.setdefault(parent_trackid, []).append(mc)
+
     records = []
     for mc in mc_records:
         if not mc.get('is_interaction_vertex'):
             continue
         vertex = mc.get('start_xyz')
         nu_idx = mc.get('nu_idx')
+
+        daughters          = daughters_by_parent.get(mc.get('trackid'), [])
+        daughter_particles = sorted(d.get('particle') for d in daughters if d.get('particle'))
+        interaction        = classify_neutrino_interaction(daughter_particles, flavor=mc.get('particle'))
 
         if vertex is not None and have_bounds:
             vx, vy, vz = vertex
@@ -1211,6 +1338,16 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
             'nu_idx': nu_idx,
             'cluster_id': cluster_id,
             'flavor': mc.get('particle'),
+            # CC/NC from the interacting flavor plus the first list of daughters
+            # -- see classify_neutrino_interaction for the rule, and for the
+            # wrong-flavor-lepton case that lands in NC with a flag on it.
+            'interaction_type': interaction['interaction_type'],
+            'interaction_channel': interaction['interaction_channel'],
+            'primary_lepton': interaction['primary_lepton'],
+            'lepton_flavor_mismatch': interaction['lepton_flavor_mismatch'],
+            'mismatched_lepton': interaction['mismatched_lepton'],
+            'daughter_particles': daughter_particles,
+            'n_daughters': len(daughters),
             'vertex_x': vertex[0] if vertex else None,
             'vertex_y': vertex[1] if vertex else None,
             'vertex_z': vertex[2] if vertex else None,
@@ -1264,10 +1401,65 @@ def build_neutrino_volume_map(vertex_records):
     return volume_map
 
 
-def filter_records_by_volume(records, volume_map, volume, id_key='true_cluster_id'):
+def build_neutrino_channel_map(vertex_records):
     """
-    The records belonging to one vertex-volume population, for re-rendering an
+    {(event_key, cluster_id): 'numu_CC' | 'nue_CC' | 'NC'} for the true neutrino
+    interactions in build_neutrino_vertex_records' output -- the CC/NC
+    counterpart of build_neutrino_volume_map, keyed identically, so the same
+    record lists can be split by interaction channel instead of by vertex volume
+    with the same filter.
+
+    See classify_neutrino_interaction for how the channel is decided. Like the
+    volume map, this contains neutrinos only (cosmic clusters have no mc.json
+    interaction), and interactions with no channel are left out rather than
+    guessed.
+
+    Parameters:
+    - vertex_records: build_neutrino_vertex_records output, at any level
+
+    Returns:
+        Dict {(event_key, cluster_id): channel}
+    """
+    channel_map = {}
+    for record in vertex_records or []:
+        cluster_id = record.get('cluster_id')
+        channel    = record.get('interaction_channel')
+        if cluster_id is None or channel is None:
+            continue
+        channel_map[(record['event'], cluster_id)] = channel
+    return channel_map
+
+
+def restrict_label_map(label_map, restrict_map, restrict_label):
+    """
+    One label map narrowed to the entries another map labels a given way, so two
+    splits can be composed: restricting the channel map to the volume map's 'in'
+    entries gives the numu CC / nue CC / NC labels OF the in-volume neutrinos.
+
+    Both maps are keyed the same way ((event, true cluster id)), so this is a
+    plain key intersection -- no matching, no tolerance.
+
+    Parameters:
+    - label_map: the map whose labels are kept (e.g. build_neutrino_channel_map)
+    - restrict_map: the map that selects which keys survive (e.g.
+      build_neutrino_volume_map)
+    - restrict_label: the value restrict_map must hold for a key to survive
+
+    Returns:
+        A new dict; the inputs are not modified
+    """
+    return {key: label for key, label in label_map.items()
+            if restrict_map.get(key) == restrict_label}
+
+
+def filter_records_by_label(records, label_map, label, id_key='true_cluster_id'):
+    """
+    The records belonging to one labelled population, for re-rendering an
     already-computed evaluation per population without recomputing anything.
+
+    The label is whatever the map holds -- 'in'/'out' from
+    build_neutrino_volume_map, 'numu_CC'/'nue_CC'/'NC' from
+    build_neutrino_channel_map -- so one filter serves every split.
 
     Nothing is recalculated here: efficiency, purity and every matching decision
     were made against the FULL true and reco populations, and this only selects
@@ -1277,8 +1469,8 @@ def filter_records_by_volume(records, volume_map, volume, id_key='true_cluster_i
 
     Parameters:
     - records: any list of dicts carrying an 'event' key and a true-cluster id
-    - volume_map: build_neutrino_volume_map output
-    - volume: 'all' (returns the list unchanged), 'in', or 'out'
+    - label_map: build_neutrino_volume_map / build_neutrino_channel_map output
+    - label: the population to keep, or 'all' to return the list unchanged
     - id_key: the record's true-cluster id field -- 'true_cluster_id' for
       efficiency / purity / metadata / pair / 1-to-many records, 'cluster_id' for
       build_true_cluster_type_records and build_neutrino_vertex_records output
@@ -1286,17 +1478,22 @@ def filter_records_by_volume(records, volume_map, volume, id_key='true_cluster_i
     Returns:
         A new list (the input is never mutated)
 
-    Note which rows disappear for volume='in'/'out', both deliberately:
+    Note which rows disappear for any label other than 'all', all deliberately:
       - cosmic true clusters, which have no vertex record at all
       - EvaluatePurity's unmatched-reco rows (true_cluster_id=8888), which
-        describe reco clusters that touched no true cluster and so belong to
-        neither volume
+        describe reco clusters that touched no true cluster and so belong to no
+        neutrino population
     An unmatched true NEUTRINO is kept: EvaluateEfficiency's unmatched row is
     keyed by the neutrino's own cluster id (only its reco_cluster_id is the 8888
     sentinel), so a neutrino that reconstructed to nothing stays in the
     efficiency denominator at 0.
     """
-    if volume == 'all':
+    if label == 'all':
         return list(records or [])
     return [r for r in (records or [])
-            if volume_map.get((r.get('event'), r.get(id_key))) == volume]
+            if label_map.get((r.get('event'), r.get(id_key))) == label]
+
+
+# The name this was introduced under, when the only split was by vertex volume.
+# Kept so existing callers keep working; new code can use either.
+filter_records_by_volume = filter_records_by_label

@@ -17,7 +17,7 @@ def _draw_empty_placeholder(message, title, output_path, xlabel=None, ylabel=Non
     """
     plt.figure(figsize=(10, 8))
     plt.text(0.5, 0.5, message, ha='center', va='center', fontsize=13, wrap=True)
-    plt.title(title)
+    plt.title(title, wrap=True)
     if xlabel:
         plt.xlabel(xlabel)
     if ylabel:
@@ -65,7 +65,7 @@ def plot_efficiency_heatmap(efficiency_results, event, apa, output_dir, file_nam
     sns.heatmap(efficiency_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
                 xticklabels=[f"{int(x):d}" for x in efficiency_matrix.columns],
                 yticklabels=[f"{int(y):d}" for y in efficiency_matrix.index])
-    plt.title(title)
+    plt.title(title, wrap=True)
     plt.xlabel("Reco Cluster ID")
     plt.ylabel("True Cluster ID")
     plt.savefig(output_path)
@@ -108,7 +108,7 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     sns.heatmap(purity_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
                 xticklabels=[f"{int(x):d}" for x in purity_matrix.columns],
                 yticklabels=[f"{int(y):d}" for y in purity_matrix.index])
-    plt.title(title)
+    plt.title(title, wrap=True)
     plt.xlabel("Reco Cluster ID")
     plt.ylabel("True Cluster ID")
     plt.savefig(output_path)
@@ -154,7 +154,7 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
         title = f'Efficiency vs True Energy (2D) - {category_name} - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.xlim(0, max(energies)*1.1)
     plt.ylim(-0.05, 1.05)
 
@@ -198,6 +198,14 @@ def plot_1d_efficiency_energy(energies, efficiencies, energy_bins):
 # breakdown (neutrino + isochronous/normal/prolonged cosmic) drawn elsewhere.
 # 'neutrino' reuses the by-category plots' purple/D so the same population looks
 # the same wherever it appears.
+# Upper limit of the true-energy axis on every 1D efficiency plot, in MeV. One
+# constant rather than a literal per plot so the 1D plots always share a scale and
+# can be read against each other. Raised from 3000: real clusters live past it
+# (this dataset reaches ~3060 MeV) and a fixed limit silently cuts them off the
+# right-hand edge rather than showing an empty tail. The 2D plots are unaffected --
+# they scale to their own data.
+TRUE_ENERGY_XMAX_MEV = 5000
+
 POPULATION_STYLES = {
     'neutrino': {'label': 'Neutrino Clusters', 'color': 'purple',     'marker': 'D'},
     'cosmic':   {'label': 'Cosmic Clusters',   'color': 'darkorange', 'marker': 's'},
@@ -237,10 +245,10 @@ def _draw_1d_efficiency_single_population(energies, efficiencies, energy_bins, p
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
@@ -279,7 +287,7 @@ def _draw_1d_purity_single_population(charges, purities, charge_bins, x_max, pop
 
     plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
     plt.ylabel('Purity', fontsize=12, fontweight='bold')
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, x_max)
@@ -327,7 +335,7 @@ def plot_2d_purity_charge(charges, purities, output_dir, event, apa, category_na
         title = f'Purity vs Reco Charge (2D) - {category_name} - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.xlim(0, max(charges)*1.1)
     plt.ylim(-0.05, 1.05)
 
@@ -479,10 +487,10 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
     title = f'Efficiency vs True Energy (1D Projection) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)  # Adjust x-axis limit based on expected energy range
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)  # 1D true-energy axis limit, shared -- see the constant
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -557,10 +565,10 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
         title = f'Efficiency vs True Energy (1D by Category) - Event {event}, {apa}'
         if file_name:
             title += f' ({file_name})'
-        plt.title(title, fontsize=12, fontweight='bold')
+        plt.title(title, fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.legend(fontsize=10)
-        plt.xlim(0, 3000)
+        plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
         plt.ylim(-0.05, 1.05)
         plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_event_{event}_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -657,10 +665,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
     title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -711,10 +719,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
     title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -851,10 +859,10 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
     title = f'Efficiency vs True Energy (1D Projection) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -928,10 +936,10 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
         title = f'Efficiency vs True Energy (1D by Category) - File Level, {apa}'
         if file_name:
             title += f' ({file_name})'
-        plt.title(title, fontsize=12, fontweight='bold')
+        plt.title(title, fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.legend(fontsize=10)
-        plt.xlim(0, 3000)
+        plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
         plt.ylim(-0.05, 1.05)
         plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_file_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1066,10 +1074,10 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
     title = f'Efficiency vs True Energy (1D Projection) - Job Level, {apa}'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1139,10 +1147,10 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
         plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
         plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
         title = f'Efficiency vs True Energy (1D by Category) - Job Level, {apa}'
-        plt.title(title, fontsize=12, fontweight='bold')
+        plt.title(title, fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.legend(fontsize=10)
-        plt.xlim(0, 3000)
+        plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
         plt.ylim(-0.05, 1.05)
         plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_job_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1222,10 +1230,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
     title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1276,10 +1284,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
     title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1351,10 +1359,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
     title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel) - Job Level, {apa}'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1401,10 +1409,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
     title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel) - Job Level, {apa}'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1473,10 +1481,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
     title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1527,10 +1535,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
     title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1603,10 +1611,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
     title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1657,10 +1665,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
     title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1731,10 +1739,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
     title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - Job Level, {apa}'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1781,10 +1789,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
     title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - Job Level, {apa}'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
+    plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
     plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -1859,7 +1867,7 @@ def DrawPurityVsRecoChargePerEvent(pair_metadata_list, output_dir, event, apa, f
     title = f'Purity vs Reco Charge (1D Projection) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, max(charges)*1.1)
@@ -1914,7 +1922,7 @@ def DrawPurityVsRecoChargePerEvent(pair_metadata_list, output_dir, event, apa, f
     title = f'Purity vs Reco Charge (1D by Category) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, max(charges)*1.1)
@@ -1992,7 +2000,7 @@ def _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, level
     title = f'Purity vs Reco Charge (1D Projection) - {level_name}, {num_events} events, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, max(charges)*1.1)
@@ -2047,7 +2055,7 @@ def _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, level
     title = f'Purity vs Reco Charge (1D by Category) - {level_name}, {num_events} events, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, max(charges)*1.1)
@@ -2092,7 +2100,7 @@ def DrawAggregatedEfficiencyPlots(efficiency_results, output_dir, level_name, ap
     plt.hist(efficiencies, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
     plt.xlabel('Efficiency', fontsize=12, fontweight='bold')
     plt.ylabel('Count', fontsize=12, fontweight='bold')
-    plt.title(f'Efficiency Distribution ({level_name}) - {apa}', fontsize=12, fontweight='bold')
+    plt.title(f'Efficiency Distribution ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
     plt.axvline(np.mean(efficiencies), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(efficiencies):.3f}')
     plt.axvline(np.median(efficiencies), color='green', linestyle='--', linewidth=2, label=f'Median: {np.median(efficiencies):.3f}')
     plt.legend(fontsize=10)
@@ -2116,7 +2124,7 @@ def DrawAggregatedPurityPlots(purity_results, output_dir, level_name, apa):
     plt.hist(purities, bins=30, color='lightcoral', edgecolor='black', alpha=0.7)
     plt.xlabel('Purity', fontsize=12, fontweight='bold')
     plt.ylabel('Count', fontsize=12, fontweight='bold')
-    plt.title(f'Purity Distribution ({level_name}) - {apa}', fontsize=12, fontweight='bold')
+    plt.title(f'Purity Distribution ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
     plt.axvline(np.mean(purities), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(purities):.3f}')
     plt.axvline(np.median(purities), color='green', linestyle='--', linewidth=2, label=f'Median: {np.median(purities):.3f}')
     plt.legend(fontsize=10)
@@ -2139,7 +2147,7 @@ def DrawMatchedPairsPlots(matched_pairs, output_dir, level_name, apa):
     plt.scatter(efficiencies, purities, s=50, alpha=0.6, color='purple', edgecolors='black', linewidth=0.5)
     plt.xlabel('Efficiency', fontsize=12, fontweight='bold')
     plt.ylabel('Purity', fontsize=12, fontweight='bold')
-    plt.title(f'Efficiency vs Purity ({level_name}) - {apa}', fontsize=12, fontweight='bold')
+    plt.title(f'Efficiency vs Purity ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
     plt.xlim(-0.05, 1.05)
     plt.ylim(-0.05, 1.05)
     plt.grid(True, linestyle='--', alpha=0.3)
@@ -2158,12 +2166,17 @@ _EFF_PUR_CATEGORY_STYLE = {
 _UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI = -0.1, 0.0  # bottom-left "no reco match" bin, both axes
 
 def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_name, apa, file_name=None,
-                                        all_true_metadata_list=None):
+                                        all_true_metadata_list=None, filename_level=None):
     """
     Draw purity-vs-efficiency (x=Purity, y=Efficiency) scatter and 2D histogram (colz)
     plots from 1-to-1 true-reco pair metadata (add_metadata_true_reco_pair_cluster).
     Used at Event, File, and Job level alike - level_name controls the title/filename,
     e.g. "Event 5", "File Level", "Job Level".
+
+    filename_level overrides what goes in the FILENAME, leaving level_name to the
+    title. Callers that decorate level_name with a population ("Job Level (true
+    numu CC interactions)") pass the plain level here, so the same plot keeps the
+    same filename in every population directory and can be diffed across them.
 
     True clusters that never matched any reco cluster (present in all_true_metadata_list
     from add_metadata_true_clusters, but absent from pair_metadata_list) are drawn as
@@ -2205,7 +2218,7 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
     # the "excluding unmatched" variant and the box shouldn't appear at all.
     show_unmatched_box = bool(all_true_metadata_list)
 
-    level_suffix = level_name.lower().replace(' ', '_')
+    level_suffix = (filename_level or level_name).lower().replace(' ', '_')
 
     # Shared across all jitter draws in this call, so unmatched points from
     # different categories/plots don't land on identical coordinates and hide each other.
@@ -2260,7 +2273,7 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
 
         total = len(entries) + len(unmatched_entries)
         plt.title(f"Efficiency vs Purity - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
-                  fontsize=16, fontweight='bold')
+                  fontsize=16, fontweight='bold', wrap=True)
         _format_axes()
         plt.legend(fontsize=12)
         plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
@@ -2292,7 +2305,7 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
 
         total = sum(len(v) for v in entries_by_cat.values()) + sum(len(v) for v in unmatched_by_cat.values())
         plt.title(f"Efficiency vs Purity - {group_label} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
-                  fontsize=16, fontweight='bold')
+                  fontsize=16, fontweight='bold', wrap=True)
         _format_axes()
         plt.legend(fontsize=11)
         plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
@@ -2324,7 +2337,7 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
 
         total = len(entries) + len(unmatched_entries)
         plt.title(f"Efficiency vs Purity 2D Histogram - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
-                  fontsize=16, fontweight='bold')
+                  fontsize=16, fontweight='bold', wrap=True)
         _format_axes()
         plt.subplots_adjust(left=0.15, right=0.92, top=0.90, bottom=0.12)
         plt.savefig(output_dir / f"efficiency_vs_purity_colz_{filename_tag}_{level_suffix}_{apa}.png",
@@ -2459,7 +2472,7 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
 
         ax1.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
         ax1.set_ylabel('Efficiency (Energy-Weighted)', fontsize=18, fontweight='bold')
-        ax1.set_title(f'2D Histogram: Efficiency vs True Energy (Event {event})', fontsize=18, fontweight='bold')
+        ax1.set_title(f'2D Histogram: Efficiency vs True Energy (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
         if len(ghost_energies) > 0:
@@ -2515,7 +2528,7 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
 
         ax2.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
         ax2.set_ylabel('Efficiency', fontsize=18, fontweight='bold')
-        ax2.set_title(f'1D Projection: Mean Efficiency vs True Energy (Event {event})', fontsize=18, fontweight='bold')
+        ax2.set_title(f'1D Projection: Mean Efficiency vs True Energy (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3)
         if len(valid_bin_centers) > 0:
@@ -2595,7 +2608,7 @@ def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, a
 
     ax1.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
     ax1.set_ylabel('Efficiency (Energy-Weighted)', fontsize=18, fontweight='bold')
-    ax1.set_title(f'SUMMARY: Efficiency vs True Energy (All Files, All Events)', fontsize=18, fontweight='bold')
+    ax1.set_title(f'SUMMARY: Efficiency vs True Energy (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
     ax1.tick_params(labelsize=14)
     ax1.grid(True, linestyle='--', alpha=0.3)
     if len(ghost_energies) > 0:
@@ -2639,7 +2652,7 @@ def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, a
 
     ax2.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
     ax2.set_ylabel('Efficiency', fontsize=18, fontweight='bold')
-    ax2.set_title(f'SUMMARY: 1D Projection (All Files, All Events)', fontsize=18, fontweight='bold')
+    ax2.set_title(f'SUMMARY: 1D Projection (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
     ax2.tick_params(labelsize=14)
     ax2.grid(True, linestyle='--', alpha=0.3)
     ax2.legend(fontsize=14, loc='lower right')
@@ -2700,7 +2713,7 @@ def DrawPuritySummaryAllFilesAllEvents(all_purity_results, output_dir, apa):
 
     ax1.set_xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=18, fontweight='bold')
     ax1.set_ylabel('Purity', fontsize=18, fontweight='bold')
-    ax1.set_title(f'SUMMARY: Purity vs Reco Charge (All Files, All Events)', fontsize=18, fontweight='bold')
+    ax1.set_title(f'SUMMARY: Purity vs Reco Charge (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
     ax1.tick_params(labelsize=14)
     ax1.grid(True, linestyle='--', alpha=0.3)
 
@@ -2737,7 +2750,7 @@ def DrawPuritySummaryAllFilesAllEvents(all_purity_results, output_dir, apa):
 
     ax2.set_xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=18, fontweight='bold')
     ax2.set_ylabel('Purity', fontsize=18, fontweight='bold')
-    ax2.set_title(f'SUMMARY: 1D Projection (All Files, All Events)', fontsize=18, fontweight='bold')
+    ax2.set_title(f'SUMMARY: 1D Projection (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
     ax2.tick_params(labelsize=14)
     ax2.grid(True, linestyle='--', alpha=0.3)
     ax2.legend(fontsize=14, loc='lower right')
@@ -2904,7 +2917,7 @@ def DrawPurityVsRecoChargeAllEvents(all_purity_results, input_directories_map, o
 
         ax1.set_xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=18, fontweight='bold')
         ax1.set_ylabel('Purity', fontsize=18, fontweight='bold')
-        ax1.set_title(f'2D Histogram: Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold')
+        ax1.set_title(f'2D Histogram: Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
 
@@ -2939,7 +2952,7 @@ def DrawPurityVsRecoChargeAllEvents(all_purity_results, input_directories_map, o
 
         ax2.set_xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=18, fontweight='bold')
         ax2.set_ylabel('Purity', fontsize=18, fontweight='bold')
-        ax2.set_title(f'1D Projection: Mean Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold')
+        ax2.set_title(f'1D Projection: Mean Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3)
         ax2.legend(fontsize=14, loc='lower right')
@@ -3049,7 +3062,7 @@ def DrawPurityVsRecoChargeAllEvents(all_purity_results, input_directories_map, o
 
         ax1.set_xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=18, fontweight='bold')
         ax1.set_ylabel('Purity', fontsize=18, fontweight='bold')
-        ax1.set_title(f'2D Histogram: Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold')
+        ax1.set_title(f'2D Histogram: Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
 
@@ -3084,7 +3097,7 @@ def DrawPurityVsRecoChargeAllEvents(all_purity_results, input_directories_map, o
 
         ax2.set_xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=18, fontweight='bold')
         ax2.set_ylabel('Purity', fontsize=18, fontweight='bold')
-        ax2.set_title(f'1D Projection: Mean Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold')
+        ax2.set_title(f'1D Projection: Mean Purity vs Reco Charge (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3)
         ax2.legend(fontsize=14, loc='lower right')
@@ -3168,7 +3181,7 @@ def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, 
         ax1.axvline(x=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
         ax1.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
         ax1.set_ylabel('Efficiency (Energy-Weighted)', fontsize=18, fontweight='bold')
-        ax1.set_title(f'File Summary: Efficiency vs True Energy ({file_name})', fontsize=18, fontweight='bold')
+        ax1.set_title(f'File Summary: Efficiency vs True Energy ({file_name})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
         if len(ghost_energies) > 0:
@@ -3203,7 +3216,7 @@ def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, 
 
         ax2.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
         ax2.set_ylabel('Mean Efficiency', fontsize=18, fontweight='bold')
-        ax2.set_title(f'File Summary: Mean Efficiency vs Energy Bins ({file_name})', fontsize=18, fontweight='bold')
+        ax2.set_title(f'File Summary: Mean Efficiency vs Energy Bins ({file_name})', fontsize=18, fontweight='bold', wrap=True)
         ax2.set_ylim(0, 1.1)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3, axis='y')
@@ -3291,7 +3304,7 @@ def DrawPuritySummaryPerFile(all_purity_results, input_directories_map, output_d
         ax1.axvline(x=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
         ax1.set_xlabel('Reco Cluster Charge [ADC]', fontsize=18, fontweight='bold')
         ax1.set_ylabel('Purity', fontsize=18, fontweight='bold')
-        ax1.set_title(f'File Summary: Purity vs Reco Charge ({file_name})', fontsize=18, fontweight='bold')
+        ax1.set_title(f'File Summary: Purity vs Reco Charge ({file_name})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
         if len(noise_charges) > 0:
@@ -3326,7 +3339,7 @@ def DrawPuritySummaryPerFile(all_purity_results, input_directories_map, output_d
 
         ax2.set_xlabel('Reco Cluster Charge [ADC]', fontsize=18, fontweight='bold')
         ax2.set_ylabel('Mean Purity', fontsize=18, fontweight='bold')
-        ax2.set_title(f'File Summary: Mean Purity vs Charge Bins ({file_name})', fontsize=18, fontweight='bold')
+        ax2.set_title(f'File Summary: Mean Purity vs Charge Bins ({file_name})', fontsize=18, fontweight='bold', wrap=True)
         ax2.set_ylim(0, 1.1)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3, axis='y')
@@ -3427,36 +3440,100 @@ def format_cluster_efficiency_by_energy(records, energy_threshold=500):
 
 
 # ============================================================================
-# IN-VOLUME vs OUT-OF-VOLUME COMPARISON (job level)
+# POPULATION COMPARISON PLOTS (job level)
 # ============================================================================
-# The two neutrino populations of the in/out-of-volume evaluation split, overlaid
-# on ONE canvas so they can be compared directly instead of by flipping between
-# two output roots. Everything else about that split renders each population into
-# its own directory; these two drawers are the only place the curves meet.
+# Several neutrino populations overlaid on ONE canvas so they can be compared
+# directly instead of by flipping between output directories. Two splits use
+# these: in-volume vs out-of-volume vertices, and the numu CC / nue CC / NC
+# interaction channels. Everything else about either split renders each
+# population into its own directory; these two drawers are the only place the
+# curves meet.
 #
 # Both take records that were computed ONCE against the full true and reco
-# populations and merely filtered by vertex volume (see
-# metadata.filter_records_by_volume) -- nothing here recomputes an efficiency or a
-# purity, so a curve drawn here is the same curve as in that population's own
-# directory, on shared bins.
+# populations and merely filtered (see metadata.filter_records_by_label) --
+# nothing here recomputes an efficiency or a purity, so a curve drawn here is the
+# same curve as in that population's own directory, on shared bins.
 #
 # SHARED BINNING is the point of these functions: bins and x-limit are derived
-# from the two populations COMBINED. Letting each population bin itself would put
-# the curves on different bin centres and different axes -- two plots that look
+# from ALL the populations combined. Letting each population bin itself would put
+# the curves on different bin centres and different axes -- plots that look
 # comparable and are not.
+
+
+def _order_legend_like(ax, keys, styles, population_note=None, fontsize=15):
+    """
+    The legend, plus the line of text that says WHICH neutrino population the plot
+    is drawn from, sitting directly above it.
+
+    Two jobs beyond calling ax.legend():
+
+    ORDER -- entries follow the CALLER's population order, whatever order the
+    curves were drawn in (they are drawn largest-population-first so a
+    single-cluster channel is not buried). Matched by the style label each curve's
+    legend text starts with.
+
+    PLACEMENT -- both go in the reserved band above y=1.05 that the callers open
+    up with their y-limit. Efficiency and purity are both bounded by 1, so nothing
+    can ever be drawn there and the legend cannot cover a curve. That is why the
+    band exists rather than relying on loc='best', which only minimises overlap
+    and still lands on top of a curve when the plot is busy.
+    """
+    handles, labels = ax.get_legend_handles_labels()
+    wanted = [styles[key]['label'] for key in keys if key in styles]
+    ordered = [(h, l) for w in wanted for h, l in zip(handles, labels) if l.startswith(w)]
+    # Anything unmatched (a label whose style is missing) keeps its drawn order.
+    ordered += [(h, l) for h, l in zip(handles, labels) if not any(l is ol for _, ol in ordered)]
+
+    if ordered:
+        legend = ax.legend([h for h, _ in ordered], [l for _, l in ordered],
+                           fontsize=fontsize, loc='upper center',
+                           bbox_to_anchor=(0.5, 0.90), framealpha=0.95,
+                           borderpad=0.6, labelspacing=0.4)
+    else:
+        legend = ax.legend(fontsize=fontsize, loc='upper center',
+                           bbox_to_anchor=(0.5, 0.90), framealpha=0.95)
+
+    if not population_note:
+        return
+
+    # Above the legend box, in axes coordinates -- needs a draw first so the
+    # legend has a measured extent to sit on top of.
+    ax.figure.canvas.draw()
+    try:
+        box = legend.get_window_extent().transformed(ax.transAxes.inverted())
+        x_center, y_top = box.x0 + box.width / 2.0, box.y1
+    except Exception:
+        # No measurable extent (rare backend cases) -- fall back to the top of the
+        # reserved band rather than losing the note.
+        x_center, y_top = 0.5, 0.93
+    ax.text(x_center, min(y_top + 0.025, 0.965), population_note,
+            transform=ax.transAxes, ha='center', va='bottom',
+            fontsize=fontsize, fontweight='bold')
 
 VOLUME_COMPARISON_STYLES = {
     'in':  {'label': 'Vertex in volume',     'color': 'green',      'marker': 'o'},
     'out': {'label': 'Vertex out of volume', 'color': 'darkorange', 'marker': 's'},
 }
 
+# Same three channels, same colours as DrawNeutrinoFlavor's bars in
+# DrawRecoTrueClusters.py, so a channel keeps one colour across the whole output.
+CHANNEL_COMPARISON_STYLES = {
+    'numu_CC': {'label': r'$\nu_\mu$ CC', 'color': 'steelblue',  'marker': 'o'},
+    'nue_CC':  {'label': r'$\nu_e$ CC',    'color': 'purple',     'marker': 'D'},
+    'NC':      {'label': 'NC',              'color': 'darkorange', 'marker': 's'},
+}
 
-def DrawClusterEfficiencyVsTrueEnergy_VolumeComparison(populations, output_dir, apa,
-                                                       level_name="Job Level", file_name=None,
-                                                       n_bins=15):
+
+def DrawClusterEfficiencyVsTrueEnergy_PopulationComparison(populations, output_dir, apa,
+                                                           level_name="Job Level", file_name=None,
+                                                           n_bins=15, styles=None,
+                                                           comparison_label="In vs Out of Volume",
+                                                           filename_suffix="in_vs_out_volume",
+                                                           population_note=None):
     """
-    Clusteringlevel 1D efficiency-vs-true-energy curves for the in-volume and
-    out-of-volume true neutrinos, overlaid on one canvas.
+    Clusteringlevel 1D efficiency-vs-true-energy curves for several true neutrino
+    populations, overlaid on one canvas: in-volume vs out-of-volume vertices, or
+    the numu CC / nue CC / NC channels.
 
     "Clusteringlevel" means the same population DrawClusterEfficiencyVsTrueEnergyPerJob
     uses: the 1-to-1 matched pairs PLUS the true clusters that matched nothing,
@@ -3465,18 +3542,28 @@ def DrawClusterEfficiencyVsTrueEnergy_VolumeComparison(populations, output_dir, 
     quietly leaving the plot.
 
     Parameters:
-    - populations: ordered list of (key, pair_metadata_list, all_true_metadata_list),
-      key being 'in' or 'out' (VOLUME_COMPARISON_STYLES)
+    - populations: ordered list of (key, pair_metadata_list, all_true_metadata_list);
+      each key must be present in `styles`
     - output_dir: Output directory
     - apa: APA identifier (label only)
     - level_name: Title label (this is a job-level plot; the parameter is here so
       the same drawer can serve another level if that is ever wanted)
     - file_name: Optional input file name for the title
     - n_bins: Energy bins across the combined population
+    - styles: {key: {label, color, marker}}; VOLUME_COMPARISON_STYLES by default,
+      CHANNEL_COMPARISON_STYLES for the CC/NC split
+    - comparison_label: what the title calls the comparison
+    - filename_suffix: what the filename calls it
+    - population_note: the line printed inside the plot above the legend, saying
+      which neutrino population these curves are drawn from (e.g. "In-volume true
+      neutrinos"). The title says it too; the note is there so a plot pulled out
+      of its directory still states what it is.
 
-    Writes efficiency_vs_true_energy_1d_clusteringlevel_in_vs_out_volume_{apa}.png
-    and does nothing at all if neither population has an entry.
+    Writes efficiency_vs_true_energy_1d_clusteringlevel_{filename_suffix}_{apa}.png
+    and does nothing at all if no population has an entry.
     """
+    styles = styles or VOLUME_COMPARISON_STYLES
+
     resolved = []
     for key, pair_metadata_list, all_true_metadata_list in populations:
         entries = _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list)
@@ -3488,12 +3575,16 @@ def DrawClusterEfficiencyVsTrueEnergy_VolumeComparison(populations, output_dir, 
 
     energy_bins = np.linspace(0, max(all_energies) * 1.1, n_bins + 1)
 
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(12, 7.5))
     drawn_any = False
-    for key, entries in resolved:
+    # Smallest population last, so it lands ON TOP: a channel with one cluster is
+    # a single marker, and drawn first it disappears under a populous curve
+    # passing through the same point. Legend order is fixed separately below so
+    # it still follows the caller's order rather than the drawing order.
+    for key, entries in sorted(resolved, key=lambda item: -len(item[1])):
         if not entries:
             continue
-        style = VOLUME_COMPARISON_STYLES[key]
+        style = styles[key]
         energies     = [m['total_true_energy'] for m in entries]
         efficiencies = [m['efficiency'] for m in entries]
         bin_centers, mean_efficiency = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
@@ -3512,30 +3603,43 @@ def DrawClusterEfficiencyVsTrueEnergy_VolumeComparison(populations, output_dir, 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
     plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
     title = (f'Efficiency vs True Energy (1D, ClusteringLevel) - True Neutrinos, '
-             f'In vs Out of Volume - {level_name}, {apa}')
+             f'{comparison_label} - {level_name}, {apa}')
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
-    plt.legend(fontsize=10)
-    plt.xlim(0, 3000)
-    plt.ylim(-0.05, 1.05)
+    # TRUE_ENERGY_XMAX_MEV is the scale the per-population 1D efficiency plots
+    # use, kept here so this reads against them -- but extended when the data runs
+    # past it. A
+    # comparison plot that silently drops a whole population off the right edge
+    # (the single nue CC cluster of this dataset sits at 3059 MeV) is worse than
+    # one with an unfamiliar axis.
+    plt.xlim(0, max(TRUE_ENERGY_XMAX_MEV, energy_bins[-1]))
+    # Headroom above y=1 for the legend and the population note. Efficiency cannot
+    # exceed 1, so this band is guaranteed empty and the legend cannot cover a
+    # curve -- set BEFORE the legend, which measures itself against these limits.
+    plt.ylim(-0.05, 1.55)
+    _order_legend_like(plt.gca(), [key for key, _ in resolved], styles,
+                       population_note=population_note)
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_in_vs_out_volume_{apa}.png"
+    out_path = output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_{filename_suffix}_{apa}.png"
     plt.savefig(out_path, dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
     return out_path
 
 
-def DrawPurityVsRecoCharge_VolumeComparison(populations, output_dir, apa,
-                                            level_name="Job Level", file_name=None,
-                                            n_bins=15):
+def DrawPurityVsRecoCharge_PopulationComparison(populations, output_dir, apa,
+                                                level_name="Job Level", file_name=None,
+                                                n_bins=15, styles=None,
+                                                comparison_label="In vs Out of Volume",
+                                                filename_suffix="in_vs_out_volume",
+                                                population_note=None):
     """
-    1D purity-vs-reco-charge curves for the in-volume and out-of-volume true
-    neutrinos, overlaid on one canvas. Counterpart to
-    DrawClusterEfficiencyVsTrueEnergy_VolumeComparison above.
+    1D purity-vs-reco-charge curves for several true neutrino populations,
+    overlaid on one canvas. Counterpart to
+    DrawClusterEfficiencyVsTrueEnergy_PopulationComparison above.
 
     Purity comes from the 1-to-1 matched pairs only: an unmatched true neutrino has
     no reco cluster and therefore no purity to plot (it is in the efficiency plot at
@@ -3544,11 +3648,14 @@ def DrawPurityVsRecoCharge_VolumeComparison(populations, output_dir, apa,
     contamination of the matched reco cluster.
 
     Parameters:
-    - populations: ordered list of (key, pair_metadata_list), key 'in' or 'out'
-    - output_dir, apa, level_name, file_name, n_bins: as above
+    - populations: ordered list of (key, pair_metadata_list)
+    - output_dir, apa, level_name, file_name, n_bins, styles, comparison_label,
+      filename_suffix, population_note: as above
 
-    Writes purity_vs_reco_charge_1d_in_vs_out_volume_{apa}.png.
+    Writes purity_vs_reco_charge_1d_{filename_suffix}_{apa}.png.
     """
+    styles = styles or VOLUME_COMPARISON_STYLES
+
     all_charges = [m['total_reco_charge'] for _, pairs in populations for m in pairs]
     if not all_charges:
         return None
@@ -3556,12 +3663,13 @@ def DrawPurityVsRecoCharge_VolumeComparison(populations, output_dir, apa,
     x_max       = max(all_charges) * 1.1
     charge_bins = np.linspace(0, x_max, n_bins + 1)
 
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(12, 7.5))
     drawn_any = False
-    for key, pairs in populations:
+    # Smallest population last -- see the efficiency drawer above.
+    for key, pairs in sorted(populations, key=lambda item: -len(item[1])):
         if not pairs:
             continue
-        style    = VOLUME_COMPARISON_STYLES[key]
+        style    = styles[key]
         charges  = [m['total_reco_charge'] for m in pairs]
         purities = [m['purity'] for m in pairs]
         bin_centers, mean_purity = plot_1d_purity_charge(charges, purities, charge_bins)
@@ -3579,19 +3687,29 @@ def DrawPurityVsRecoCharge_VolumeComparison(populations, output_dir, apa,
 
     plt.xlabel('Reco Cluster Charge [ADC] Arbitrary Units', fontsize=12, fontweight='bold')
     plt.ylabel('Purity', fontsize=12, fontweight='bold')
-    title = (f'Purity vs Reco Charge (1D) - True Neutrinos, In vs Out of Volume - '
+    title = (f'Purity vs Reco Charge (1D) - True Neutrinos, {comparison_label} - '
              f'{level_name}, {apa}')
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
-    plt.legend(fontsize=10)
     plt.xlim(0, x_max)
-    plt.ylim(-0.05, 1.05)
+    # Headroom for legend + note -- see the efficiency drawer above.
+    plt.ylim(-0.05, 1.55)
+    _order_legend_like(plt.gca(), [key for key, _ in populations], styles,
+                       population_note=population_note)
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"purity_vs_reco_charge_1d_in_vs_out_volume_{apa}.png"
+    out_path = output_dir / f"purity_vs_reco_charge_1d_{filename_suffix}_{apa}.png"
     plt.savefig(out_path, dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
     return out_path
+
+
+# The names these were introduced under, when the only comparison was by vertex
+# volume. Kept so existing callers keep working; both default to the volume
+# styles, labels and filenames, so a call written for the volume split behaves
+# exactly as before.
+DrawClusterEfficiencyVsTrueEnergy_VolumeComparison = DrawClusterEfficiencyVsTrueEnergy_PopulationComparison
+DrawPurityVsRecoCharge_VolumeComparison            = DrawPurityVsRecoCharge_PopulationComparison

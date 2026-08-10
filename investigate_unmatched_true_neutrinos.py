@@ -32,6 +32,30 @@ middle, reasons on the bottom), plus per-event XZ/YZ/XY spatial plots
 (DrawRecoTrueClusters.DrawUnmatchedTrueNeutrinos, cluster IDs in the legend) for
 every event with at least one unmatched true neutrino.
 
+SPLIT BY POPULATION. Every one of those outputs is written once per population,
+at each level (see POPULATIONS below):
+
+  <level>/                                                    all true neutrinos
+  <level>/by_vertex_volume/in_volume/                         vertex in the box
+  <level>/by_vertex_volume/out_volume/                        vertex outside it
+  <level>/by_vertex_volume/in_volume/by_interaction_channel/  numu_CC, nue_CC, NC
+                                                              (in-volume only)
+
+Volume first, because the two fail differently: an out-of-volume interaction only
+ever deposits the part of itself that leaked into the active volume, so "no reco
+overlap" means something different there than for a vertex sitting in the middle
+of the detector, and mixing them hides that. Then the in-volume neutrinos by
+interaction channel, since those are the ones fully inside the detector -- a
+failure there is a statement about reconstructing that channel rather than about
+how much of the interaction happened to land inside.
+
+Only the TRUE side is split. The reco set is never cut, so a category assignment
+is identical in every copy (it IS the same row), and the selected-reco bar in the
+top panel stays the whole beam-window reco population everywhere, since that is
+what all of these neutrinos were matched against. There is deliberately no
+reco-side version of this split: with no vertex reconstruction, a reco cluster has
+no volume and no channel of its own.
+
 Run directly: python investigate_unmatched_true_neutrinos.py
 Output: multi_file_plots_charge_light_matching/unmatched_true_neutrino_investigation_{timestamp}/
 """
@@ -39,7 +63,7 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 
-from readfiles import read_charge_light_files_for_event
+from readfiles import read_charge_light_files_for_event, flatten_mc_tree
 from selections import (
     GroupClustersByID, build_true_points_charge_light,
     reassign_cluster_ID_true_charge_light, reassign_cluster_ID_reco,
@@ -52,6 +76,13 @@ from clusterpairmatching import MatchTrueToReco1to1
 from metadata import (
     build_cluster_flash_metadata, build_img_cluster_flash_metadata,
     categorize_unmatched_true_neutrinos, NEUTRINO_CLUSTER_ID_BASE,
+    # The vertex-volume split: the vertex records give each interaction its
+    # in/out-of-volume flag, build_neutrino_volume_map turns those into a
+    # {(event, true cluster id) -> 'in'|'out'} lookup, and filter_records_by_label
+    # selects one population's rows. The neutrino rows here carry the same
+    # (event, true_cluster_id) key, so the same filter serves them unchanged.
+    build_neutrino_vertex_records, build_neutrino_volume_map, build_neutrino_channel_map,
+    filter_records_by_label, restrict_label_map,
 )
 from writeinformation import write_unmatched_true_neutrino_info
 from DrawRecoTrueClusters import DrawUnmatchedTrueNeutrinos, DrawUnmatchedTrueNeutrinoBreakdown
@@ -82,6 +113,53 @@ y_min, y_max = -200.0, 200.0
 z_min, z_max = 0.15, 500.85
 
 b_draw_event_level_plots = True   # per-event XZ/YZ/XY plots for events with >=1 unmatched true neutrino
+
+# The populations every output is written for. 'all' keeps its outputs where they
+# have always been (directly in the level's directory); the rest go in
+# subdirectories, with the population named in the plot titles. Filenames are
+# identical in all of them, so the same plot can be diffed between populations.
+#
+# Two axes, composed: WHERE the interaction happened (vertex in / out of the
+# wire-readout sensitive box) and WHAT came out of it (numu CC / nue CC / NC, from
+# metadata.classify_neutrino_interaction). The channel breakdown is done for the
+# IN-VOLUME neutrinos: those are the ones fully inside the detector, so a failure
+# there is a reconstruction statement about that channel rather than a statement
+# about how much of the interaction happened to leak in.
+#
+# 'volume'/'channel' are the labels a row must carry to belong; None means that
+# axis is not applied.
+POPULATIONS = [
+    {'key': 'all',        'volume': None, 'channel': None,
+     'subdir': None,                                                        'label': None},
+    {'key': 'in',         'volume': 'in',  'channel': None,
+     'subdir': Path("by_vertex_volume/in_volume"),                          'label': 'vertex in volume'},
+    {'key': 'out',        'volume': 'out', 'channel': None,
+     'subdir': Path("by_vertex_volume/out_volume"),                         'label': 'vertex out of volume'},
+    {'key': 'in_numu_CC', 'volume': 'in',  'channel': 'numu_CC',
+     'subdir': Path("by_vertex_volume/in_volume/by_interaction_channel/numu_CC"),
+     'label': 'vertex in volume, numu CC'},
+    {'key': 'in_nue_CC',  'volume': 'in',  'channel': 'nue_CC',
+     'subdir': Path("by_vertex_volume/in_volume/by_interaction_channel/nue_CC"),
+     'label': 'vertex in volume, nue CC'},
+    {'key': 'in_NC',      'volume': 'in',  'channel': 'NC',
+     'subdir': Path("by_vertex_volume/in_volume/by_interaction_channel/NC"),
+     'label': 'vertex in volume, NC'},
+]
+
+
+def population_rows(neutrino_rows, population, volume_map, channel_map):
+    """
+    The rows belonging to one population. Nothing is recategorized -- the rows
+    were built once against the full reco set, this only selects which of them a
+    given directory shows.
+    """
+    if population['channel'] is not None:
+        # Channel labels restricted to this volume, so the two axes compose.
+        composed = restrict_label_map(channel_map, volume_map, population['volume'])
+        return filter_records_by_label(neutrino_rows, composed, population['channel'])
+    if population['volume'] is not None:
+        return filter_records_by_label(neutrino_rows, volume_map, population['volume'])
+    return list(neutrino_rows)
 
 
 def find_input_files():
@@ -147,6 +225,72 @@ def group_reco_with_provenance(predicted_points):
     return clusters, provenance
 
 
+def render_level_outputs(neutrino_rows, volume_map, channel_map, n_selected_reco, level_dir,
+                         level_name, filename_prefix, file_name=None,
+                         clusters_true=None, clusters_reco_all=None, event=None,
+                         draw=True, always_write_breakdown=True):
+    """
+    Every output of one level (event, file or job), written once per vertex-volume
+    population: all true neutrinos, then the in-volume and out-of-volume subsets.
+
+    Nothing is recategorized -- the rows were built once against the full reco set
+    and are only filtered here, so a neutrino's category is the same in whichever
+    copy it appears in. n_selected_reco likewise stays the FULL beam-window reco
+    count in every copy: that is the population all of these neutrinos were
+    matched against, and scaling it per subset would invent a number the matching
+    never used.
+
+    Parameters:
+    - neutrino_rows: categorize_unmatched_true_neutrinos() rows for this level
+    - volume_map / channel_map: build_neutrino_volume_map() and
+      build_neutrino_channel_map() output covering those rows
+    - n_selected_reco: beam-window reco clusters at this level (top-panel bar)
+    - level_dir: the level's output directory; 'all' writes here, the other two
+      into subdirectories of it
+    - level_name, filename_prefix, file_name: drawer conventions, unchanged
+    - clusters_true / clusters_reco_all / event: event level only -- when given,
+      the per-event XZ/YZ/XY spatial plot is drawn too
+    - draw: False writes the text tables and skips the plots
+    - always_write_breakdown: the breakdown chart is drawn even when nothing is
+      unmatched (event level does this: "all matched" is a result worth seeing);
+      the info table and spatial/flash plots still need >=1 unmatched row
+
+    Returns {population key: number of unmatched rows in that population}.
+    """
+    unmatched_by_population = {}
+
+    for population in POPULATIONS:
+        pop_key = population['key']
+        pop_rows = population_rows(neutrino_rows, population, volume_map, channel_map)
+        unmatched_by_population[pop_key] = sum(1 for r in pop_rows if r['category'] != 'matched')
+
+        # An empty subset means this level has no neutrino of that kind -- skip it
+        # rather than create a directory of empty plots. The 'all' population is
+        # never skipped: its directory is the level's own.
+        if population['subdir'] is not None and not pop_rows:
+            continue
+
+        pop_dir = level_dir if population['subdir'] is None else level_dir / population['subdir']
+        pop_level_name = level_name if not population['label'] else f"{level_name} ({population['label']})"
+
+        if draw and (always_write_breakdown or unmatched_by_population[pop_key] > 0):
+            DrawUnmatchedTrueNeutrinoBreakdown(pop_rows, n_selected_reco, pop_dir, APA_LABEL,
+                                                pop_level_name, filename_prefix, file_name=file_name)
+
+        if unmatched_by_population[pop_key] > 0:
+            write_unmatched_true_neutrino_info(pop_rows, pop_dir)
+            if draw:
+                draw_unmatched_neutrino_flash_times(pop_rows, pop_dir, APA_LABEL,
+                                                     pop_level_name, filename_prefix, file_name=file_name)
+                if clusters_true is not None and event is not None:
+                    # Full cluster dicts on purpose: the drawer indexes into them
+                    # by the ids on the rows it was given.
+                    DrawUnmatchedTrueNeutrinos(clusters_true, pop_rows, event, APA_LABEL, pop_dir,
+                                                file_name=file_name, clusters_reco_all=clusters_reco_all)
+
+    return unmatched_by_population
+
+
 def process_event(input_dir, file_name, evt):
     """
     Run one event through the same selection + beam-window-cut pipeline as
@@ -154,8 +298,8 @@ def process_event(input_dir, file_name, evt):
     the PRE-cut reco set alongside the post-cut one, then categorize every true
     neutrino cluster.
 
-    Returns (clusters_true, clusters_reco, clusters_reco_all, neutrino_rows) or
-    None if the event's files are missing.
+    Returns (clusters_true, clusters_reco, clusters_reco_all, neutrino_rows,
+    vertex_records) or None if the event's files are missing.
     """
     result = read_charge_light_files_for_event(input_dir, evt)
     if result is None:
@@ -207,7 +351,21 @@ def process_event(input_dir, file_name, evt):
         file_name, evt, apa=APA_LABEL, event_key=event_key,
         radius_efficiency=radius_efficiency, min_recopoints_threshold=min_recopoints_threshold)
 
-    return clusters_true, clusters_reco, clusters_reco_all, neutrino_rows
+    # --- Interaction vertices (mc.json), for the in/out-of-volume split ---
+    # Same builder and same bounds as the evaluation notebook, so "in volume"
+    # means exactly what it means there. The flag is copied onto each neutrino row
+    # as well, so unmatched_true_neutrino_info.txt can show it per interaction
+    # without the reader having to cross-reference another table.
+    vertex_records = build_neutrino_vertex_records(
+        flatten_mc_tree(result['mc']), clusters_true, file_name, evt, event_key,
+        x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, z_min=z_min, z_max=z_max)
+    volume_by_cluster  = {r['cluster_id']: r['vertex_in_volume'] for r in vertex_records}
+    channel_by_cluster = {r['cluster_id']: r['interaction_channel'] for r in vertex_records}
+    for row in neutrino_rows:
+        row['vertex_in_volume']    = volume_by_cluster.get(row['true_cluster_id'])
+        row['interaction_channel'] = channel_by_cluster.get(row['true_cluster_id'])
+
+    return clusters_true, clusters_reco, clusters_reco_all, neutrino_rows, vertex_records
 
 
 def main():
@@ -221,6 +379,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     job_rows = []
+    job_vertex_records = []
     job_selected_reco = 0
     events_processed = 0
     events_with_unmatched = 0
@@ -230,6 +389,7 @@ def main():
         print(f"{file_name}: {len(events)} event(s) to process", flush=True)
 
         file_rows = []
+        file_vertex_records = []
         file_selected_reco = 0
         file_output_dir = output_dir / file_name
 
@@ -237,60 +397,74 @@ def main():
             processed = process_event(PARENT_DIR / file_name, file_name, evt)
             if processed is None:
                 continue
-            clusters_true, clusters_reco, clusters_reco_all, neutrino_rows = processed
+            clusters_true, clusters_reco, clusters_reco_all, neutrino_rows, vertex_records = processed
 
             file_rows.extend(neutrino_rows)
             job_rows.extend(neutrino_rows)
+            file_vertex_records.extend(vertex_records)
+            job_vertex_records.extend(vertex_records)
             file_selected_reco += len(clusters_reco)
             job_selected_reco  += len(clusters_reco)
             events_processed += 1
 
             n_unmatched = sum(1 for r in neutrino_rows if r['category'] != 'matched')
-            print(f"  {file_name}_{evt}: {len(neutrino_rows)} true neutrino(s), "
+            event_volume_map = build_neutrino_volume_map(vertex_records)
+            n_in  = sum(1 for r in neutrino_rows
+                        if event_volume_map.get((r['event'], r['true_cluster_id'])) == 'in')
+            print(f"  {file_name}_{evt}: {len(neutrino_rows)} true neutrino(s) "
+                  f"({n_in} in volume, {len(neutrino_rows) - n_in} out), "
                   f"{len(clusters_reco)}/{len(clusters_reco_all)} reco in beam window, "
                   f"{n_unmatched} unmatched", flush=True)
 
-            event_output_dir = file_output_dir / f"event_{evt:03d}"
-            if b_draw_event_level_plots:
-                DrawUnmatchedTrueNeutrinoBreakdown(neutrino_rows, len(clusters_reco), event_output_dir, APA_LABEL,
-                                                    "Event Level", file_name, file_name=file_name)
-
             if n_unmatched > 0:
                 events_with_unmatched += 1
-                write_unmatched_true_neutrino_info(neutrino_rows, event_output_dir)
-                if b_draw_event_level_plots:
-                    DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, evt, APA_LABEL, event_output_dir,
-                                                file_name=file_name, clusters_reco_all=clusters_reco_all)
-                    draw_unmatched_neutrino_flash_times(neutrino_rows, event_output_dir, APA_LABEL,
-                                                         "Event Level", file_name, file_name=file_name)
+
+            render_level_outputs(
+                neutrino_rows, event_volume_map, build_neutrino_channel_map(vertex_records),
+                len(clusters_reco),
+                file_output_dir / f"event_{evt:03d}", "Event Level", file_name,
+                file_name=file_name,
+                clusters_true=clusters_true, clusters_reco_all=clusters_reco_all, event=evt,
+                draw=b_draw_event_level_plots)
 
         if file_rows or file_selected_reco:
-            file_summary_dir = file_output_dir / "file_summary"
-            write_unmatched_true_neutrino_info(file_rows, file_summary_dir)
-            DrawUnmatchedTrueNeutrinoBreakdown(file_rows, file_selected_reco, file_summary_dir, APA_LABEL,
-                                                "File Level", file_name, file_name=file_name)
-            draw_unmatched_neutrino_flash_times(file_rows, file_summary_dir, APA_LABEL,
-                                                 "File Level", file_name, file_name=file_name)
+            render_level_outputs(
+                file_rows, build_neutrino_volume_map(file_vertex_records),
+                build_neutrino_channel_map(file_vertex_records), file_selected_reco,
+                file_output_dir / "file_summary", "File Level", file_name, file_name=file_name)
 
     if job_rows or job_selected_reco:
-        job_summary_dir = output_dir / "job_summary"
-        write_unmatched_true_neutrino_info(job_rows, job_summary_dir)
-        DrawUnmatchedTrueNeutrinoBreakdown(job_rows, job_selected_reco, job_summary_dir, APA_LABEL, "Job Level", "alljobs")
-        draw_unmatched_neutrino_flash_times(job_rows, job_summary_dir, APA_LABEL, "Job Level", "alljobs")
+        job_volume_map = build_neutrino_volume_map(job_vertex_records)
+        render_level_outputs(job_rows, job_volume_map, build_neutrino_channel_map(job_vertex_records),
+                             job_selected_reco, output_dir / "job_summary", "Job Level", "alljobs")
 
-    n_matched = sum(1 for r in job_rows if r['category'] == 'matched')
-    categories = ['reco_outside_beam_window', 'reco_no_flash_match', 'broken_or_sparse_reco',
+    categories = ['matched', 'reco_outside_beam_window', 'reco_no_flash_match', 'broken_or_sparse_reco',
                   'no_reco_overlap_x_shift', 'no_reco_overlap', 'unexplained']
+    job_volume_map  = build_neutrino_volume_map(job_vertex_records)
+    job_channel_map = build_neutrino_channel_map(job_vertex_records)
+    rows_by_population = {p['key']: population_rows(job_rows, p, job_volume_map, job_channel_map)
+                          for p in POPULATIONS}
 
     print(f"\n{'='*70}")
     print(f"Events processed: {events_processed} across {len(input_files)} file(s)")
     print(f"Events with >=1 unmatched true neutrino: {events_with_unmatched}")
-    print(f"Total true neutrino clusters: {len(job_rows)}")
     print(f"Total selected reco clusters (beam window, post cuts): {job_selected_reco}")
-    print(f"  matched:                  {n_matched}")
+    print()
+    # Same numbers as before, now with the two vertex-volume columns beside the
+    # total. 'in' + 'out' can fall short of 'all' by any interaction with no
+    # volume flag (no vertex in mc.json) -- none in the current dataset.
+    columns = [(p['key'], p['label'] or 'all') for p in POPULATIONS]
+    print(f"{'category':<26}" + "".join(f"{name:>30}" for _, name in columns))
+    print(f"{'true neutrino clusters':<26}"
+          + "".join(f"{len(rows_by_population[key]):>30}" for key, _ in columns))
     for cat in categories:
-        print(f"  {cat + ':':<26}{sum(1 for r in job_rows if r['category'] == cat)}")
-    print(f"Output written to: {output_dir}")
+        print(f"  {cat + ':':<24}"
+              + "".join(f"{sum(1 for r in rows_by_population[key] if r['category'] == cat):>30}"
+                        for key, _ in columns))
+    print(f"\nOutput written to: {output_dir}")
+    for population in POPULATIONS:
+        where = "<level>/" if population['subdir'] is None else f"<level>/{population['subdir']}/"
+        print(f"  {(population['label'] or 'all true neutrinos'):<28}: {where}")
 
 
 if __name__ == "__main__":

@@ -117,7 +117,7 @@ def _draw_selection_flow(stage_records, categories, output_dir, filename, title,
     ax.set_xlabel(f'{xlabel} (symlog scale)' if log_scale else xlabel,
                   fontsize=13, fontweight='bold')
     ax.tick_params(axis='x', labelsize=12)
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='x')
     ax.invert_yaxis()      # first stage on top
     ax.legend(fontsize=14, loc='lower right')
@@ -232,7 +232,7 @@ def DrawTrueClusterSelectionFlow(stage_records, output_dir, level_name, filename
     title = f'True Selection Flow: {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.tick_params(axis='x', labelsize=12)
     ax.grid(True, alpha=0.3, axis='x')
     # Reserve headroom ABOVE the first block for the legend instead of pushing it

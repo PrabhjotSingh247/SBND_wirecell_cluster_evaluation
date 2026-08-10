@@ -135,9 +135,9 @@ def write_neutrino_vertex_info(vertex_records, output_dir, filename="true_neutri
         return format(value, spec) if value is not None else "n/a"
 
     with open(out_path, "w") as f:
-        f.write(f"{'='*150}\n")
+        f.write(f"{'='*200}\n")
         f.write("TRUE NEUTRINO INTERACTIONS (one row per interaction, from mc.json interaction-vertex nodes)\n")
-        f.write(f"{'='*150}\n")
+        f.write(f"{'='*200}\n")
         f.write("vertex_x/y/z  : interaction vertex from mc.json (cm, same frame as the true points)\n")
         f.write(f"in_volume     : vertex inside the {volume_label}\n")
         f.write("cluster_energy: TRUE cluster energy summed from the sed true points -- the energy used\n")
@@ -145,20 +145,35 @@ def write_neutrino_vertex_info(vertex_records, output_dir, filename="true_neutri
         f.write("mc_Etot/mc_Edep: mc.json reference energies (incident neutrino total / mc-side deposited).\n")
         f.write("                NOT used for any cut or evaluation -- shown for cross-reference only\n")
         f.write("has_cluster   : whether this interaction produced a true cluster that survived the cuts\n")
-        f.write(f"{'='*150}\n\n")
+        f.write("channel       : CC/NC from the interacting flavor plus the FIRST list of daughters\n")
+        f.write("                (direct children of the vertex): a numu with a muon there -> numu_CC,\n")
+        f.write("                a nue with an electron -> nue_CC, no muon and no electron -> NC\n")
+        f.write("lepton        : the charged lepton that made it CC (blank for NC)\n")
+        f.write("daughters     : that first daughter list, the evidence behind the channel\n")
+        f.write("A '*' after an NC channel marks an interaction that DID have a charged lepton, but of\n")
+        f.write("the other flavor -- not the partner of the neutrino that made it, so not CC. Real\n")
+        f.write("physics, not a parse error: a numu event with an outgoing numu and a positron from a\n")
+        f.write("photon is NC with an e+ in the daughter list.\n")
+        f.write(f"{'='*200}\n\n")
 
-        f.write(f"{'event':<12} {'nu_idx':>6} {'flavor':<8} {'cluster_id':>11} "
+        f.write(f"{'event':<12} {'nu_idx':>6} {'flavor':<8} {'channel':<9} {'lepton':<7} {'cluster_id':>11} "
                 f"{'vertex_x':>10} {'vertex_y':>10} {'vertex_z':>10} {'in_volume':>10} "
-                f"{'cluster_energy':>15} {'n_points':>9} {'mc_Etot':>10} {'mc_Edep':>10} {'has_cluster':>12}\n")
+                f"{'cluster_energy':>15} {'n_points':>9} {'mc_Etot':>10} {'mc_Edep':>10} {'has_cluster':>12} "
+                f"  {'daughters'}\n")
         for r in sorted(vertex_records, key=lambda r: (r['file_name'], r['event_num'], r['nu_idx'] or 0)):
+            channel = str(r.get('interaction_channel', 'n/a'))
+            if r.get('lepton_flavor_mismatch'):
+                channel += "*"
+            daughters = ",".join(r.get('daughter_particles') or []) or "-"
             f.write(
-                f"{r['event']:<12} {str(r['nu_idx']):>6} {str(r['flavor']):<8} "
+                f"{r['event']:<12} {str(r['nu_idx']):>6} {str(r['flavor']):<8} {channel:<9} "
+                f"{str(r.get('primary_lepton') or ''):<7} "
                 f"{_fmt(r['cluster_id'], '.0f'):>11} "
                 f"{_fmt(r['vertex_x'], '.2f'):>10} {_fmt(r['vertex_y'], '.2f'):>10} {_fmt(r['vertex_z'], '.2f'):>10} "
                 f"{str(r['vertex_in_volume']):>10} "
                 f"{_fmt(r['cluster_energy_MeV'], '.2f'):>15} {r['n_true_points']:>9} "
                 f"{_fmt(r['mc_total_energy_MeV'], '.1f'):>10} {_fmt(r['mc_edep_MeV'], '.1f'):>10} "
-                f"{str(r['has_true_cluster']):>12}\n")
+                f"{str(r['has_true_cluster']):>12}   {daughters}\n")
 
         n_total    = len(vertex_records)
         n_in       = sum(1 for r in vertex_records if r['vertex_in_volume'] is True)
@@ -167,13 +182,40 @@ def write_neutrino_vertex_info(vertex_records, output_dir, filename="true_neutri
         n_in_clu   = sum(1 for r in vertex_records if r['vertex_in_volume'] is True and r['has_true_cluster'])
         n_out_clu  = sum(1 for r in vertex_records if r['vertex_in_volume'] is False and r['has_true_cluster'])
 
-        f.write(f"\n{'='*150}\n")
+        f.write(f"\n{'='*200}\n")
         f.write(f"Total true neutrino interactions: {n_total}\n")
         f.write(f"  vertex IN  volume: {n_in:>5}   (with a true cluster: {n_in_clu})\n")
         f.write(f"  vertex OUT volume: {n_out:>5}   (with a true cluster: {n_out_clu})\n")
         f.write(f"  produced a true cluster: {n_cluster} / {n_total}\n")
         f.write("Note: an OUT-of-volume interaction can still produce a true cluster -- a daughter\n")
         f.write("particle entering the active volume deposits there even though the vertex is outside.\n")
+
+        # CC/NC breakdown, split the same three ways the rest of this table is
+        # read: all interactions, those in volume, and those that deposited a
+        # surviving cluster.
+        channels = sorted({str(r.get('interaction_channel', 'n/a')) for r in vertex_records})
+        f.write(f"\n{'='*200}\n")
+        f.write("CC / NC breakdown (channel from the first list of daughters)\n")
+        f.write(f"{'channel':<10} {'total':>7} {'in volume':>11} {'out volume':>11} {'with cluster':>14}\n")
+        for channel in channels:
+            rows = [r for r in vertex_records if str(r.get('interaction_channel', 'n/a')) == channel]
+            f.write(f"{channel:<10} {len(rows):>7} "
+                    f"{sum(1 for r in rows if r['vertex_in_volume'] is True):>11} "
+                    f"{sum(1 for r in rows if r['vertex_in_volume'] is False):>11} "
+                    f"{sum(1 for r in rows if r['has_true_cluster']):>14}\n")
+        n_cc = sum(1 for r in vertex_records if r.get('interaction_type') == 'CC')
+        n_nc = sum(1 for r in vertex_records if r.get('interaction_type') == 'NC')
+        f.write(f"{'CC (all)':<10} {n_cc:>7}\n")
+        f.write(f"{'NC (all)':<10} {n_nc:>7}\n")
+        n_mismatch = sum(1 for r in vertex_records if r.get('lepton_flavor_mismatch'))
+        if n_mismatch:
+            f.write(f"\nOf the NC interactions, {n_mismatch} carried a charged lepton of the OTHER "
+                    f"flavor (marked '*' above):\n")
+            for r in vertex_records:
+                if r.get('lepton_flavor_mismatch'):
+                    f.write(f"  {r['event']} nu_idx {r['nu_idx']}: {r['flavor']} interaction with "
+                            f"{r.get('mismatched_lepton')} among "
+                            f"{','.join(r.get('daughter_particles') or [])}\n")
 
     return out_path
 
@@ -622,6 +664,13 @@ def write_unmatched_true_neutrino_info(neutrino_rows, output_dir, filename="unma
         f.write("unexplained              : should never appear -- a SELECTED reco cluster overlaps well enough to\n")
         f.write("                           match yet no pair formed; means this script and the notebook have drifted\n")
         f.write("\n")
+        f.write("channel: numu_CC / nue_CC / NC from the interacting flavor plus the first list of daughters\n")
+        f.write("        (metadata.classify_neutrino_interaction). The in-volume neutrinos are also written\n")
+        f.write("        split by it, under by_vertex_volume/in_volume/by_interaction_channel/\n")
+        f.write("in_vol: whether this interaction's mc.json VERTEX sits inside the wire-readout sensitive box.\n")
+        f.write("        An out-of-volume interaction only ever deposits the part of itself that leaked into the\n")
+        f.write("        active volume, so a failure category reads differently there -- which is why the plots\n")
+        f.write("        are also written split, under by_vertex_volume/{in_volume,out_volume}/\n")
         f.write("linearity: PCA lambda1/sum(lambda) of the TRUE cluster (1.0 = a clean line, low = scattered/multi-prong)\n")
         f.write("strict_ovl / relaxed_ovl: best energy-weighted overlap over the pre-cut reco set, with / without the\n")
         f.write("                          min-reco-points-per-true-point neighbor requirement\n")
@@ -630,7 +679,7 @@ def write_unmatched_true_neutrino_info(neutrino_rows, output_dir, filename="unma
         f.write("             cluster IDs as the event plots and the extra-reco investigation, so it cross-references\n")
         f.write(f"{'='*205}\n\n")
 
-        f.write(f"{'file':<8} {'event':<14} {'true_id':>9} {'category':<26} {'n_pts':>7} {'energy_MeV':>11} "
+        f.write(f"{'file':<8} {'event':<14} {'true_id':>9} {'in_vol':>7} {'channel':<9} {'category':<26} {'n_pts':>7} {'energy_MeV':>11} "
                 f"{'linearity':>10} {'ext_x':>7} {'ext_y':>7} {'ext_z':>7} "
                 f"{'strict_ovl':>11} {'relaxed_ovl':>12} {'ovl_reco_id':>12} {'n_ovl_reco':>11} {'n_ovl_inbeam':>13} "
                 f"{'flash_us':>9} {'flash_off_us':>13} {'nearest_reco':>13} {'min_dist_cm':>12} {'mean_nn_cm':>11} "
@@ -638,7 +687,9 @@ def write_unmatched_true_neutrino_info(neutrino_rows, output_dir, filename="unma
         for r in sorted(unmatched_rows, key=_sort_key):
             ovl_reco_id = r['best_strict_reco_cluster_id'] if r['best_strict_overlap'] > 0 \
                 else r['best_relaxed_reco_cluster_id']
-            f.write(f"{r['file_name']:<8} {str(r['event']):<14} {r['true_cluster_id']:>9.0f} {r['category']:<26} "
+            f.write(f"{r['file_name']:<8} {str(r['event']):<14} {r['true_cluster_id']:>9.0f} "
+                    f"{str(r.get('vertex_in_volume', 'n/a')):>7} {str(r.get('interaction_channel') or 'n/a'):<9} "
+                    f"{r['category']:<26} "
                     f"{r['n_true_points']:>7} {r['total_true_energy']:>11.1f} {r['linearity']:>10.4f} "
                     f"{r['extent_x']:>7.1f} {r['extent_y']:>7.1f} {r['extent_z']:>7.1f} "
                     f"{r['best_strict_overlap']:>11.4f} {r['best_relaxed_overlap']:>12.4f} "
@@ -655,12 +706,25 @@ def write_unmatched_true_neutrino_info(neutrino_rows, output_dir, filename="unma
         f.write(f"\n{'='*205}\n")
         f.write("SUMMARY BY CATEGORY\n")
         f.write(f"{'='*205}\n")
-        n_matched = sum(1 for r in neutrino_rows if r['category'] == 'matched')
-        f.write(f"{'matched (found a reco pair)':<34} {n_matched:>8}\n")
+        # Split by vertex volume beside the total: the same table the by_vertex_volume/
+        # copies show one column of, kept here so the whole picture is readable in
+        # one file too. 'n/a' rows (no vertex flag) fall in neither column.
+        def _n(rows, predicate=None):
+            return sum(1 for r in rows if predicate is None or predicate(r))
+
+        in_vol  = lambda r: r.get('vertex_in_volume') is True
+        out_vol = lambda r: r.get('vertex_in_volume') is False
+
+        f.write(f"{'category':<34} {'all':>8} {'in volume':>11} {'out volume':>12}\n")
+        matched_rows = [r for r in neutrino_rows if r['category'] == 'matched']
+        f.write(f"{'matched (found a reco pair)':<34} {_n(matched_rows):>8} "
+                f"{_n(matched_rows, in_vol):>11} {_n(matched_rows, out_vol):>12}\n")
         for cat in _UNMATCHED_TRUE_NU_CATEGORY_ORDER:
-            n = sum(1 for r in unmatched_rows if r['category'] == cat)
-            f.write(f"{cat:<34} {n:>8}\n")
-        f.write(f"{'-'*44}\n")
-        f.write(f"{'TOTAL true neutrino clusters':<34} {len(neutrino_rows):>8}\n")
+            cat_rows = [r for r in unmatched_rows if r['category'] == cat]
+            f.write(f"{cat:<34} {_n(cat_rows):>8} "
+                    f"{_n(cat_rows, in_vol):>11} {_n(cat_rows, out_vol):>12}\n")
+        f.write(f"{'-'*67}\n")
+        f.write(f"{'TOTAL true neutrino clusters':<34} {len(neutrino_rows):>8} "
+                f"{_n(neutrino_rows, in_vol):>11} {_n(neutrino_rows, out_vol):>12}\n")
 
     return out_path

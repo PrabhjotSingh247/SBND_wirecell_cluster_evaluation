@@ -83,7 +83,7 @@ def draw_flashes(flash_metadata_list, output_dir, apa, level_name, filename_pref
     plt.axvspan(BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US, color='gold', alpha=0.25, label='beam-window')
     plt.xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
     plt.ylabel('Number of Imaging Clusters', fontsize=12, fontweight='bold')
-    plt.title(f'{title}\n(coarse bins, width={BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold')
+    plt.title(f'{title}\n(coarse bins, width={BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend()
     plt.savefig(output_dir / f'flash_time_vs_num_clusters_{filename_prefix}_{apa}.png', dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -101,7 +101,7 @@ def draw_flashes(flash_metadata_list, output_dir, apa, level_name, filename_pref
     plt.xlim(-2, 4)
     plt.xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
     plt.ylabel('Number of Imaging Clusters', fontsize=12, fontweight='bold')
-    plt.title(f'{title}\n(fine bins, width={FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold')
+    plt.title(f'{title}\n(fine bins, width={FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend()
     plt.savefig(output_dir / f'flash_time_vs_num_clusters_{filename_prefix}_{apa}_beam_window_zoom.png', dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -188,7 +188,7 @@ def draw_clustering_flashes(cluster_flash_records, output_dir, apa, level_name, 
                 label=f'beam-window (in={n_in_beam_window}, out={n_out_of_beam_window})')
     plt.xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
     plt.ylabel('Number of Clusters', fontsize=12, fontweight='bold')
-    plt.title(f'{title}\n(coarse bins, width={BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold')
+    plt.title(f'{title}\n(coarse bins, width={BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend()
     plt.savefig(output_dir / f'flash_time_vs_num_clusters_{filename_prefix}_{apa}.png', dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -206,7 +206,7 @@ def draw_clustering_flashes(cluster_flash_records, output_dir, apa, level_name, 
     plt.xlim(-2, 4)
     plt.xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
     plt.ylabel('Number of Clusters', fontsize=12, fontweight='bold')
-    plt.title(f'{title}\n(fine bins, width={FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold')
+    plt.title(f'{title}\n(fine bins, width={FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend()
     plt.savefig(output_dir / f'flash_time_vs_num_clusters_{filename_prefix}_{apa}_beam_window_zoom.png', dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -302,7 +302,7 @@ def draw_cluster_flash_time_bar(cluster_flash_records, event, apa, output_dir, f
     title = f'Flash Time per Cluster: Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    plt.title(title, fontsize=12, fontweight='bold')
+    plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3, axis='y')
     plt.legend()
     plt.savefig(output_dir / f'cluster_flash_time_bar_event{event}_{apa}.png', dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -372,7 +372,7 @@ def draw_img_global_clusters(all_clusters, flash_clusters, beam_window_clusters,
             title = f"{row_label}: Event {event}, {apa}, {view_label}"
             if file_name:
                 title += f" ({file_name})"
-            ax.set_title(title, fontsize=10)
+            ax.set_title(title, fontsize=10, wrap=True)
 
             for cluster_id, points in clusters.items():
                 points = np.array(points)
@@ -465,7 +465,7 @@ def draw_unmatched_neutrino_flash_times(neutrino_rows, output_dir, apa, level_na
     ax_coarse.axvspan(BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US, color='gold', alpha=0.25, label=beam_window_label)
     ax_coarse.set_xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
     ax_coarse.set_ylabel('Number of Clusters', fontsize=12, fontweight='bold')
-    ax_coarse.set_title(f'{title}\n(full range, bins of {BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold')
+    ax_coarse.set_title(f'{title}\n(full range, bins of {BEAM_WINDOW_WIDTH_US:.2f} us)', fontsize=12, fontweight='bold', wrap=True)
     ax_coarse.grid(True, linestyle='--', alpha=0.3)
     _count_axis(ax_coarse, coarse_counts)
     ax_coarse.legend(fontsize=9)
@@ -483,7 +483,7 @@ def draw_unmatched_neutrino_flash_times(neutrino_rows, output_dir, apa, level_na
     ax_fine.set_xlim(-2, 4)
     ax_fine.set_xlabel('Flash Time [us]', fontsize=12, fontweight='bold')
     ax_fine.set_ylabel('Number of Clusters', fontsize=12, fontweight='bold')
-    ax_fine.set_title(f'Zoom on the beam window (bins of {FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold')
+    ax_fine.set_title(f'Zoom on the beam window (bins of {FINE_BIN_WIDTH_US*1000:.0f} ns)', fontsize=12, fontweight='bold', wrap=True)
     ax_fine.grid(True, linestyle='--', alpha=0.3)
     _count_axis(ax_fine, fine_counts)
     ax_fine.legend(fontsize=9)

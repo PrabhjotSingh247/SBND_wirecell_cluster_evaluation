@@ -5,14 +5,102 @@ from matplotlib.lines import Line2D
 from pathlib import Path
 from scipy.spatial import KDTree
 
+# ============================================================================
+# TRUE NEUTRINO IDENTITY BANNER (XZ / YZ / XY cluster plots)
+# ============================================================================
+# Every spatial plot that shows true neutrino clusters gets one line per neutrino
+# above the panels, naming the cluster and saying what it is: which interaction
+# channel (numu CC / nue CC / NC) and whether its interaction vertex is inside the
+# wire-readout sensitive box. With two neutrinos in one canvas the cluster IDs are
+# what tells them apart -- they are the same IDs used in the panel legends and in
+# every .txt table -- so each gets its own line rather than one merged summary.
+
+def format_true_neutrino_banner(neutrino_records, cluster_ids=None, id_key=None):
+    """
+    The banner text for a set of true neutrinos: one line each, e.g.
+
+        Cluster 99991: numu CC, vertex in volume
+        Cluster 99992: NC, vertex out of volume
+
+    Parameters:
+    - neutrino_records: dicts carrying the neutrino's identity -- either
+      metadata.build_neutrino_vertex_records() output (cluster id under
+      'cluster_id') or metadata.categorize_unmatched_true_neutrinos() rows (under
+      'true_cluster_id'). Both carry 'interaction_channel' and
+      'vertex_in_volume'; whichever is missing prints as 'channel n/a' /
+      'volume n/a' rather than being guessed.
+    - cluster_ids: restrict to these cluster ids -- the ones actually drawn on the
+      canvas, so a record for a neutrino that left no cluster is not announced
+    - id_key: which field holds the cluster id; auto-detected when None
+
+    Returns:
+        The banner string ('' when there is nothing to announce)
+    """
+    CHANNEL_TEXT = {'numu_CC': 'numu CC', 'nue_CC': 'nue CC', 'NC': 'NC'}
+    VOLUME_TEXT  = {True: 'vertex in volume', False: 'vertex out of volume'}
+
+    wanted = None if cluster_ids is None else {float(cid) for cid in cluster_ids}
+    lines, seen = [], set()
+
+    for record in neutrino_records or []:
+        key = id_key or ('cluster_id' if 'cluster_id' in record else 'true_cluster_id')
+        cluster_id = record.get(key)
+        if cluster_id is None or (wanted is not None and float(cluster_id) not in wanted):
+            continue
+        if float(cluster_id) in seen:
+            continue
+        seen.add(float(cluster_id))
+        channel = CHANNEL_TEXT.get(record.get('interaction_channel'), 'channel n/a')
+        volume  = VOLUME_TEXT.get(record.get('vertex_in_volume'), 'volume n/a')
+        lines.append(f"Cluster {cluster_id:.0f}: {channel}, {volume}")
+
+    return "\n".join(lines)
+
+
+def _draw_true_neutrino_note(ax, banner, fontsize=11):
+    """
+    Put the banner INSIDE the panel, tucked under its legend, so it travels with
+    the plot instead of sitting in the margin above it.
+
+    The legend's drawn extent is measured and the text placed just below it,
+    aligned to the same right edge -- so the two read as one block wherever
+    matplotlib decided to put the legend. With no legend on the panel (nothing was
+    drawn to label) the text falls back to the top-right corner, which is where the
+    legend would have gone.
+    """
+    if not banner:
+        return
+
+    legend = ax.get_legend()
+    x, y, ha = 0.98, 0.97, 'right'
+    if legend is not None:
+        ax.figure.canvas.draw()      # the legend needs a layout pass to have an extent
+        try:
+            box = legend.get_window_extent().transformed(ax.transAxes.inverted())
+            x, y, ha = box.x1, box.y0 - 0.025, 'right'
+        except Exception:
+            pass
+
+    ax.text(x, y, banner, transform=ax.transAxes, ha=ha, va='top',
+            fontsize=fontsize, fontweight='bold', linespacing=1.35,
+            bbox=dict(boxstyle='round,pad=0.35', facecolor='white',
+                      edgecolor='0.6', alpha=0.9))
+
+
 def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
-                             filename_stem="all_clusters_reco_true", true_label="True clusters"):
+                             filename_stem="all_clusters_reco_true", true_label="True clusters",
+                             neutrino_records=None):
     """Draw true and reco clusters in XZ projection for comparison.
 
     filename_stem / true_label exist so the same drawer can produce a SUBSET view of the
     same event: pass a filtered true_clusters plus a distinct stem and left-panel label
     (see DrawNeutrinoRecoClusters). Defaults reproduce the original all-clusters plot
     exactly, so existing callers are unaffected.
+
+    neutrino_records (vertex records or unmatched-neutrino rows) adds a banner above
+    the panels naming each true neutrino drawn here -- cluster id, interaction
+    channel, vertex volume -- see format_true_neutrino_banner. Omit it and the plot
+    is exactly as before.
     """
     marker_size = 1
     view = "XZ"
@@ -27,7 +115,7 @@ def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     title = true_label + ": Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
-    axes[0].set_title(title)
+    axes[0].set_title(title, wrap=True)
 
     for cluster_id, points in true_clusters.items():
         points = np.array(points)
@@ -47,7 +135,7 @@ def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     title = "Reco clusters: Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
-    axes[1].set_title(title)
+    axes[1].set_title(title, wrap=True)
 
     for cluster_id, points in predicted_clusters.items():
         points = np.array(points)
@@ -59,19 +147,30 @@ def DrawTrueRecoClustersXZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     if predicted_clusters:
         axes[1].legend()
 
+    # Neutrino identity note in the TRUE panel (axes[0]), under its legend -- the
+    # right panel is reco clusters, where a true-neutrino note would not belong.
+    _draw_true_neutrino_note(axes[0],
+                             format_true_neutrino_banner(neutrino_records,
+                                                          cluster_ids=true_clusters.keys()))
     plt.tight_layout()
     plt.savefig(PLOTDIR_EVT / f"{filename_stem}_event{event}_apa_{apa}_{view}.png")
    # plt.show(block=False)
     plt.close()
 
 def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
-                             filename_stem="all_clusters_reco_true", true_label="True clusters"):
+                             filename_stem="all_clusters_reco_true", true_label="True clusters",
+                             neutrino_records=None):
     """Draw true and reco clusters in YZ projection for comparison.
 
     filename_stem / true_label exist so the same drawer can produce a SUBSET view of the
     same event: pass a filtered true_clusters plus a distinct stem and left-panel label
     (see DrawNeutrinoRecoClusters). Defaults reproduce the original all-clusters plot
     exactly, so existing callers are unaffected.
+
+    neutrino_records (vertex records or unmatched-neutrino rows) adds a banner above
+    the panels naming each true neutrino drawn here -- cluster id, interaction
+    channel, vertex volume -- see format_true_neutrino_banner. Omit it and the plot
+    is exactly as before.
     """
     marker_size = 1
     view = "YZ"
@@ -86,7 +185,7 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     title = true_label + ": Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
-    axes[0].set_title(title)
+    axes[0].set_title(title, wrap=True)
 
     for cluster_id, points in true_clusters.items():
         points = np.array(points)
@@ -106,7 +205,7 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     title = "Reco clusters: Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
-    axes[1].set_title(title)
+    axes[1].set_title(title, wrap=True)
 
     for cluster_id, points in predicted_clusters.items():
         points = np.array(points)
@@ -118,19 +217,30 @@ def DrawTrueRecoClustersYZ(true_clusters, predicted_clusters, event, apa, PLOTDI
     if predicted_clusters:
         axes[1].legend()
 
+    # Neutrino identity note in the TRUE panel (axes[0]), under its legend -- the
+    # right panel is reco clusters, where a true-neutrino note would not belong.
+    _draw_true_neutrino_note(axes[0],
+                             format_true_neutrino_banner(neutrino_records,
+                                                          cluster_ids=true_clusters.keys()))
     plt.tight_layout()
     plt.savefig(PLOTDIR_EVT / f"{filename_stem}_event{event}_apa_{apa}_{view}.png")
    # plt.show(block=False)
     plt.close()
 
 def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
-                             filename_stem="all_clusters_reco_true", true_label="True clusters"):
+                             filename_stem="all_clusters_reco_true", true_label="True clusters",
+                             neutrino_records=None):
     """Draw true and reco clusters in XY projection for comparison.
 
     filename_stem / true_label exist so the same drawer can produce a SUBSET view of the
     same event: pass a filtered true_clusters plus a distinct stem and left-panel label
     (see DrawNeutrinoRecoClusters). Defaults reproduce the original all-clusters plot
     exactly, so existing callers are unaffected.
+
+    neutrino_records (vertex records or unmatched-neutrino rows) adds a banner above
+    the panels naming each true neutrino drawn here -- cluster id, interaction
+    channel, vertex volume -- see format_true_neutrino_banner. Omit it and the plot
+    is exactly as before.
     """
     marker_size = 1
     view = "XY"
@@ -145,7 +255,7 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
     title = true_label + ": Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
-    axes[0].set_title(title)
+    axes[0].set_title(title, wrap=True)
 
     for cluster_id, points in true_clusters.items():
         points = np.array(points)
@@ -165,7 +275,7 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
     title = "Reco clusters: Event " + str(event) + ", " + apa + ", " + view
     if file_name:
         title += f" ({file_name})"
-    axes[1].set_title(title)
+    axes[1].set_title(title, wrap=True)
 
     for cluster_id, points in predicted_clusters.items():
         points = np.array(points)
@@ -177,12 +287,18 @@ def DrawTrueRecoClustersXY(true_clusters, predicted_clusters, event, apa, PLOTDI
     if predicted_clusters:
         axes[1].legend()
 
+    # Neutrino identity note in the TRUE panel (axes[0]), under its legend -- the
+    # right panel is reco clusters, where a true-neutrino note would not belong.
+    _draw_true_neutrino_note(axes[0],
+                             format_true_neutrino_banner(neutrino_records,
+                                                          cluster_ids=true_clusters.keys()))
     plt.tight_layout()
     plt.savefig(PLOTDIR_EVT / f"{filename_stem}_event{event}_apa_{apa}_{view}.png")
    # plt.show(block=False)
     plt.close()
 
-def DrawNeutrinoRecoClusters(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None):
+def DrawNeutrinoRecoClusters(true_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=None,
+                              neutrino_records=None):
     """
     The same three XZ/YZ/XY true-vs-reco panels as DrawTrueRecoClusters{XZ,YZ,XY}, but with
     the left panel restricted to the TRUE NEUTRINO clusters of the event. The right panel is
@@ -208,11 +324,13 @@ def DrawNeutrinoRecoClusters(true_clusters, predicted_clusters, event, apa, PLOT
 
     for draw in (DrawTrueRecoClustersXZ, DrawTrueRecoClustersYZ, DrawTrueRecoClustersXY):
         draw(neutrino_clusters, predicted_clusters, event, apa, PLOTDIR_EVT, file_name=file_name,
-             filename_stem="neutrino_clusters_reco_true", true_label="True neutrino clusters")
+             filename_stem="neutrino_clusters_reco_true", true_label="True neutrino clusters",
+             neutrino_records=neutrino_records)
 
 
 def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, output_dir, event, apa, file_name=None,
-                                    radius_efficiency=1, min_recopoints_threshold=5):
+                                    radius_efficiency=1, min_recopoints_threshold=5,
+                                    neutrino_records=None):
     """
     Draw a single true cluster with all its matched reco clusters (1-to-many).
     True cluster in red, matched reco clusters in distinct colors.
@@ -231,6 +349,10 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     - output_dir: Output directory
     - event: Event number
     - apa: APA identifier
+    - neutrino_records: optional vertex records; when the drawn true cluster is one
+        of them its channel and vertex volume are announced above the panels (see
+        format_true_neutrino_banner). A cosmic true cluster is not in those records
+        and gets no banner.
     """
     true_cid            = matched_info['true_cluster_id']
     matched_reco_list   = matched_info['matched_reco_clusters']
@@ -315,7 +437,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     xz_title = f'True Cluster {true_cid:.0f} with Matched Reco (XZ) - Event {event}, {apa}'
     if file_name:
         xz_title += f' ({file_name})'
-    ax_xz.set_title(xz_title, fontsize=12, fontweight='bold')
+    ax_xz.set_title(xz_title, fontsize=12, fontweight='bold', wrap=True)
     ax_xz.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_xz.grid(True, linestyle='--', alpha=0.3)
 
@@ -327,7 +449,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     yz_title = f'True Cluster {true_cid:.0f} with Matched Reco (YZ) - Event {event}, {apa}'
     if file_name:
         yz_title += f' ({file_name})'
-    ax_yz.set_title(yz_title, fontsize=12, fontweight='bold')
+    ax_yz.set_title(yz_title, fontsize=12, fontweight='bold', wrap=True)
     ax_yz.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_yz.grid(True, linestyle='--', alpha=0.3)
 
@@ -339,7 +461,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     xy_title = f'True Cluster {true_cid:.0f} with Matched Reco (XY) - Event {event}, {apa}'
     if file_name:
         xy_title += f' ({file_name})'
-    ax_xy.set_title(xy_title, fontsize=12, fontweight='bold')
+    ax_xy.set_title(xy_title, fontsize=12, fontweight='bold', wrap=True)
     ax_xy.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_xy.grid(True, linestyle='--', alpha=0.3)
 
@@ -351,7 +473,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     missed_xz_title = f'True Cluster {true_cid:.0f} Missed Points (XZ) - Event {event}, {apa}'
     if file_name:
         missed_xz_title += f' ({file_name})'
-    ax_missed_xz.set_title(missed_xz_title, fontsize=12, fontweight='bold')
+    ax_missed_xz.set_title(missed_xz_title, fontsize=12, fontweight='bold', wrap=True)
     if len(missed_points) > 0:
         ax_missed_xz.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_missed_xz.grid(True, linestyle='--', alpha=0.3)
@@ -364,7 +486,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     missed_yz_title = f'True Cluster {true_cid:.0f} Missed Points (YZ) - Event {event}, {apa}'
     if file_name:
         missed_yz_title += f' ({file_name})'
-    ax_missed_yz.set_title(missed_yz_title, fontsize=12, fontweight='bold')
+    ax_missed_yz.set_title(missed_yz_title, fontsize=12, fontweight='bold', wrap=True)
     if len(missed_points) > 0:
         ax_missed_yz.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_missed_yz.grid(True, linestyle='--', alpha=0.3)
@@ -377,11 +499,14 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     missed_xy_title = f'True Cluster {true_cid:.0f} Missed Points (XY) - Event {event}, {apa}'
     if file_name:
         missed_xy_title += f' ({file_name})'
-    ax_missed_xy.set_title(missed_xy_title, fontsize=12, fontweight='bold')
+    ax_missed_xy.set_title(missed_xy_title, fontsize=12, fontweight='bold', wrap=True)
     if len(missed_points) > 0:
         ax_missed_xy.legend(fontsize=18, loc='upper right', framealpha=0.9)
     ax_missed_xy.grid(True, linestyle='--', alpha=0.3)
 
+    _draw_true_neutrino_note(plt.gcf().axes[0],
+                             format_true_neutrino_banner(neutrino_records, cluster_ids=[true_cid]),
+                             fontsize=10)
     plt.tight_layout()
     reco_ids_str = '_'.join(f"{r['reco_cluster_id']:.0f}" for r in matched_reco_list)
     plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_with_reco_{reco_ids_str}_event_{event}_{apa}.png",
@@ -442,7 +567,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
         plt.hist(t_recorded, bins=100, alpha=0.7, color='blue')
         plt.xlabel('Recorded Time (μs)', fontsize=12, fontweight='bold')
         plt.ylabel('Number of Points', fontsize=12, fontweight='bold')
-        plt.title(f'Recorded Time Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold')
+        plt.title(f'Recorded Time Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         # Draw vertical lines for time window cuts
         plt.axvline(x=time_min, color='red', linestyle='--', label=f'TW Min ({time_min} μs)')
@@ -458,7 +583,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
         plt.hist(t0, bins=100, alpha=0.7, color='orange')
         plt.xlabel('True Time t0 (μs)', fontsize=12, fontweight='bold')
         plt.ylabel('Number of Points', fontsize=12, fontweight='bold')
-        plt.title(f'True Time t0 Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold')
+        plt.title(f'True Time t0 Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_t0_distribution_event_{event}_{apa}.png", dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -469,7 +594,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
         plt.hist(t_drift, bins=100, alpha=0.7, color='green')
         plt.xlabel('Drift Time (μs)', fontsize=12, fontweight='bold')
         plt.ylabel('Number of Points', fontsize=12, fontweight='bold')
-        plt.title(f'Drift Time Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold')
+        plt.title(f'Drift Time Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_drift_time_distribution_event_{event}_{apa}.png", dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -480,7 +605,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
         plt.hist(x0, bins=100, alpha=0.7, color='purple')
         plt.xlabel('True X Position (cm)', fontsize=12, fontweight='bold')
         plt.ylabel('Number of Points', fontsize=12, fontweight='bold')
-        plt.title(f'True X Position Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold')
+        plt.title(f'True X Position Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_x0_distribution_event_{event}_{apa}.png", dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -491,7 +616,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
         plt.hist(x_drft, bins=100, alpha=0.7, color='cyan')
         plt.xlabel('Drift Distance (cm)', fontsize=12, fontweight='bold')
         plt.ylabel('Number of Points', fontsize=12, fontweight='bold')
-        plt.title(f'Drift Distance Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold')
+        plt.title(f'Drift Distance Distribution of True Cluster {true_cid:.0f} - Event {event}, {apa}', fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(output_dir / f"true_cluster_{true_cid:.0f}_drift_distance_distribution_event_{event}_{apa}.png", dpi=100, bbox_inches='tight', pad_inches=0.3)
@@ -550,7 +675,7 @@ def DrawLabels(true_clusters, event, apa, PLOTDIR_EVT, file_name=None):
     title = f'True Clusters by Type: Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='y')
 
     # Create legend with neutrino cluster IDs
@@ -642,7 +767,7 @@ def DrawLabelsAggregated(cluster_type_records, output_dir, level_name, filename_
     title = f'True Clusters by Type (Aggregated): {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
@@ -708,7 +833,7 @@ def DrawLabelsByNuIdx(cluster_type_records, output_dir, level_name, filename_pre
     title = f'True Clusters by Type (By Neutrino Index): {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
@@ -761,7 +886,7 @@ def _draw_neutrino_cosmic_bar(metadata_list, output_dir, apa, level_name, filena
     title = f'True Clusters by Type - {level_name}, {num_events} events, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
@@ -797,7 +922,7 @@ def _draw_cosmic_category_bar(metadata_list, output_dir, apa, level_name, filena
     title = f'Cosmic Clusters by Category - {level_name}, {num_events} events, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
@@ -873,7 +998,7 @@ def _draw_match_multiplicity_bar(metadata_list, output_dir, apa, level_name, fil
     title = f'True-Reco Match Multiplicity ({category_label}) - {level_name}, {num_events} events, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
@@ -1019,7 +1144,7 @@ def DrawTrueClusterWithDeadArea(true_cluster_points_full, deadarea_polygons, clu
     title = f'True Cluster {cluster_id:.0f} - Full Cluster with Dead Area (YZ): Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=13, fontweight='bold')
+    ax.set_title(title, fontsize=13, fontweight='bold', wrap=True)
     ax.legend(fontsize=11, loc='upper right', framealpha=0.9)
     ax.grid(True, alpha=0.3)
 
@@ -1080,7 +1205,7 @@ def DrawPointsBeforeAfterDeadArea(cluster_before, cluster_after, event, apa, out
     title = f'Points Before and After Dead Area Cut (Affected Clusters): Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=13, fontweight='bold')
+    ax.set_title(title, fontsize=13, fontweight='bold', wrap=True)
     ax.set_xticks(x)
     ax.set_xticklabels([f'{cid:.0f}' for cid in affected_cluster_ids], rotation=45, ha='right')
     ax.legend(fontsize=11)
@@ -1143,7 +1268,7 @@ def DrawTrueClusterCategories(cluster_category_results, clusters_true, output_di
         title += f' - Event {event}, {apa}'
     if file_name is not None:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
 
     # Create custom legend for track types
     legend_elements = [
@@ -1223,7 +1348,7 @@ def DrawClusterBeforeAfterDeadArea(true_points_before, true_points_after, deadar
     draw_deadareas(ax_before)
     ax_before.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
     ax_before.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
-    ax_before.set_title('Full View - Before Dead Area Cut', fontsize=12, fontweight='bold')
+    ax_before.set_title('Full View - Before Dead Area Cut', fontsize=12, fontweight='bold', wrap=True)
     ax_before.legend(fontsize=9, loc='upper right')
     ax_before.grid(True, alpha=0.3)
     ax_before.set_xlim(0, 500)
@@ -1237,7 +1362,7 @@ def DrawClusterBeforeAfterDeadArea(true_points_before, true_points_after, deadar
     draw_deadareas(ax_after)
     ax_after.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
     ax_after.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
-    ax_after.set_title('Full View - After Dead Area Cut', fontsize=12, fontweight='bold')
+    ax_after.set_title('Full View - After Dead Area Cut', fontsize=12, fontweight='bold', wrap=True)
     ax_after.legend(fontsize=9, loc='upper right')
     ax_after.grid(True, alpha=0.3)
     ax_after.set_xlim(0, 500)
@@ -1251,7 +1376,7 @@ def DrawClusterBeforeAfterDeadArea(true_points_before, true_points_after, deadar
     draw_deadareas(ax_zoom_before)
     ax_zoom_before.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
     ax_zoom_before.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
-    ax_zoom_before.set_title('Zoomed View - Before Dead Area Cut (10 cm zoom)', fontsize=12, fontweight='bold')
+    ax_zoom_before.set_title('Zoomed View - Before Dead Area Cut (10 cm zoom)', fontsize=12, fontweight='bold', wrap=True)
     ax_zoom_before.legend(fontsize=9, loc='upper right')
     ax_zoom_before.grid(True, alpha=0.3)
     ax_zoom_before.set_xlim(z_zoom_min, z_zoom_max)
@@ -1265,16 +1390,16 @@ def DrawClusterBeforeAfterDeadArea(true_points_before, true_points_after, deadar
     draw_deadareas(ax_zoom_after)
     ax_zoom_after.set_xlabel('Z [cm]', fontsize=11, fontweight='bold')
     ax_zoom_after.set_ylabel('Y [cm]', fontsize=11, fontweight='bold')
-    ax_zoom_after.set_title('Zoomed View - After Dead Area Cut (10 cm zoom)', fontsize=12, fontweight='bold')
+    ax_zoom_after.set_title('Zoomed View - After Dead Area Cut (10 cm zoom)', fontsize=12, fontweight='bold', wrap=True)
     ax_zoom_after.legend(fontsize=9, loc='upper right')
     ax_zoom_after.grid(True, alpha=0.3)
     ax_zoom_after.set_xlim(z_zoom_min, z_zoom_max)
     ax_zoom_after.set_ylim(y_zoom_min, y_zoom_max)
 
     fig.suptitle(f'True Clusters Before/After Dead Area Cut - Event {event}, {apa}',
-                fontsize=14, fontweight='bold')
+                fontsize=14, fontweight='bold', wrap=True)
     if file_name:
-        fig.suptitle(fig._suptitle.get_text() + f' ({file_name})', fontsize=13, fontweight='bold')
+        fig.suptitle(fig._suptitle.get_text() + f' ({file_name})', fontsize=13, fontweight='bold', wrap=True)
 
     plt.tight_layout()
     plt.savefig(output_dir / f"true_clusters_before_after_deadarea_event{event}_apa_{apa}.png",
@@ -1345,7 +1470,7 @@ def draw_clustering_global_clusters(all_clusters, beam_window_clusters, event, a
             title = f"{row_label}: Event {event}, {apa}, {view_label}"
             if file_name:
                 title += f" ({file_name})"
-            ax.set_title(title, fontsize=10)
+            ax.set_title(title, fontsize=10, wrap=True)
 
             for cluster_id, points in clusters.items():
                 points = np.array(points)
@@ -1488,7 +1613,7 @@ def DrawNeutrinoVertices(vertex_records, output_dir, level_name, filename_prefix
         title = f"True Neutrino Vertices: {level_name}, {apa}, {view_label}"
         if file_name:
             title += f" ({file_name})"
-        ax.set_title(title, fontsize=12, fontweight='bold')
+        ax.set_title(title, fontsize=12, fontweight='bold', wrap=True)
         ax.grid(True, alpha=0.3)
         ax.tick_params(labelsize=11)
         if legend_handles is None:
@@ -1558,7 +1683,7 @@ def DrawNeutrinoVolumeCategory(vertex_records, output_dir, level_name, filename_
     title = f'True Neutrino Interactions by Vertex Volume: {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=14, fontweight='bold', wrap=True)
     ax.tick_params(labelsize=12)
     ax.grid(True, alpha=0.3, axis='y')
 
@@ -1573,20 +1698,29 @@ def DrawNeutrinoVolumeCategory(vertex_records, output_dir, level_name, filename_
 def DrawNeutrinoFlavor(vertex_records, output_dir, level_name, filename_prefix, apa, file_name=None,
                        volume_label="wire-readout sensitive box"):
     """
-    Bar chart of neutrino FLAVOR (numu, nue, ... as named by mc.json's
-    interaction-vertex node) counting IN-VOLUME, CUT-SURVIVING interactions only
-    -- vertices outside the volume and interactions whose cluster the cuts
-    removed are both excluded, so this describes the flavour composition of the
-    in-detector sample that the rest of the pipeline actually evaluates.
-    Event/File/Job level alike.
+    Bar chart of the true neutrino INTERACTION CHANNEL -- numu CC, nue CC, NC --
+    counting IN-VOLUME, CUT-SURVIVING interactions only: vertices outside the
+    volume and interactions whose cluster the cuts removed are both excluded, so
+    this describes the composition of the in-detector sample that the rest of the
+    pipeline actually evaluates. Event/File/Job level alike.
 
-    Bars adapt to whatever flavours are present rather than assuming a fixed set,
-    so a flavour absent from a given event/file simply has no bar (this dataset
-    is overwhelmingly numu with a handful of nue).
+    The channel comes from metadata.classify_neutrino_interaction: the incident
+    flavor together with the first list of daughters (a numu with a muon there is
+    numu CC, a nue with an electron is nue CC, neither is NC). This used to plot
+    the raw mc.json flavor instead, which could not tell a numu CC from a numu NC
+    -- and in a numu-dominated beam that is the distinction worth seeing, since
+    the two leave completely different final states in the detector.
+
+    All THREE channels always get a bar, including empty ones, so an absent
+    channel reads as a measured zero rather than as a missing category, and the
+    bars stay in the same order and place across levels and populations. Any
+    further channel found in the records is appended after them rather than
+    dropped.
 
     Parameters:
     - vertex_records: List of dicts from metadata.build_neutrino_vertex_records(),
-        each with 'flavor' and 'vertex_in_volume'
+        each with 'interaction_channel', 'vertex_in_volume', 'has_true_cluster'
+        (records predating the CC/NC classification fall back to 'unknown')
     - output_dir: Output directory
     - level_name: Label for the title (e.g. 'Event 9', 'File Level', 'Job Level')
     - filename_prefix: Suffix used in the output filename (e.g. 'event_9', 'file', 'job')
@@ -1600,22 +1734,28 @@ def DrawNeutrinoFlavor(vertex_records, output_dir, level_name, filename_prefix, 
     if not in_volume:
         return
 
-    flavor_counts = {}
+    CHANNEL_STYLES = {
+        'numu_CC': {'label': r'$\nu_\mu$ CC', 'color': 'steelblue'},
+        'nue_CC':  {'label': r'$\nu_e$ CC',   'color': 'purple'},
+        'NC':      {'label': 'NC',            'color': 'darkorange'},
+    }
+
+    channel_counts = {}
     for r in in_volume:
-        flavor = r.get('flavor') or 'unknown'
-        flavor_counts[flavor] = flavor_counts.get(flavor, 0) + 1
+        channel = r.get('interaction_channel') or 'unknown'
+        channel_counts[channel] = channel_counts.get(channel, 0) + 1
 
-    flavors = sorted(flavor_counts, key=lambda f: -flavor_counts[f])
-    counts = [flavor_counts[f] for f in flavors]
+    # The three known channels first, in a fixed order, then anything unexpected.
+    channels = list(CHANNEL_STYLES) + sorted(c for c in channel_counts if c not in CHANNEL_STYLES)
+    counts   = [channel_counts.get(c, 0) for c in channels]
+    labels   = [CHANNEL_STYLES.get(c, {}).get('label', c) for c in channels]
+    colors   = [CHANNEL_STYLES.get(c, {}).get('color', 'grey') for c in channels]
 
-    color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    colors = [color_cycle[i % len(color_cycle)] for i in range(len(flavors))]
-
-    fig, ax = plt.subplots(figsize=(max(8, 2.2 * len(flavors)), 6))
+    fig, ax = plt.subplots(figsize=(max(8, 2.2 * len(channels)), 6))
     # Default matplotlib bar width here (unlike the other neutrino bar charts):
-    # with only a couple of flavours present, narrower bars made the 1-count nue
-    # bar unreadable as a bar at all.
-    bars = ax.bar(flavors, counts, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
+    # with only a few bars present, narrower ones made a 1-count bar unreadable
+    # as a bar at all.
+    bars = ax.bar(labels, counts, color=colors, alpha=0.7, edgecolor='black', linewidth=2)
     # Percentage is of the IN-VOLUME sample plotted here (len(in_volume)), which is
     # what the bars are drawn from -- not of all interactions, and not of the
     # surviving total. The title states that sample size so the denominator is
@@ -1627,14 +1767,24 @@ def DrawNeutrinoFlavor(vertex_records, output_dir, level_name, filename_prefix, 
                 ha='center', va='bottom', fontsize=16, fontweight='bold')
 
     ax.set_ylabel('Number of True Neutrino Interactions', fontsize=13, fontweight='bold')
-    ax.set_xlabel('Neutrino Flavor (mc.json)', fontsize=13, fontweight='bold')
-    title = f'In-Volume True Neutrino Flavor: {level_name}, {apa}'
+    ax.set_xlabel('True Interaction Channel (mc.json flavor + first daughters)',
+                  fontsize=13, fontweight='bold')
+    title = f'In-Volume True Neutrino Interaction Channel: {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(f'{title}\n(vertex inside the {volume_label}; {len(in_volume)} interactions)',
-                 fontsize=14, fontweight='bold')
+    subtitle = f'(vertex inside the {volume_label}; {len(in_volume)} interactions)'
+    # An NC that did produce a charged lepton, of the OTHER flavor, is still NC
+    # (see classify_neutrino_interaction) -- say so rather than let the bar imply
+    # no lepton was there at all.
+    n_mismatch = sum(1 for r in in_volume if r.get('lepton_flavor_mismatch'))
+    if n_mismatch:
+        subtitle += f'\n{n_mismatch} NC with a charged lepton of the other flavor'
+    ax.set_title(f'{title}\n{subtitle}', fontsize=14, fontweight='bold', wrap=True)
     ax.tick_params(labelsize=12)
     ax.grid(True, alpha=0.3, axis='y')
+    # Headroom for the count/percentage labels, which sit on top of each bar.
+    if max(counts) > 0:
+        ax.set_ylim(0, max(counts) * 1.18)
 
     plt.tight_layout()
     output_dir = Path(output_dir)
@@ -1749,7 +1899,7 @@ def DrawNeutrinoBreakdown(vertex_records, output_dir, level_name, filename_prefi
     title = f'True Neutrino Breakdown: {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    ax.set_title(title, fontsize=16, fontweight='bold')
+    ax.set_title(title, fontsize=16, fontweight='bold', wrap=True)
     ax.tick_params(labelsize=13)
     ax.grid(True, alpha=0.3, axis='y')
     # Headroom for the legend. The bars are non-increasing left to right by
@@ -1834,7 +1984,7 @@ def DrawExtraRecoClusters(clusters_reco, categorized_rows, event, apa, output_di
         title = f"Extra reco clusters: Event {event}, {apa}, {view_label}"
         if file_name:
             title += f" ({file_name})"
-        ax.set_title(title, fontsize=11)
+        ax.set_title(title, fontsize=11, wrap=True)
 
         for reco_cid, category in sorted(extra_reco_category.items()):
             points = np.array(clusters_reco[reco_cid])
@@ -1914,7 +2064,7 @@ def DrawExtraRecoCategoryBreakdown(categorized_rows, n_true_neutrinos, output_di
     title_top = f'True Neutrinos vs Selected Reco - {level_name}, {num_events} events, {apa}'
     if file_name:
         title_top += f' ({file_name})'
-    ax_top.set_title(title_top, fontsize=13, fontweight='bold')
+    ax_top.set_title(title_top, fontsize=13, fontweight='bold', wrap=True)
     ax_top.grid(True, alpha=0.3, axis='y')
 
     # MIDDLE: matched vs. extra. Neutral gray for "Extra" -- reads as "explained
@@ -1933,7 +2083,7 @@ def DrawExtraRecoCategoryBreakdown(categorized_rows, n_true_neutrinos, output_di
     title_middle = f'Selected Reco: Matched vs Extra - {level_name}, {num_events} events, {apa}'
     if file_name:
         title_middle += f' ({file_name})'
-    ax_middle.set_title(title_middle, fontsize=13, fontweight='bold')
+    ax_middle.set_title(title_middle, fontsize=13, fontweight='bold', wrap=True)
     ax_middle.grid(True, alpha=0.3, axis='y')
 
     # BOTTOM: the Extra bucket broken down by reason (matched_winner excluded --
@@ -1952,7 +2102,7 @@ def DrawExtraRecoCategoryBreakdown(categorized_rows, n_true_neutrinos, output_di
     title_bottom = f'Extra Reco Clusters by Reason - {level_name}, {num_events} events, {apa}'
     if file_name:
         title_bottom += f' ({file_name})'
-    ax_bottom.set_title(title_bottom, fontsize=13, fontweight='bold')
+    ax_bottom.set_title(title_bottom, fontsize=13, fontweight='bold', wrap=True)
     ax_bottom.grid(True, alpha=0.3, axis='y')
     plt.setp(ax_bottom.get_xticklabels(), rotation=15, ha='right')
 
@@ -2090,6 +2240,15 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
 
     fig, axes = plt.subplots(1, 3, figsize=(20, 6.5))
 
+    # What each flagged neutrino IS -- interaction channel and vertex volume, keyed
+    # by the same cluster ids the legends use. With two neutrinos on one canvas
+    # that is what tells them apart. Built from the rows themselves, which carry
+    # the fields when the caller annotated them (investigate_unmatched_true_neutrinos
+    # does); absent fields print as n/a. Drawn inside each panel below its legend,
+    # once the panels are populated.
+    banner = format_true_neutrino_banner(neutrino_rows, cluster_ids=unmatched_category.keys(),
+                                          id_key='true_cluster_id')
+
     for col_idx, (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel) in enumerate(views):
         ax = axes[col_idx]
         ax.set_xlim(xlim)
@@ -2099,7 +2258,7 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
         title = f"Unmatched true neutrinos: Event {event}, {apa}, {view_label}"
         if file_name:
             title += f" ({file_name})"
-        ax.set_title(title, fontsize=11)
+        ax.set_title(title, fontsize=11, wrap=True)
 
         # Gray reco first, so the true cluster it failed to match sits on top of it.
         # Drawn with a LARGER marker than the true points (s=6 vs s=1): where the
@@ -2123,6 +2282,9 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
             label = _UNMATCHED_TRUE_NU_CATEGORY_LABELS[category].replace('\n', ' ')
             ax.plot([], [], color=color, label=f"True cluster {true_cid:.0f} ({label})")
         ax.legend(fontsize=8, loc='upper right')
+
+    for ax in axes:
+        _draw_true_neutrino_note(ax, banner, fontsize=10)
 
     plt.tight_layout()
     plt.savefig(output_dir / f"unmatched_true_neutrinos_event{event}_{apa}.png", dpi=100, bbox_inches='tight')
@@ -2187,7 +2349,7 @@ def DrawUnmatchedTrueNeutrinoBreakdown(neutrino_rows, n_selected_reco, output_di
     title_top = f'True Neutrinos vs Selected Reco - {level_name}, {num_events} events, {apa}'
     if file_name:
         title_top += f' ({file_name})'
-    ax_top.set_title(title_top, fontsize=13, fontweight='bold')
+    ax_top.set_title(title_top, fontsize=13, fontweight='bold', wrap=True)
     ax_top.grid(True, alpha=0.3, axis='y')
 
     # MIDDLE: matched vs. not matched. Neutral gray for "Not matched" -- reads as
@@ -2205,7 +2367,7 @@ def DrawUnmatchedTrueNeutrinoBreakdown(neutrino_rows, n_selected_reco, output_di
     title_middle = f'True Neutrinos: Matched vs Not Matched - {level_name}, {num_events} events, {apa}'
     if file_name:
         title_middle += f' ({file_name})'
-    ax_middle.set_title(title_middle, fontsize=13, fontweight='bold')
+    ax_middle.set_title(title_middle, fontsize=13, fontweight='bold', wrap=True)
     ax_middle.grid(True, alpha=0.3, axis='y')
 
     # BOTTOM: the Not-matched bucket broken down by reason ('matched' excluded --
@@ -2224,7 +2386,7 @@ def DrawUnmatchedTrueNeutrinoBreakdown(neutrino_rows, n_selected_reco, output_di
     title_bottom = f'Unmatched True Neutrinos by Reason - {level_name}, {num_events} events, {apa}'
     if file_name:
         title_bottom += f' ({file_name})'
-    ax_bottom.set_title(title_bottom, fontsize=13, fontweight='bold')
+    ax_bottom.set_title(title_bottom, fontsize=13, fontweight='bold', wrap=True)
     ax_bottom.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()

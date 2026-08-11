@@ -2163,10 +2163,35 @@ _EFF_PUR_CATEGORY_STYLE = {
     'prolonged_cosmic':    {'label': 'Prolonged Cosmic',   'color': 'blue',   'marker': '^'},
 }
 
-_UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI = -0.1, 0.0  # bottom-left "no reco match" bin, both axes
+# Two off-scale bins below/left of the physical [0, 1] square, one per kind of
+# cluster that has no partner and therefore no (purity, completeness) point:
+#
+#   EXTRA RECO     a reco cluster that is not the winner of any 1-to-1 pair.
+#                  Two ways to become one, both counted here: no overlap with any
+#                  true cluster at all, or overlap with a true cluster that a
+#                  DIFFERENT reco cluster won (MatchTrueToReco1to1 keeps only the
+#                  highest-completeness reco per true cluster, so the rest are
+#                  extra). Either way the cluster contributes to no pair, so it
+#                  has no (purity, completeness) point to be drawn at and sits in
+#                  the bin nearest the origin instead.
+#   UNMATCHED TRUE a true cluster matched to NO reco cluster. Completeness 0,
+#                  purity undefined. Pushed to the outer bin to make room.
+#
+# Both are placeholders, not measurements: nothing inside either box is a real
+# coordinate, which is why they are drawn outside [0, 1] and outlined rather than
+# left to blend into the physical points.
+_EXTRA_RECO_BOX_LO, _EXTRA_RECO_BOX_HI = -0.1, 0.0   # inner box, both axes
+# A blue distinct from the 'blue' the matched points default to in this figure --
+# same family, so extra reco still reads as a reco-side quantity, but light enough
+# that the two series are told apart by colour and not only by marker.
+_EXTRA_RECO_COLOR = 'deepskyblue'
+
+_PURITY_UNMATCHED_TRUE_ID = 8888  # EvaluatePurity's "this reco touched no true cluster" sentinel
+_UNMATCHED_BOX_LO,  _UNMATCHED_BOX_HI  = -0.2, -0.1  # outer box, both axes
 
 def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_name, apa, file_name=None,
-                                        all_true_metadata_list=None, filename_level=None):
+                                        all_true_metadata_list=None, filename_level=None,
+                                        purity_results=None):
     """
     Draw purity-vs-completeness (x=Purity, y=Completeness) scatter and 2D histogram (colz)
     plots from 1-to-1 true-reco pair metadata (add_metadata_true_reco_pair_cluster).
@@ -2178,10 +2203,29 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
     numu CC interactions)") pass the plain level here, so the same plot keeps the
     same filename in every population directory and can be diffed across them.
 
-    True clusters that never matched any reco cluster (present in all_true_metadata_list
-    from add_metadata_true_clusters, but absent from pair_metadata_list) are drawn as
-    points inside a dedicated "no match" bin in the bottom-left corner
-    ([-0.1, 0] x [-0.1, 0]), outlined with a dashed box.
+    Two kinds of partnerless cluster are drawn in dedicated off-scale bins below and
+    left of the physical [0, 1] square, each outlined with a dashed box:
+
+      - EXTRA RECO ([-0.1, 0]^2, the bin nearest the origin): reco clusters that
+        won no 1-to-1 pair - either they overlap no true cluster at all, or they
+        overlap one whose pair slot a higher-completeness reco took. The reco
+        population comes from purity_results (one row per reco cluster), minus the
+        reco ids present in pair_metadata_list. Drawn only when purity_results is
+        passed. These clusters appear in no completeness or purity number the plot
+        otherwise shows, so without this bin the reconstruction's over-splitting
+        and its spurious clusters are both invisible here however many there are.
+      - UNMATCHED TRUE ([-0.2, -0.1]^2, the outer bin): true clusters that never
+        matched any reco cluster - present in all_true_metadata_list (from
+        add_metadata_true_clusters) but absent from pair_metadata_list. Drawn only
+        when all_true_metadata_list is passed.
+
+    Extra reco is ATTRIBUTED to a true category and appears in that category's
+    figure as well as in "All Clusters": each one is labelled with the type of the
+    true cluster it overlaps most (its highest-purity purity_results row), so a
+    reco cluster that split a true neutrino in two shows up in the neutrino figure,
+    which is the figure that failure belongs in. Extra reco overlapping no true
+    cluster at all cannot be attributed and appears in "All Clusters" only, so the
+    per-category counts never claim a truth label that does not exist.
 
     Produces:
       - All Clusters: one scatter plot, one colz plot
@@ -2195,7 +2239,7 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
     # cluster goes in the no-match box at completeness 0. The "excluding unmatched"
     # variant passes all_true_metadata_list=None and still returns here, as before.
     # Every inner helper already accepts empty `entries` with non-empty `unmatched_entries`.
-    if not pair_metadata_list and not all_true_metadata_list:
+    if not pair_metadata_list and not all_true_metadata_list and not purity_results:
         return
 
     def _in_category(metadata, category_key):
@@ -2218,6 +2262,62 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
     # the "excluding unmatched" variant and the box shouldn't appear at all.
     show_unmatched_box = bool(all_true_metadata_list)
 
+    # Extra reco: every reco cluster that won no 1-to-1 pair. purity_results carries
+    # a row for every reco cluster in the event (a real row per overlapping true
+    # cluster, or one true_cluster_id=8888 sentinel row when it overlaps none), so
+    # the reco ids in it are the full reco population; subtracting the ids that DID
+    # win a pair leaves the extra ones. Both routes into the category land here:
+    # zero overlap with any true cluster, and overlap with a true cluster whose
+    # 1-to-1 slot a higher-completeness reco took.
+    #
+    # Both sides key on (event, reco_cluster_id) with event = the event_key string
+    # ("file1_0"): EvaluatePurity is called with event_key everywhere in this repo,
+    # and add_metadata_true_reco_pair_cluster stores event_key under 'event'. The
+    # pair is needed because reco cluster ids are only unique within an event.
+    #
+    # Each extra reco is ATTRIBUTED to the true category of the true cluster it
+    # overlaps most (its highest-purity purity_results row), so it can be drawn in
+    # that category's figure and not only in "All Clusters". A reco cluster that
+    # split a true neutrino in two is a fact about the NEUTRINO's reconstruction:
+    # leaving it out of the neutrino figure hides exactly the failure that figure
+    # exists to show. Extra reco overlapping no true cluster (the 8888 sentinel
+    # rows) has no category to be attributed to and stays in "All Clusters" alone -
+    # cluster_type None matches no category in _in_category.
+    true_category_lookup = {}
+    for m in list(all_true_metadata_list or []) + list(pair_metadata_list):
+        true_category_lookup.setdefault((m['event'], m['true_cluster_id']),
+                                        (m.get('cluster_type'), m.get('cluster_category')))
+
+    if purity_results:
+        paired_reco_ids = {(m['event'], m['reco_cluster_id']) for m in pair_metadata_list}
+        all_reco_ids    = set()
+        best_true_by_reco = {}      # (event, reco id) -> (purity, true cluster id)
+        for p in purity_results:
+            reco_key = (p['event'], p['reco_cluster_id'])
+            all_reco_ids.add(reco_key)
+            if p.get('true_cluster_id') == _PURITY_UNMATCHED_TRUE_ID:
+                continue
+            best = best_true_by_reco.get(reco_key)
+            if best is None or p['purity'] > best[0]:
+                best_true_by_reco[reco_key] = (p['purity'], p['true_cluster_id'])
+
+        extra_reco_entries = []
+        for reco_key in sorted(all_reco_ids - paired_reco_ids):
+            best_purity, best_true_id = best_true_by_reco.get(reco_key, (None, None))
+            cluster_type, cluster_category = true_category_lookup.get(
+                (reco_key[0], best_true_id), (None, None))
+            extra_reco_entries.append({
+                'event':            reco_key[0],
+                'reco_cluster_id':  reco_key[1],
+                'purity':           best_purity,
+                'true_cluster_id':  best_true_id,
+                'cluster_type':     cluster_type,
+                'cluster_category': cluster_category,
+            })
+    else:
+        extra_reco_entries = []
+    show_extra_reco_box = bool(purity_results)
+
     level_suffix = (filename_level or level_name).lower().replace(' ', '_')
 
     # Shared across all jitter draws in this call, so unmatched points from
@@ -2228,36 +2328,49 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
         return f' ({file_name})' if file_name else ''
 
     def _axis_limits():
-        return (_UNMATCHED_BOX_LO - 0.02, 1.02)
+        # Reach down to whichever off-scale box is actually drawn. With neither
+        # (the "excluding unmatched" variant) this still returns the -0.12 the plot
+        # has always used, so those figures keep their framing unchanged.
+        lo = _UNMATCHED_BOX_LO if show_unmatched_box else _EXTRA_RECO_BOX_LO
+        return (lo - 0.02, 1.02)
 
-    def _jitter_unmatched(n):
+    def _jitter_in_box(n, box_lo, box_hi):
         if n == 0:
             return np.array([]), np.array([])
-        x = _jitter_rng.uniform(_UNMATCHED_BOX_LO + 0.005, _UNMATCHED_BOX_HI - 0.005, n)
-        y = _jitter_rng.uniform(_UNMATCHED_BOX_LO + 0.005, _UNMATCHED_BOX_HI - 0.005, n)
+        x = _jitter_rng.uniform(box_lo + 0.005, box_hi - 0.005, n)
+        y = _jitter_rng.uniform(box_lo + 0.005, box_hi - 0.005, n)
         return x, y
 
-    def _draw_unmatched_box():
-        plt.gca().add_patch(Rectangle(
-            (_UNMATCHED_BOX_LO, _UNMATCHED_BOX_LO),
-            _UNMATCHED_BOX_HI - _UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI - _UNMATCHED_BOX_LO,
-            fill=False, edgecolor='gray', linestyle='--', linewidth=1.5))
+    def _jitter_unmatched(n):
+        return _jitter_in_box(n, _UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI)
 
-    def _format_axes():
+    def _jitter_extra_reco(n):
+        return _jitter_in_box(n, _EXTRA_RECO_BOX_LO, _EXTRA_RECO_BOX_HI)
+
+    def _draw_box(box_lo, box_hi, edgecolor):
+        plt.gca().add_patch(Rectangle(
+            (box_lo, box_lo), box_hi - box_lo, box_hi - box_lo,
+            fill=False, edgecolor=edgecolor, linestyle='--', linewidth=1.5))
+
+    def _format_axes(with_extra_reco_box=False):
         lo, hi = _axis_limits()
         plt.xlim(lo, hi)
         plt.ylim(lo, hi)
         if show_unmatched_box:
-            _draw_unmatched_box()
+            _draw_box(_UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI, 'gray')
+        if with_extra_reco_box and show_extra_reco_box:
+            _draw_box(_EXTRA_RECO_BOX_LO, _EXTRA_RECO_BOX_HI, _EXTRA_RECO_COLOR)
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.xlabel('Purity', fontsize=20, fontweight='bold')
         plt.ylabel('Completeness', fontsize=20, fontweight='bold')
         plt.xticks(fontsize=16)
         plt.yticks(fontsize=16)
 
-    def _scatter(entries, category_name, filename_tag, unmatched_entries=None, color='blue', marker='o'):
+    def _scatter(entries, category_name, filename_tag, unmatched_entries=None, color='blue', marker='o',
+                 extra_reco_entries=None):
         unmatched_entries = unmatched_entries or []
-        if not entries and not unmatched_entries:
+        extra_reco_entries = extra_reco_entries or []
+        if not entries and not unmatched_entries and not extra_reco_entries:
             return
         purities     = [m['purity'] for m in entries]
         completenesses = [m['completeness'] for m in entries]
@@ -2269,12 +2382,16 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
         if unmatched_entries:
             ux, uy = _jitter_unmatched(len(unmatched_entries))
             plt.scatter(ux, uy, color='gray', marker='x', alpha=0.8, s=100, linewidth=2,
-                        label=f"Unmatched ({len(unmatched_entries)})")
+                        label=f"Unmatched true, no reco match ({len(unmatched_entries)})")
+        if extra_reco_entries:
+            ex, ey = _jitter_extra_reco(len(extra_reco_entries))
+            plt.scatter(ex, ey, color=_EXTRA_RECO_COLOR, marker='+', alpha=0.9, s=120, linewidth=2,
+                        label=f"Extra reco, no 1-to-1 pair ({len(extra_reco_entries)})")
 
-        total = len(entries) + len(unmatched_entries)
+        total = len(entries) + len(unmatched_entries) + len(extra_reco_entries)
         plt.title(f"Completeness vs Purity - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
                   fontsize=16, fontweight='bold', wrap=True)
-        _format_axes()
+        _format_axes(with_extra_reco_box=bool(extra_reco_entries))
         plt.legend(fontsize=12)
         plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
         plt.savefig(output_dir / f"completeness_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
@@ -2284,7 +2401,9 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
     def _scatter_overlay(category_keys, group_label, filename_tag):
         entries_by_cat    = {k: [m for m in pair_metadata_list if _in_category(m, k)] for k in category_keys}
         unmatched_by_cat  = {k: [m for m in unmatched_metadata_list if _in_category(m, k)] for k in category_keys}
-        if not any(entries_by_cat.values()) and not any(unmatched_by_cat.values()):
+        extra_by_cat      = {k: [m for m in extra_reco_entries if _in_category(m, k)] for k in category_keys}
+        if not any(entries_by_cat.values()) and not any(unmatched_by_cat.values()) \
+                and not any(extra_by_cat.values()):
             return
 
         plt.figure(figsize=(14, 11))
@@ -2303,31 +2422,49 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
                 plt.scatter(ux, uy, color=info['color'], marker='x', alpha=0.8, s=90, linewidth=2,
                             label=f"{info['label']} unmatched ({len(unmatched)})")
 
-        total = sum(len(v) for v in entries_by_cat.values()) + sum(len(v) for v in unmatched_by_cat.values())
+            extra = extra_by_cat[category_key]
+            if extra:
+                ex, ey = _jitter_extra_reco(len(extra))
+                plt.scatter(ex, ey, color=info['color'], marker='+', alpha=0.9, s=110, linewidth=2,
+                            label=f"{info['label']} extra reco ({len(extra)})")
+
+        total = (sum(len(v) for v in entries_by_cat.values())
+                 + sum(len(v) for v in unmatched_by_cat.values())
+                 + sum(len(v) for v in extra_by_cat.values()))
         plt.title(f"Completeness vs Purity - {group_label} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
                   fontsize=16, fontweight='bold', wrap=True)
-        _format_axes()
+        _format_axes(with_extra_reco_box=any(extra_by_cat.values()))
         plt.legend(fontsize=11)
         plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
         plt.savefig(output_dir / f"completeness_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
                     dpi=150, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
-    def _colz(entries, category_name, filename_tag, unmatched_entries=None):
+    def _colz(entries, category_name, filename_tag, unmatched_entries=None, extra_reco_entries=None):
         unmatched_entries = unmatched_entries or []
-        if not entries and not unmatched_entries:
+        extra_reco_entries = extra_reco_entries or []
+        if not entries and not unmatched_entries and not extra_reco_entries:
             return
         purities     = [m['purity'] for m in entries]
         completenesses = [m['completeness'] for m in entries]
+        # Place all partnerless clusters at a single representative point inside their
+        # own box, so each kind collects into exactly one 2D-histogram cell.
         if unmatched_entries:
-            # Place all unmatched clusters at a single representative point inside the
-            # dedicated no-match bin, so they collect into that one 2D-histogram cell.
             box_mid = (_UNMATCHED_BOX_LO + _UNMATCHED_BOX_HI) / 2
             purities     = purities + [box_mid] * len(unmatched_entries)
             completenesses = completenesses + [box_mid] * len(unmatched_entries)
+        if extra_reco_entries:
+            box_mid = (_EXTRA_RECO_BOX_LO + _EXTRA_RECO_BOX_HI) / 2
+            purities     = purities + [box_mid] * len(extra_reco_entries)
+            completenesses = completenesses + [box_mid] * len(extra_reco_entries)
 
-        # One wide bin covering the no-match box, then regular bins across [0, 1]
-        edges = np.concatenate(([_UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI], np.linspace(0, 1, 41)[1:]))
+        # One wide bin per off-scale box, then regular bins across [0, 1]. The extra
+        # reco box's lower edge is always present so this variant's binning inside
+        # [0, 1] is identical whether or not the outer box is drawn; np.linspace's
+        # first edge IS _EXTRA_RECO_BOX_HI (0.0), so no duplicate edge is produced.
+        special_edges = ([_UNMATCHED_BOX_LO, _EXTRA_RECO_BOX_LO] if show_unmatched_box
+                         else [_EXTRA_RECO_BOX_LO])
+        edges = np.concatenate((special_edges, np.linspace(0, 1, 41)))
 
         plt.figure(figsize=(14, 11))
         h = plt.hist2d(purities, completenesses, bins=[edges, edges], cmap='YlOrRd')
@@ -2335,18 +2472,20 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
         cbar.set_label('Count', fontsize=18, fontweight='bold')
         cbar.ax.tick_params(labelsize=16)
 
-        total = len(entries) + len(unmatched_entries)
+        total = len(entries) + len(unmatched_entries) + len(extra_reco_entries)
         plt.title(f"Completeness vs Purity 2D Histogram - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
                   fontsize=16, fontweight='bold', wrap=True)
-        _format_axes()
+        _format_axes(with_extra_reco_box=bool(extra_reco_entries))
         plt.subplots_adjust(left=0.15, right=0.92, top=0.90, bottom=0.12)
         plt.savefig(output_dir / f"completeness_vs_purity_colz_{filename_tag}_{level_suffix}_{apa}.png",
                     dpi=150, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
-    # All clusters
-    _scatter(pair_metadata_list, "All Clusters", "all", unmatched_entries=unmatched_metadata_list)
-    _colz(pair_metadata_list, "All Clusters", "all", unmatched_entries=unmatched_metadata_list)
+    # All clusters -- every extra reco, including the ones no category could claim.
+    _scatter(pair_metadata_list, "All Clusters", "all", unmatched_entries=unmatched_metadata_list,
+             extra_reco_entries=extra_reco_entries)
+    _colz(pair_metadata_list, "All Clusters", "all", unmatched_entries=unmatched_metadata_list,
+          extra_reco_entries=extra_reco_entries)
 
     # Overlaid scatter groupings
     _scatter_overlay(['neutrino', 'cosmic'],
@@ -2360,11 +2499,13 @@ def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_
     for category_key in ['neutrino', 'cosmic', 'isochronous_cosmic', 'normal_cosmic', 'prolonged_cosmic']:
         category_entries   = [m for m in pair_metadata_list if _in_category(m, category_key)]
         category_unmatched = [m for m in unmatched_metadata_list if _in_category(m, category_key)]
+        category_extra     = [m for m in extra_reco_entries if _in_category(m, category_key)]
         info = _EFF_PUR_CATEGORY_STYLE[category_key]
         _scatter(category_entries, info['label'], category_key,
-                 unmatched_entries=category_unmatched, color=info['color'], marker=info['marker'])
+                 unmatched_entries=category_unmatched, color=info['color'], marker=info['marker'],
+                 extra_reco_entries=category_extra)
         _colz(category_entries, info['label'], category_key,
-              unmatched_entries=category_unmatched)
+              unmatched_entries=category_unmatched, extra_reco_entries=category_extra)
 
 # Function to match true and reco clusters based on purity and completeness results
 # make pairing based on highest purity for each true cluster, then ensure one-to-one matching by keeping only the best pair for each reco cluster

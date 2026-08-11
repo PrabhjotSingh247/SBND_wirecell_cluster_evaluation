@@ -4,15 +4,15 @@ from pathlib import Path
 
 def AnalyticResults(all_matched_pairs, output_dir=None):
     """
-    Perform comprehensive statistical analysis on efficiency and purity matched pairs.
+    Perform comprehensive statistical analysis on completeness and purity matched pairs.
     Optionally save results to a text file in output_dir.
     """
     if len(all_matched_pairs) == 0:
         print("No matched pairs to analyze")
         return
     
-    # Extract efficiency and purity values
-    efficiencies = [p['efficiency_energy_weighted'] for p in all_matched_pairs]
+    # Extract completeness and purity values
+    completenesses = [p['completeness_energy_weighted'] for p in all_matched_pairs]
     purities = [p['purity'] for p in all_matched_pairs]
     
     # Prepare output text
@@ -21,16 +21,16 @@ def AnalyticResults(all_matched_pairs, output_dir=None):
     output_text += "ANALYTIC RESULTS - Statistical Analysis\n"
     output_text += "="*70 + "\n"
     
-    # Efficiency Statistics
-    output_text += "\n[EFFICIENCY STATISTICS]\n"
-    output_text += f"  Mean:                {np.mean(efficiencies):.4f}\n"
-    output_text += f"  Std Dev:             {np.std(efficiencies):.4f}\n"
-    output_text += f"  Median:              {np.median(efficiencies):.4f}\n"
-    output_text += f"  Min:                 {np.min(efficiencies):.4f}\n"
-    output_text += f"  Max:                 {np.max(efficiencies):.4f}\n"
-    output_text += f"  25th Percentile:     {np.percentile(efficiencies, 25):.4f} (25% of clusters below this)\n"
-    output_text += f"  75th Percentile:     {np.percentile(efficiencies, 75):.4f} (75% of clusters below this)\n"
-    output_text += f"  95th Percentile:     {np.percentile(efficiencies, 95):.4f} (95% of clusters below this)\n"
+    # Completeness Statistics
+    output_text += "\n[COMPLETENESS STATISTICS]\n"
+    output_text += f"  Mean:                {np.mean(completenesses):.4f}\n"
+    output_text += f"  Std Dev:             {np.std(completenesses):.4f}\n"
+    output_text += f"  Median:              {np.median(completenesses):.4f}\n"
+    output_text += f"  Min:                 {np.min(completenesses):.4f}\n"
+    output_text += f"  Max:                 {np.max(completenesses):.4f}\n"
+    output_text += f"  25th Percentile:     {np.percentile(completenesses, 25):.4f} (25% of clusters below this)\n"
+    output_text += f"  75th Percentile:     {np.percentile(completenesses, 75):.4f} (75% of clusters below this)\n"
+    output_text += f"  95th Percentile:     {np.percentile(completenesses, 95):.4f} (95% of clusters below this)\n"
     
     # Purity Statistics
     output_text += "\n[PURITY STATISTICS]\n"
@@ -45,28 +45,28 @@ def AnalyticResults(all_matched_pairs, output_dir=None):
     
     # Combined Statistics
     output_text += "\n[COMBINED STATISTICS]\n"
-    combined_scores = [(e + p) / 2 for e, p in zip(efficiencies, purities)]
+    combined_scores = [(e + p) / 2 for e, p in zip(completenesses, purities)]
     output_text += f"  Mean Combined Score: {np.mean(combined_scores):.4f}\n"
     output_text += f"  Std Dev Combined:    {np.std(combined_scores):.4f}\n"
     
     # Count statistics
     output_text += "\n[PERFORMANCE COUNTS]\n"
-    high_eff = sum(1 for e in efficiencies if e > 0.9)
+    high_eff = sum(1 for e in completenesses if e > 0.9)
     high_pur = sum(1 for p in purities if p > 0.9)
-    eff_80 = sum(1 for e in efficiencies if e > 0.8)
+    eff_80 = sum(1 for e in completenesses if e > 0.8)
     pur_80 = sum(1 for p in purities if p > 0.8)
-    good_both = sum(1 for e, p in zip(efficiencies, purities) if e > 0.8 and p > 0.8)
+    good_both = sum(1 for e, p in zip(completenesses, purities) if e > 0.8 and p > 0.8)
     
-    output_text += f"  Clusters with Eff > 0.9:              {high_eff} ({100*high_eff/len(efficiencies):.1f}%)\n"
+    output_text += f"  Clusters with Eff > 0.9:              {high_eff} ({100*high_eff/len(completenesses):.1f}%)\n"
     output_text += f"  Clusters with Pur > 0.9:              {high_pur} ({100*high_pur/len(purities):.1f}%)\n"
-    output_text += f"  Clusters with Eff > 0.8:              {eff_80} ({100*eff_80/len(efficiencies):.1f}%)\n"
+    output_text += f"  Clusters with Eff > 0.8:              {eff_80} ({100*eff_80/len(completenesses):.1f}%)\n"
     output_text += f"  Clusters with Pur > 0.8:              {pur_80} ({100*pur_80/len(purities):.1f}%)\n"
-    output_text += f"  Clusters with BOTH Eff>0.8 & Pur>0.8: {good_both} ({100*good_both/len(efficiencies):.1f}%)\n"
+    output_text += f"  Clusters with BOTH Eff>0.8 & Pur>0.8: {good_both} ({100*good_both/len(completenesses):.1f}%)\n"
     
     # Correlation
     output_text += "\n[CORRELATION]\n"
-    correlation = np.corrcoef(efficiencies, purities)[0, 1]
-    output_text += f"  Efficiency-Purity Correlation: {correlation:.4f}\n"
+    correlation = np.corrcoef(completenesses, purities)[0, 1]
+    output_text += f"  Completeness-Purity Correlation: {correlation:.4f}\n"
     
     output_text += "\n" + "="*70 + "\n"
     

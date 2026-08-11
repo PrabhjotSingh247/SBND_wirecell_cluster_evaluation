@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.spatial import KDTree
 
-# Evaluate reconstruction efficiency by comparing true and reconstructed clusters using KDTree spatial matching
-# Returns list of efficiency metrics for matched cluster pairs, with unmatched true clusters marked as reco_cluster_id=8888
-def EvaluateEfficiency(clusters_true, clusters_reco, event, radius_efficiency=1, min_recopoints_threshold=5):
-    efficiency_results = []
+# Evaluate reconstruction completeness by comparing true and reconstructed clusters using KDTree spatial matching
+# Returns list of completeness metrics for matched cluster pairs, with unmatched true clusters marked as reco_cluster_id=8888
+def EvaluateCompleteness(clusters_true, clusters_reco, event, radius_completeness=1, min_recopoints_threshold=5):
+    completeness_results = []
     matched_true_cids = set()  # Track which true clusters found a match
     
     # loop over true clusters and find matching reco clusters based on spatial proximity using KDTree
@@ -22,21 +22,21 @@ def EvaluateEfficiency(clusters_true, clusters_reco, event, radius_efficiency=1,
             reco_coords = reco_points[:, :3]
             
             reco_tree   = KDTree(reco_coords)
-            indices     = reco_tree.query_ball_point(true_coords, r=radius_efficiency)
+            indices     = reco_tree.query_ball_point(true_coords, r=radius_completeness)
             
             matched_true_points_energy = np.sum([true_energies[i] for i, neighbors in enumerate(indices) if len(neighbors) > min_recopoints_threshold])
             total_true_energy = np.sum(true_energies)
             
-            efficiency_energy_weighted = matched_true_points_energy / total_true_energy if total_true_energy > 0 else 0
+            completeness_energy_weighted = matched_true_points_energy / total_true_energy if total_true_energy > 0 else 0
             
-            # Only keep pairs with non-zero efficiency
-            if efficiency_energy_weighted > 0:
+            # Only keep pairs with non-zero completeness
+            if completeness_energy_weighted > 0:
                 matched_true_cids.add(true_cluster_id)
-                efficiency_results.append({
+                completeness_results.append({
                     'event': event,
                     'true_cluster_id': true_cluster_id,
                     'reco_cluster_id': reco_cluster_id,
-                    'efficiency_energy_weighted': efficiency_energy_weighted,
+                    'completeness_energy_weighted': completeness_energy_weighted,
                     'matched_true_cluster_energy': matched_true_points_energy,
                     'total_true_cluster_energy': total_true_energy
                 })    
@@ -48,17 +48,17 @@ def EvaluateEfficiency(clusters_true, clusters_reco, event, radius_efficiency=1,
             true_pts            = np.array(true_pts)
             total_true_energy   = np.sum(true_pts[:, 5])
             if total_true_energy > 0:
-                efficiency_results.append({
+                completeness_results.append({
                     'event': event,
                     'true_cluster_id': cid_true,
                     'reco_cluster_id': 8888,  # Sentinel for unmatched
-                    'efficiency_energy_weighted': 0,  # Sentinel for unmatched
+                    'completeness_energy_weighted': 0,  # Sentinel for unmatched
                     'matched_true_cluster_energy': 0.0,
                     'total_true_cluster_energy': total_true_energy
                 })
     
-    #print(f"  [DEBUG EvaluateEfficiency] Event {event}: {len(matched_true_cids)} matched, {unmatched_count} unmatched, {len(efficiency_results)} total results")
-    return efficiency_results
+    #print(f"  [DEBUG EvaluateCompleteness] Event {event}: {len(matched_true_cids)} matched, {unmatched_count} unmatched, {len(completeness_results)} total results")
+    return completeness_results
 
 # Evaluate cluster purity by measuring the fraction of reconstructed points matching true cluster locations using KDTree projection matching
 # Returns list of purity metrics for matched cluster pairs, with unmatched reco clusters marked as true_cluster_id=8888 and purity=-0.1

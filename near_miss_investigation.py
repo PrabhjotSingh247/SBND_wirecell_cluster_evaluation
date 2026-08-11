@@ -1,10 +1,10 @@
 """
 Standalone diagnostic script (not part of the main notebook pipeline): for each
 true cluster in a chosen file/event range, finds its nearest reco cluster via
-KDTree nearest-neighbor search (independent of EvaluateEfficiency's official
-match, which requires >min_recopoints_threshold points within radius_efficiency),
+KDTree nearest-neighbor search (independent of EvaluateCompleteness's official
+match, which requires >min_recopoints_threshold points within radius_completeness),
 to distinguish "true near-misses just outside the matching radius" from "no
-nearby reco cluster at all" among EvaluateEfficiency's unmatched clusters.
+nearby reco cluster at all" among EvaluateCompleteness's unmatched clusters.
 
 Run directly: python near_miss_investigation.py
 Output: multi_file_plots_charge_light_matching/near_miss_investigation_{TARGET_FILE}_events{EVENT_LOW}-{EVENT_HIGH-1}.txt
@@ -23,7 +23,7 @@ from selections import (
     apply_wire_readout_sensitive_yz_plane_cut_reco,
     apply_deadarea_cut_true_charge_light,
 )
-from efficiency_purity_estimate import EvaluateEfficiency
+from completeness_purity_estimate import EvaluateCompleteness
 
 # ============================================================================
 # CONFIG -- same selection settings as Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb
@@ -34,7 +34,7 @@ EVENT_LOW     = None    # None = auto-detect from each file's data/ (all events 
 EVENT_HIGH    = None    # exclusive; None = auto-detect
 OUTPUT_DIR    = Path("multi_file_plots_charge_light_matching")
 
-radius_efficiency        = 2
+radius_completeness        = 2
 min_recopoints_threshold = 5
 min_cluster_energy       = 100
 x_min, x_max = -250.0, 250.0
@@ -80,7 +80,7 @@ def find_near_miss_rows(clusters_true, clusters_reco, matched_true_cids, evt, fi
     For every true cluster, KDTree-search every reco cluster in the same event
     to find the reco cluster with the single smallest point-to-point distance
     to any of the true cluster's points (min_dist) -- NOT necessarily the
-    cluster EvaluateEfficiency officially matched. mean_nn_dist is the mean
+    cluster EvaluateCompleteness officially matched. mean_nn_dist is the mean
     nearest-neighbor distance across ALL of the true cluster's points to that
     same nearest reco cluster. offset_dx/dy/dz = mean(true_point -
     nearest_reco_point) over the true cluster's points.
@@ -183,8 +183,8 @@ def main():
             clusters_reco = GroupClustersByID(predicted_points)
 
             event_key = f"{file_name}_{evt}"
-            efficiency_results = EvaluateEfficiency(clusters_true, clusters_reco, event_key, radius_efficiency, min_recopoints_threshold)
-            matched_true_cids = {e['true_cluster_id'] for e in efficiency_results if e['reco_cluster_id'] != 8888}
+            completeness_results = EvaluateCompleteness(clusters_true, clusters_reco, event_key, radius_completeness, min_recopoints_threshold)
+            matched_true_cids = {e['true_cluster_id'] for e in completeness_results if e['reco_cluster_id'] != 8888}
 
             event_rows = find_near_miss_rows(clusters_true, clusters_reco, matched_true_cids, evt, file_name)
             all_rows.extend(event_rows)
@@ -217,14 +217,14 @@ def main():
         f.write("Context: for each true cluster, 'nearest_reco' is the reco cluster with the smallest\n"
                 "single point-to-point distance to any of the true cluster's points (min_dist), found via\n"
                 "KDTree nearest-neighbor search against every reco cluster in the same event -- NOT\n"
-                "necessarily the cluster EvaluateEfficiency officially matched. Only UNMATCHED true\n"
+                "necessarily the cluster EvaluateCompleteness officially matched. Only UNMATCHED true\n"
                 "clusters are listed below (matched clusters align to ~0.01-0.1cm and aren't informative\n"
                 "here); mean_nn_dist is the mean nearest-neighbor distance across ALL of the true cluster's\n"
                 "points to that same nearest reco cluster (large mean_nn_dist despite tiny min_dist = the\n"
                 "true cluster only partially/tangentially overlaps that reco cluster). offset_dx/dy/dz =\n"
                 "mean(true_point - nearest_reco_point) over the true cluster's points, i.e. signed direction\n"
                 "of the residual gap.\n\n")
-        f.write(f"Pipeline settings: radius_efficiency={radius_efficiency}cm, "
+        f.write(f"Pipeline settings: radius_completeness={radius_completeness}cm, "
                 f"min_recopoints_threshold={min_recopoints_threshold}, energy cutoff={min_cluster_energy} MeV,\n"
                 f"wire-readout + dead-area cuts applied, reco clusters grouped by real_cluster_id then\n"
                 f"reassign_cluster_ID_reco (avg-X relabeling); true clusters via\n"

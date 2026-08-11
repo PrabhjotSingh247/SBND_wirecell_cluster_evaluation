@@ -27,13 +27,13 @@ matplotlib.use("Agg")  # headless backend - required when rendering from a subpr
 import numpy as np
 
 from root_reconstruction import RootEventStore
-from efficiency_purity_draw import (
-    plot_efficiency_heatmap, plot_purity_heatmap,
-    DrawEfficiencyVsTrueEnergyPerEvent, DrawEfficiencyVsTrueEnergyPerFile,
-    DrawClusterEfficiencyVsTrueEnergyPerEvent, DrawClusterEfficiencyVsTrueEnergyPerFile,
-    DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent, DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile,
+from completeness_purity_draw import (
+    plot_completeness_heatmap, plot_purity_heatmap,
+    DrawCompletenessVsTrueEnergyPerEvent, DrawCompletenessVsTrueEnergyPerFile,
+    DrawClusterCompletenessVsTrueEnergyPerEvent, DrawClusterCompletenessVsTrueEnergyPerFile,
+    DrawCompletenessVsTrueEnergy_MatchedPairs_PerEvent, DrawCompletenessVsTrueEnergy_MatchedPairs_PerFile,
     DrawPurityVsRecoChargePerEvent, DrawPurityVsRecoChargePerFile,
-    DrawEfficiencyVsPurity_MatchedPairs,
+    DrawCompletenessVsPurity_MatchedPairs,
 )
 from DrawRecoTrueClusters import (
     DrawTrueRecoClustersXZ, DrawTrueRecoClustersYZ, DrawTrueRecoClustersXY,
@@ -43,8 +43,8 @@ from DrawRecoTrueClusters import (
 )
 
 
-def efficiency_results_per_cluster_like(true_rows):
-    """One row per true cluster - exact (matches what DrawEfficiencyVsTrueEnergyPerEvent/
+def completeness_results_per_cluster_like(true_rows):
+    """One row per true cluster - exact (matches what DrawCompletenessVsTrueEnergyPerEvent/
     PerFile/PerJob re-aggregate to internally anyway)."""
     results = []
     for r in true_rows:
@@ -52,7 +52,7 @@ def efficiency_results_per_cluster_like(true_rows):
         reco_id = 8888 if matched_ids is None or len(matched_ids) == 0 else matched_ids[0]
         results.append({
             "event": r["event"], "true_cluster_id": r["true_cluster_id"], "reco_cluster_id": reco_id,
-            "efficiency_energy_weighted": r.get("total_efficiency", 0),
+            "completeness_energy_weighted": r.get("total_completeness", 0),
             "total_true_cluster_energy": r.get("total_true_energy", 0),
         })
     return results
@@ -65,14 +65,14 @@ def _matched_ids(r):
     return [] if v is None else list(v)
 
 
-def efficiency_results_pairs_like(true_rows, matched_pairs):
+def completeness_results_pairs_like(true_rows, matched_pairs):
     matched_true_ids = {p["true_cluster_id"] for p in matched_pairs}
     results = [{"true_cluster_id": p["true_cluster_id"], "reco_cluster_id": p["reco_cluster_id"],
-                "efficiency_energy_weighted": p["efficiency_energy_weighted"]} for p in matched_pairs]
+                "completeness_energy_weighted": p["completeness_energy_weighted"]} for p in matched_pairs]
     for r in true_rows:
         if r["true_cluster_id"] not in matched_true_ids:
             results.append({"true_cluster_id": r["true_cluster_id"], "reco_cluster_id": 8888,
-                             "efficiency_energy_weighted": 0})
+                             "completeness_energy_weighted": 0})
     return results
 
 
@@ -130,22 +130,22 @@ def process_one_file(root_path, file_name, apa, view, file_output_dir, root_file
         PLOTDIR_EVT = event_output_dir
         root_event_dir = f"{root_file_dir}/event_{evt:03d}"
 
-        efficiency_dir = event_output_dir / "efficiency"
+        completeness_dir = event_output_dir / "completeness"
         purity_dir = event_output_dir / "purity"
-        efficiency_dir.mkdir(parents=True, exist_ok=True)
+        completeness_dir.mkdir(parents=True, exist_ok=True)
         purity_dir.mkdir(parents=True, exist_ok=True)
 
-        eff_vs_purity_incl_dir = event_output_dir / "true_reco_matched_pair_efficiency_purity_including_unmatched_true_clusters"
-        eff_vs_purity_excl_dir = event_output_dir / "true_reco_matched_pair_efficiency_purity_excluding_unmatched_true_clusters"
+        eff_vs_purity_incl_dir = event_output_dir / "true_reco_matched_pair_completeness_purity_including_unmatched_true_clusters"
+        eff_vs_purity_excl_dir = event_output_dir / "true_reco_matched_pair_completeness_purity_excluding_unmatched_true_clusters"
         eff_vs_purity_incl_dir.mkdir(parents=True, exist_ok=True)
         eff_vs_purity_excl_dir.mkdir(parents=True, exist_ok=True)
 
-        efficiency_2d1d_imaging_dir = efficiency_dir / "efficiency_2d_1d_imaging_level"
-        efficiency_2d1d_clustering_dir = efficiency_dir / "efficiency_2d_1d_clusteringlevel"
-        efficiency_2d1d_clustering_pairs_only_dir = efficiency_dir / "efficiency_2d_1d_clusteringlevel_true_reco_pairs_only"
-        efficiency_2d1d_imaging_dir.mkdir(parents=True, exist_ok=True)
-        efficiency_2d1d_clustering_dir.mkdir(parents=True, exist_ok=True)
-        efficiency_2d1d_clustering_pairs_only_dir.mkdir(parents=True, exist_ok=True)
+        completeness_2d1d_imaging_dir = completeness_dir / "completeness_2d_1d_imaging_level"
+        completeness_2d1d_clustering_dir = completeness_dir / "completeness_2d_1d_clusteringlevel"
+        completeness_2d1d_clustering_pairs_only_dir = completeness_dir / "completeness_2d_1d_clusteringlevel_true_reco_pairs_only"
+        completeness_2d1d_imaging_dir.mkdir(parents=True, exist_ok=True)
+        completeness_2d1d_clustering_dir.mkdir(parents=True, exist_ok=True)
+        completeness_2d1d_clustering_pairs_only_dir.mkdir(parents=True, exist_ok=True)
 
         clusters_true = store.clusters_true(file_name, evt, apa)
         clusters_reco = store.clusters_reco(file_name, evt, apa)
@@ -180,39 +180,39 @@ def process_one_file(root_path, file_name, apa, view, file_output_dir, root_file
 
         # ---- heatmaps (exact per-pair values) ----
         matched_pairs = store.matched_pairs_exact(file_name, evt, apa)
-        plot_efficiency_heatmap(efficiency_results_pairs_like(true_rows, matched_pairs), evt, apa, efficiency_dir, file_name)
+        plot_completeness_heatmap(completeness_results_pairs_like(true_rows, matched_pairs), evt, apa, completeness_dir, file_name)
         plot_purity_heatmap(purity_results_pairs_like(reco_rows, matched_pairs), evt, apa, purity_dir, file_name)
 
         # ---- true cluster with matched reco clusters (exact per-pair values) ----
         for matched_info in store.matched_info_list(file_name, evt, apa):
-            DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, efficiency_dir, evt, apa, file_name)
+            DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, completeness_dir, evt, apa, file_name)
 
-        # ---- efficiency vs true energy ----
-        eff_like = efficiency_results_per_cluster_like(true_rows)
-        DrawEfficiencyVsTrueEnergyPerEvent(eff_like, efficiency_2d1d_imaging_dir, evt, apa, file_name, cluster_category_results=cluster_category_results)
-        DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_rows, efficiency_2d1d_clustering_dir, evt, apa, file_name, all_true_metadata_list=true_rows)
-        DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_rows, efficiency_2d1d_clustering_pairs_only_dir, evt, apa, file_name)
+        # ---- completeness vs true energy ----
+        eff_like = completeness_results_per_cluster_like(true_rows)
+        DrawCompletenessVsTrueEnergyPerEvent(eff_like, completeness_2d1d_imaging_dir, evt, apa, file_name, cluster_category_results=cluster_category_results)
+        DrawClusterCompletenessVsTrueEnergyPerEvent(pair_rows, completeness_2d1d_clustering_dir, evt, apa, file_name, all_true_metadata_list=true_rows)
+        DrawCompletenessVsTrueEnergy_MatchedPairs_PerEvent(pair_rows, completeness_2d1d_clustering_pairs_only_dir, evt, apa, file_name)
 
         # ---- purity vs reco charge ----
         DrawPurityVsRecoChargePerEvent(pair_rows, purity_dir, evt, apa, file_name)
-        DrawEfficiencyVsPurity_MatchedPairs(pair_rows, eff_vs_purity_incl_dir, f'Event {evt}', apa, file_name, all_true_metadata_list=true_rows)
-        DrawEfficiencyVsPurity_MatchedPairs(pair_rows, eff_vs_purity_excl_dir, f'Event {evt}', apa, file_name, all_true_metadata_list=None)
+        DrawCompletenessVsPurity_MatchedPairs(pair_rows, eff_vs_purity_incl_dir, f'Event {evt}', apa, file_name, all_true_metadata_list=true_rows)
+        DrawCompletenessVsPurity_MatchedPairs(pair_rows, eff_vs_purity_excl_dir, f'Event {evt}', apa, file_name, all_true_metadata_list=None)
 
         DrawTrueRecoMatchMultiplicity(true_rows, event_output_dir, apa, f'Event {evt}', f'event_{evt}', file_name=file_name)
 
         # ---- mirrored ROOT histograms, deferred for the parent process to write ----
         energies_evt = np.array([r["total_true_energy"] for r in true_rows])
-        effs_evt = np.array([r["total_efficiency"] for r in true_rows])
-        histogram_records.append({"kind": "th2", "dir": f"{root_event_dir}/efficiency", "name": "efficiency_vs_true_energy_2d",
+        effs_evt = np.array([r["total_completeness"] for r in true_rows])
+        histogram_records.append({"kind": "th2", "dir": f"{root_event_dir}/completeness", "name": "completeness_vs_true_energy_2d",
                                    "x": energies_evt, "y": effs_evt, "xbins": 50, "ybins": 50})
         if pair_rows:
             charges_evt = np.array([r["total_reco_charge"] for r in pair_rows])
             purities_evt = np.array([r["purity"] for r in pair_rows])
             histogram_records.append({"kind": "th2", "dir": f"{root_event_dir}/purity", "name": "purity_vs_reco_charge_2d",
                                        "x": charges_evt, "y": purities_evt, "xbins": 50, "ybins": 50})
-            histogram_records.append({"kind": "th2", "dir": f"{root_event_dir}/true_reco_matched_pair_efficiency_purity",
-                                       "name": "efficiency_vs_purity",
-                                       "x": np.array([r["efficiency"] for r in pair_rows]), "y": purities_evt,
+            histogram_records.append({"kind": "th2", "dir": f"{root_event_dir}/true_reco_matched_pair_completeness_purity",
+                                       "name": "completeness_vs_purity",
+                                       "x": np.array([r["completeness"] for r in pair_rows]), "y": purities_evt,
                                        "xbins": 50, "ybins": 50})
 
         total_events_processed += 1
@@ -225,35 +225,35 @@ def process_one_file(root_path, file_name, apa, view, file_output_dir, root_file
         agg_output_dir.mkdir(parents=True, exist_ok=True)
         root_file_summary_dir = f"{root_file_dir}/file_summary"
 
-        file_efficiency_2d1d_imaging_dir = agg_output_dir / "efficiency" / "efficiency_2d_1d_imaging_level"
-        file_efficiency_2d1d_clustering_dir = agg_output_dir / "efficiency" / "efficiency_2d_1d_clusteringlevel"
-        file_efficiency_2d1d_clustering_pairs_only_dir = agg_output_dir / "efficiency" / "efficiency_2d_1d_clusteringlevel_true_reco_pairs_only"
-        file_efficiency_2d1d_imaging_dir.mkdir(parents=True, exist_ok=True)
-        file_efficiency_2d1d_clustering_dir.mkdir(parents=True, exist_ok=True)
-        file_efficiency_2d1d_clustering_pairs_only_dir.mkdir(parents=True, exist_ok=True)
+        file_completeness_2d1d_imaging_dir = agg_output_dir / "completeness" / "completeness_2d_1d_imaging_level"
+        file_completeness_2d1d_clustering_dir = agg_output_dir / "completeness" / "completeness_2d_1d_clusteringlevel"
+        file_completeness_2d1d_clustering_pairs_only_dir = agg_output_dir / "completeness" / "completeness_2d_1d_clusteringlevel_true_reco_pairs_only"
+        file_completeness_2d1d_imaging_dir.mkdir(parents=True, exist_ok=True)
+        file_completeness_2d1d_clustering_dir.mkdir(parents=True, exist_ok=True)
+        file_completeness_2d1d_clustering_pairs_only_dir.mkdir(parents=True, exist_ok=True)
 
         file_purity_summary_dir = agg_output_dir / "purity"
         file_purity_summary_dir.mkdir(parents=True, exist_ok=True)
 
-        file_eff_vs_purity_incl_dir = agg_output_dir / "true_reco_matched_pair_efficiency_purity_including_unmatched_true_clusters"
-        file_eff_vs_purity_excl_dir = agg_output_dir / "true_reco_matched_pair_efficiency_purity_excluding_unmatched_true_clusters"
+        file_eff_vs_purity_incl_dir = agg_output_dir / "true_reco_matched_pair_completeness_purity_including_unmatched_true_clusters"
+        file_eff_vs_purity_excl_dir = agg_output_dir / "true_reco_matched_pair_completeness_purity_excluding_unmatched_true_clusters"
         file_eff_vs_purity_incl_dir.mkdir(parents=True, exist_ok=True)
         file_eff_vs_purity_excl_dir.mkdir(parents=True, exist_ok=True)
 
-        file_eff_like = efficiency_results_per_cluster_like(file_true_rows)
-        file_energies, file_effs = DrawEfficiencyVsTrueEnergyPerFile(
-            file_eff_like, file_efficiency_2d1d_imaging_dir, apa, file_name, file_metadata_list=file_true_rows) or ([], [])
-        DrawClusterEfficiencyVsTrueEnergyPerFile(file_pair_metadata_list, file_efficiency_2d1d_clustering_dir, apa, file_name, all_true_metadata_list=file_true_rows)
-        DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(file_pair_metadata_list, file_efficiency_2d1d_clustering_pairs_only_dir, apa, file_name)
+        file_eff_like = completeness_results_per_cluster_like(file_true_rows)
+        file_energies, file_effs = DrawCompletenessVsTrueEnergyPerFile(
+            file_eff_like, file_completeness_2d1d_imaging_dir, apa, file_name, file_metadata_list=file_true_rows) or ([], [])
+        DrawClusterCompletenessVsTrueEnergyPerFile(file_pair_metadata_list, file_completeness_2d1d_clustering_dir, apa, file_name, all_true_metadata_list=file_true_rows)
+        DrawCompletenessVsTrueEnergy_MatchedPairs_PerFile(file_pair_metadata_list, file_completeness_2d1d_clustering_pairs_only_dir, apa, file_name)
         DrawPurityVsRecoChargePerFile(file_pair_metadata_list, file_purity_summary_dir, apa, file_name)
-        DrawEfficiencyVsPurity_MatchedPairs(file_pair_metadata_list, file_eff_vs_purity_incl_dir, 'File Level', apa, file_name, all_true_metadata_list=file_true_rows)
-        DrawEfficiencyVsPurity_MatchedPairs(file_pair_metadata_list, file_eff_vs_purity_excl_dir, 'File Level', apa, file_name, all_true_metadata_list=None)
+        DrawCompletenessVsPurity_MatchedPairs(file_pair_metadata_list, file_eff_vs_purity_incl_dir, 'File Level', apa, file_name, all_true_metadata_list=file_true_rows)
+        DrawCompletenessVsPurity_MatchedPairs(file_pair_metadata_list, file_eff_vs_purity_excl_dir, 'File Level', apa, file_name, all_true_metadata_list=None)
         DrawLabelPerFile(file_true_rows, agg_output_dir, apa, file_name)
         DrawTrueRecoMatchMultiplicity(file_true_rows, agg_output_dir, apa, 'File Level', 'file', file_name=file_name)
 
         if file_energies is not None and len(file_energies):
-            histogram_records.append({"kind": "th1", "dir": f"{root_file_summary_dir}/efficiency",
-                                       "name": "efficiency_vs_true_energy_1d_file", "values": np.array(file_effs), "bins": 20})
+            histogram_records.append({"kind": "th1", "dir": f"{root_file_summary_dir}/completeness",
+                                       "name": "completeness_vs_true_energy_1d_file", "values": np.array(file_effs), "bins": 20})
         neutrino_n = sum(1 for r in file_true_rows if r["cluster_type"] == "neutrino")
         cosmic_n = sum(1 for r in file_true_rows if r["cluster_type"] == "cosmic")
         histogram_records.append({"kind": "th1_counts", "dir": root_file_summary_dir,

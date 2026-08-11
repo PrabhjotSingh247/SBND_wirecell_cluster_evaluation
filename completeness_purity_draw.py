@@ -11,7 +11,7 @@ def _draw_empty_placeholder(message, title, output_path, xlabel=None, ylabel=Non
 
     An event can legitimately contain no true-reco match at all -- e.g. with the
     beam-window cut on, an event whose reco clusters are all out of spill leaves
-    every true cluster unmatched (efficiency 0, reco id 8888). That is a real
+    every true cluster unmatched (completeness 0, reco id 8888). That is a real
     result, not an error, so the plot for it is still written: a missing file is
     indistinguishable from a crashed job when scanning an output tree.
     """
@@ -28,43 +28,43 @@ def _draw_empty_placeholder(message, title, output_path, xlabel=None, ylabel=Non
     plt.close()
 
 
-def plot_efficiency_heatmap(efficiency_results, event, apa, output_dir, file_name=None):
-    """Plot energy-weighted efficiency values as a heatmap for visual inspection of cluster matching."""
-    output_path = output_dir / f"efficiency_energy_weighted_evt_{event}_{apa}.png"
-    title = f"Energy-Weighted Efficiency: Event {event}, {apa}"
+def plot_completeness_heatmap(completeness_results, event, apa, output_dir, file_name=None):
+    """Plot energy-weighted completeness values as a heatmap for visual inspection of cluster matching."""
+    output_path = output_dir / f"completeness_energy_weighted_evt_{event}_{apa}.png"
+    title = f"Energy-Weighted Completeness: Event {event}, {apa}"
     if file_name:
         title += f" ({file_name})"
 
-    # No efficiency rows at all (no true cluster survived the cuts)
-    if not efficiency_results:
+    # No completeness rows at all (no true cluster survived the cuts)
+    if not completeness_results:
         _draw_empty_placeholder("No true clusters in this event", title, output_path,
                                 "Reco Cluster ID", "True Cluster ID")
         return
 
-    df = pd.DataFrame(efficiency_results)
-    efficiency_matrix = df.pivot_table(
+    df = pd.DataFrame(completeness_results)
+    completeness_matrix = df.pivot_table(
         index='true_cluster_id',
         columns='reco_cluster_id',
-        values='efficiency_energy_weighted',
+        values='completeness_energy_weighted',
         fill_value=0
     )
 
     # avoid to draw reco cluster if it's id is 8888 (sentinel for unmatched)
-    efficiency_matrix = efficiency_matrix.loc[:, efficiency_matrix.columns != 8888]
+    completeness_matrix = completeness_matrix.loc[:, completeness_matrix.columns != 8888]
 
     # Every true cluster went unmatched, so 8888 was the only column and the matrix
     # is now empty -- seaborn's heatmap raises on a zero-size array. Draw the
     # placeholder instead of failing the whole job.
-    if efficiency_matrix.empty or efficiency_matrix.shape[1] == 0:
+    if completeness_matrix.empty or completeness_matrix.shape[1] == 0:
         _draw_empty_placeholder(
-            f"No true-reco matches in this event\n({len(df['true_cluster_id'].unique())} true cluster(s), all unmatched, efficiency = 0)",
+            f"No true-reco matches in this event\n({len(df['true_cluster_id'].unique())} true cluster(s), all unmatched, completeness = 0)",
             title, output_path, "Reco Cluster ID", "True Cluster ID")
         return
 
     plt.figure(figsize=(10, 8))
-    sns.heatmap(efficiency_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
-                xticklabels=[f"{int(x):d}" for x in efficiency_matrix.columns],
-                yticklabels=[f"{int(y):d}" for y in efficiency_matrix.index])
+    sns.heatmap(completeness_matrix, annot=True, fmt=".2f", cmap="YlGnBu",
+                xticklabels=[f"{int(x):d}" for x in completeness_matrix.columns],
+                yticklabels=[f"{int(y):d}" for y in completeness_matrix.index])
     plt.title(title, wrap=True)
     plt.xlabel("Reco Cluster ID")
     plt.ylabel("True Cluster ID")
@@ -96,7 +96,7 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     # avoid to draw reco cluster if it's id is 8888 (sentinel for unmatched)
     purity_matrix = purity_matrix.loc[:, purity_matrix.columns != 8888]
 
-    # Same zero-size guard as the efficiency heatmap: every reco cluster unmatched
+    # Same zero-size guard as the completeness heatmap: every reco cluster unmatched
     # (true_cluster_id=8888) leaves nothing to draw.
     if purity_matrix.empty or purity_matrix.shape[1] == 0:
         _draw_empty_placeholder(
@@ -115,14 +115,14 @@ def plot_purity_heatmap(purity_results, event, apa, output_dir, file_name=None):
     plt.close()
     ##plt.show(block=False)
 
-def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None, num_clusters=None):
+def plot_2d_completeness_energy(energies, completenesses, output_dir, event, apa, category_name="All Clusters", file_name=None, num_events=None, num_clusters=None):
     """
-    Draw 2D histogram of Efficiency vs True Energy for a cluster category.
-    Returns the energies and efficiencies lists for use in 1D projections.
+    Draw 2D histogram of Completeness vs True Energy for a cluster category.
+    Returns the energies and completenesses lists for use in 1D projections.
 
     Args:
         energies: List of energy values
-        efficiencies: List of efficiency values
+        completenesses: List of completeness values
         output_dir: Output directory for saving plots
         event: Event number (for single event) or 0 (for aggregated data)
         apa: APA number
@@ -131,8 +131,8 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
         num_events: Optional number of events aggregated (if provided, shows event count instead of event number)
         num_clusters: Optional number of true clusters that went into this plot (shown alongside num_events)
     """
-    if not energies or not efficiencies:
-        return energies, efficiencies
+    if not energies or not completenesses:
+        return energies, completenesses
 
     plt.figure(figsize=(10, 8))
     x_bin_size = 50  # MeV
@@ -140,18 +140,18 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
     y_bin_size = 0.05
     ybins = np.arange(0, 1 + y_bin_size, y_bin_size)
 
-    plt.hist2d(energies, efficiencies, bins=[xbins, ybins], cmap='YlGnBu')
+    plt.hist2d(energies, completenesses, bins=[xbins, ybins], cmap='YlGnBu')
     plt.colorbar(label='Count')
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
 
     # Create title based on whether this is a single event or aggregated data
     if num_events is not None:
-        title = f'Efficiency vs True Energy (2D) - {category_name} - {num_events} events, {apa}'
+        title = f'Completeness vs True Energy (2D) - {category_name} - {num_events} events, {apa}'
         if num_clusters is not None:
             title += f', {num_clusters} true clusters'
     else:
-        title = f'Efficiency vs True Energy (2D) - {category_name} - Event {event}, {apa}'
+        title = f'Completeness vs True Energy (2D) - {category_name} - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -161,44 +161,44 @@ def plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa, ca
     # Save with appropriate filename based on category
     category_suffix = category_name.lower().replace(' ', '_').replace('_clusters', '')
     if num_events is not None:
-        filename = f"efficiency_vs_true_energy_2d_{category_suffix}_{num_events}events_{apa}.png"
+        filename = f"completeness_vs_true_energy_2d_{category_suffix}_{num_events}events_{apa}.png"
         if num_clusters is not None:
-            filename = f"efficiency_vs_true_energy_2d_{category_suffix}_{num_events}events_{num_clusters}trueclusters_{apa}.png"
+            filename = f"completeness_vs_true_energy_2d_{category_suffix}_{num_events}events_{num_clusters}trueclusters_{apa}.png"
     else:
-        filename = f"efficiency_vs_true_energy_2d_{category_suffix}_event_{event}_{apa}.png"
+        filename = f"completeness_vs_true_energy_2d_{category_suffix}_event_{event}_{apa}.png"
     plt.savefig(output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-    return energies, efficiencies
+    return energies, completenesses
 
-def plot_1d_efficiency_energy(energies, efficiencies, energy_bins):
+def plot_1d_completeness_energy(energies, completenesses, energy_bins):
     """
-    Create 1D projection by binning energy and averaging efficiency values.
-    Returns bin centers and mean efficiencies for plotting.
+    Create 1D projection by binning energy and averaging completeness values.
+    Returns bin centers and mean completenesses for plotting.
     """
-    if not energies or not efficiencies:
+    if not energies or not completenesses:
         return [], []
 
     bin_centers = (energy_bins[:-1] + energy_bins[1:]) / 2
     bin_centers_nonzero = []
-    mean_efficiency_per_bin = []
+    mean_completeness_per_bin = []
 
     for i in range(len(energy_bins)-1):
         mask = (np.array(energies) >= energy_bins[i]) & (np.array(energies) < energy_bins[i+1])
         if np.sum(mask) > 0:
-            mean_eff = np.mean(np.array(efficiencies)[mask])
-            mean_efficiency_per_bin.append(mean_eff)
+            mean_eff = np.mean(np.array(completenesses)[mask])
+            mean_completeness_per_bin.append(mean_eff)
             bin_centers_nonzero.append(bin_centers[i])
 
-    return bin_centers_nonzero, mean_efficiency_per_bin
+    return bin_centers_nonzero, mean_completeness_per_bin
 
 
-# Styles for the single-population 1D efficiency plots below. Only two entries:
+# Styles for the single-population 1D completeness plots below. Only two entries:
 # these are the neutrino/cosmic split, coarser than the four-way by-category
 # breakdown (neutrino + isochronous/normal/prolonged cosmic) drawn elsewhere.
 # 'neutrino' reuses the by-category plots' purple/D so the same population looks
 # the same wherever it appears.
-# Upper limit of the true-energy axis on every 1D efficiency plot, in MeV. One
+# Upper limit of the true-energy axis on every 1D completeness plot, in MeV. One
 # constant rather than a literal per plot so the 1D plots always share a scale and
 # can be read against each other. Raised from 3000: real clusters live past it
 # (this dataset reaches ~3060 MeV) and a fixed limit silently cuts them off the
@@ -212,10 +212,10 @@ POPULATION_STYLES = {
 }
 
 
-def _draw_1d_efficiency_single_population(energies, efficiencies, energy_bins, population,
+def _draw_1d_completeness_single_population(energies, completenesses, energy_bins, population,
                                           output_dir, filename, title):
     """
-    One 1D efficiency-vs-true-energy curve for a SINGLE population -- neutrino-only or
+    One 1D completeness-vs-true-energy curve for a SINGLE population -- neutrino-only or
     cosmic-only -- on its own canvas and its own file, alongside the "All Clusters"
     plot each caller already draws.
 
@@ -225,26 +225,26 @@ def _draw_1d_efficiency_single_population(energies, efficiencies, energy_bins, p
     population would silently shift the points and make the three plots incomparable.
 
     Draws nothing at all when the population is empty. An empty canvas would read as
-    "efficiency is zero everywhere" rather than "there are no clusters of this kind",
+    "completeness is zero everywhere" rather than "there are no clusters of this kind",
     which is the more common case at event level -- most events have no neutrino.
     """
     if not energies:
         return
 
-    bin_centers, mean_efficiency = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers, mean_completeness = plot_1d_completeness_energy(energies, completenesses, energy_bins)
     if len(bin_centers) == 0:
         return
 
     style = POPULATION_STYLES[population]
 
     plt.figure(figsize=(12, 6))
-    plt.plot(bin_centers, mean_efficiency, marker=style['marker'], linestyle='-',
+    plt.plot(bin_centers, mean_completeness, marker=style['marker'], linestyle='-',
              linewidth=2.5, markersize=10, color=style['color'],
              label=f"{style['label']} ({len(energies)} clusters)",
              markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
@@ -257,7 +257,7 @@ def _draw_1d_efficiency_single_population(energies, efficiencies, energy_bins, p
 def _draw_1d_purity_single_population(charges, purities, charge_bins, x_max, population,
                                       output_dir, filename, title):
     """
-    Purity counterpart to _draw_1d_efficiency_single_population: one 1D
+    Purity counterpart to _draw_1d_completeness_single_population: one 1D
     purity-vs-reco-charge curve for a SINGLE population -- neutrino-only or
     cosmic-only -- on its own canvas and file, alongside the "All Clusters" plot
     each caller already draws.
@@ -267,7 +267,7 @@ def _draw_1d_purity_single_population(charges, purities, charge_bins, x_max, pop
     Re-deriving either from the subset would shift the bin centres and rescale the
     axis, leaving three plots that look comparable but are not.
 
-    Draws nothing when the population is empty -- see the efficiency version for why
+    Draws nothing when the population is empty -- see the completeness version for why
     a blank canvas would be actively misleading here.
     """
     if not charges:
@@ -373,61 +373,61 @@ def plot_1d_purity_charge(charges, purities, charge_bins):
 
     return bin_centers_nonzero, mean_purity_per_bin
 
-def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, apa, file_name=None, cluster_category_results=None):
+def DrawCompletenessVsTrueEnergyPerEvent(completeness_results, output_dir, event, apa, file_name=None, cluster_category_results=None):
     """
-    For each true cluster: calculate sum of efficiency values,
-    then plot efficiency vs true cluster energy (2D and 1D).
+    For each true cluster: calculate sum of completeness values,
+    then plot completeness vs true cluster energy (2D and 1D).
     If cluster_category_results is provided, also plot separate lines for isochronous, normal, and prolonged clusters.
     """
-    if not efficiency_results:
+    if not completeness_results:
         return
 
-    # Group efficiency by true cluster and calculate sum
-    true_cluster_efficiency = {}
-    for eff in efficiency_results:
+    # Group completeness by true cluster and calculate sum
+    true_cluster_completeness = {}
+    for eff in completeness_results:
         true_cid = eff['true_cluster_id']
         #if true_cid == 8888:  # Skip unmatched sentinel
         #    continue
-        if true_cid not in true_cluster_efficiency:
-            true_cluster_efficiency[true_cid] = {
-                'total_efficiency': 0,
+        if true_cid not in true_cluster_completeness:
+            true_cluster_completeness[true_cid] = {
+                'total_completeness': 0,
                 'total_energy': eff.get('total_true_cluster_energy', 0),
                 'num_reco_matches': 0
             }
 
-        true_cluster_efficiency[true_cid]['total_efficiency'] += eff['efficiency_energy_weighted']
-        true_cluster_efficiency[true_cid]['num_reco_matches'] += 1
+        true_cluster_completeness[true_cid]['total_completeness'] += eff['completeness_energy_weighted']
+        true_cluster_completeness[true_cid]['num_reco_matches'] += 1
 
-    if not true_cluster_efficiency:
+    if not true_cluster_completeness:
         return
 
     # Debug: Print information about true clusters and their matched reco clusters
     print_debug_info = False  # Set to False to disable debug printing
     if print_debug_info:
         print("\n" + "="*80)
-        print(f"DEBUG: Efficiency vs True Energy - Event {event}, {apa}")
+        print(f"DEBUG: Completeness vs True Energy - Event {event}, {apa}")
         print("="*80)
-        for true_cid in sorted(true_cluster_efficiency.keys()):
-            data = true_cluster_efficiency[true_cid]
+        for true_cid in sorted(true_cluster_completeness.keys()):
+            data = true_cluster_completeness[true_cid]
         print(f"\nTrue Cluster {true_cid:.0f}:")
         print(f"  Total Energy: {data['total_energy']:.3f} MeV")
-        print(f"  Total Efficiency (sum): {data['total_efficiency']:.4f}")
+        print(f"  Total Completeness (sum): {data['total_completeness']:.4f}")
         print(f"  Number of Matched Reco Clusters: {data['num_reco_matches']}")
 
-        # Find and print individual efficiencies for each true-reco match
+        # Find and print individual completenesses for each true-reco match
         #print(f"  Individual True-Reco Matches:")
-        for eff in efficiency_results:
+        for eff in completeness_results:
             if eff['true_cluster_id'] == true_cid and eff['true_cluster_id'] != 8888:
                 reco_cid = eff.get('reco_cluster_id', 'N/A')
-                eff_val = eff['efficiency_energy_weighted']
-                #print(f"    → Reco Cluster {reco_cid:.0f}: efficiency = {eff_val:.4f}")
+                eff_val = eff['completeness_energy_weighted']
+                #print(f"    → Reco Cluster {reco_cid:.0f}: completeness = {eff_val:.4f}")
         print("="*80 + "\n")
 
-    energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
-    efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
+    energies        = [data['total_energy']     for data in true_cluster_completeness.values()]
+    completenesses    = [data['total_completeness'] for data in true_cluster_completeness.values()]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, event, apa,
                              category_name="All Clusters", file_name=file_name)
 
     # 2D plots by category (only if cluster_category_results is provided)
@@ -456,13 +456,13 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
             if not category_cluster_ids:
                 continue
 
-            # Get energies and efficiencies for this category
-            category_energies = [true_cluster_efficiency[cid]['total_energy'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
-            category_efficiencies = [true_cluster_efficiency[cid]['total_efficiency'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
+            # Get energies and completenesses for this category
+            category_energies = [true_cluster_completeness[cid]['total_energy'] for cid in category_cluster_ids if cid in true_cluster_completeness]
+            category_completenesses = [true_cluster_completeness[cid]['total_completeness'] for cid in category_cluster_ids if cid in true_cluster_completeness]
 
             # Draw 2D plot for this category
             if category_energies:
-                plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, event, apa,
+                plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, event, apa,
                                          category_name=category_label, file_name=file_name)
 
 
@@ -475,7 +475,7 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot 1: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -483,8 +483,8 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection) - Event {event}, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -492,7 +492,7 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)  # 1D true-energy axis limit, shared -- see the constant
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_event_{event}_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     ##plt.show(block=False)
     plt.close()
@@ -506,15 +506,15 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
         for _population in ('neutrino', 'cosmic'):
             _population_keys = [key for key, data in cluster_category_results.items()
                                 if bool(data['is_neutrino']) == (_population == 'neutrino')
-                                and key in true_cluster_efficiency]
-            _population_title = f'Efficiency vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+                                and key in true_cluster_completeness]
+            _population_title = f'Completeness vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
             if file_name:
                 _population_title += f' ({file_name})'
-            _draw_1d_efficiency_single_population(
-                [true_cluster_efficiency[key]['total_energy']     for key in _population_keys],
-                [true_cluster_efficiency[key]['total_efficiency'] for key in _population_keys],
+            _draw_1d_completeness_single_population(
+                [true_cluster_completeness[key]['total_energy']     for key in _population_keys],
+                [true_cluster_completeness[key]['total_completeness'] for key in _population_keys],
                 energy_bins, _population, output_dir,
-                f"efficiency_vs_true_energy_1d_{_population}_event_{event}_{apa}.png", _population_title)
+                f"completeness_vs_true_energy_1d_{_population}_event_{event}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category (only if cluster_category_results is provided)
     if cluster_category_results is not None:
@@ -545,13 +545,13 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
             if not category_cluster_ids:
                 continue
 
-            # Get energies and efficiencies for this category
-            category_energies = [true_cluster_efficiency[cid]['total_energy'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
-            category_efficiencies = [true_cluster_efficiency[cid]['total_efficiency'] for cid in category_cluster_ids if cid in true_cluster_efficiency]
+            # Get energies and completenesses for this category
+            category_energies = [true_cluster_completeness[cid]['total_energy'] for cid in category_cluster_ids if cid in true_cluster_completeness]
+            category_completenesses = [true_cluster_completeness[cid]['total_completeness'] for cid in category_cluster_ids if cid in true_cluster_completeness]
 
             if category_energies:
                 # Get 1D projection for this category
-                bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+                bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
 
                 if len(bin_centers_cat) > 0:
                     color = info['color']
@@ -561,8 +561,8 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
                             color=color, label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
         plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-        plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-        title = f'Efficiency vs True Energy (1D by Category) - Event {event}, {apa}'
+        plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+        title = f'Completeness vs True Energy (1D by Category) - Event {event}, {apa}'
         if file_name:
             title += f' ({file_name})'
         plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -570,7 +570,7 @@ def DrawEfficiencyVsTrueEnergyPerEvent(efficiency_results, output_dir, event, ap
         plt.legend(fontsize=10)
         plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
         plt.ylim(-0.05, 1.05)
-        plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_event_{event}_{apa}.png",
+        plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_event_{event}_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
@@ -580,7 +580,7 @@ def _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list):
     Combine 1-to-1 matched true-reco pair metadata with true clusters that never matched
     any reco cluster (present in all_true_metadata_list, from add_metadata_true_clusters,
     but absent from pair_metadata_list). Unmatched true clusters are added with
-    efficiency=0, so efficiency-vs-true-energy plots reflect the full true cluster
+    completeness=0, so completeness-vs-true-energy plots reflect the full true cluster
     population instead of silently dropping the ones that never found a reco match.
     """
     if not all_true_metadata_list:
@@ -593,7 +593,7 @@ def _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list):
             'true_cluster_id': m['true_cluster_id'],
             'cluster_type': m['cluster_type'],
             'cluster_category': m['cluster_category'],
-            'efficiency': 0,
+            'completeness': 0,
             'total_true_energy': m['total_true_energy'],
         }
         for m in all_true_metadata_list
@@ -602,14 +602,14 @@ def _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list):
     return list(pair_metadata_list) + unmatched_entries
 
 
-def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, event, apa, file_name=None, all_true_metadata_list=None):
+def DrawClusterCompletenessVsTrueEnergyPerEvent(pair_metadata_list, output_dir, event, apa, file_name=None, all_true_metadata_list=None):
     """
-    For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster), plot efficiency
+    For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster), plot completeness
     vs true cluster energy (2D and 1D), for all clusters and broken down by cluster category
     (neutrino, isochronous/normal/prolonged cosmic).
 
     If all_true_metadata_list is provided (from add_metadata_true_clusters), true clusters
-    that never matched any reco cluster are included as well with efficiency=0.
+    that never matched any reco cluster are included as well with completeness=0.
     """
     all_entries = _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list)
     if not all_entries:
@@ -621,10 +621,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
         return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
 
     energies        = [m['total_true_energy'] for m in all_entries]
-    efficiencies    = [m['efficiency'] for m in all_entries]
+    completenesses    = [m['completeness'] for m in all_entries]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, event, apa,
                              category_name="All Clusters ClusteringLevel", file_name=file_name)
 
     # 2D plots by category
@@ -641,8 +641,8 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
-        plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, event, apa,
+        category_completenesses  = [m['completeness'] for m in category_entries]
+        plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, event, apa,
                                  category_name=category_label, file_name=file_name)
 
     # Setup binning for 1D projections
@@ -653,7 +653,7 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot 1: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -661,8 +661,8 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel) - Event {event}, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection, ClusteringLevel) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -670,7 +670,7 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_event_{event}_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -681,14 +681,14 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
     # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
     for _population in ('neutrino', 'cosmic'):
         _population_entries = [m for m in all_entries if m['cluster_type'] == _population]
-        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+        _population_title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
         if file_name:
             _population_title += f' ({file_name})'
-        _draw_1d_efficiency_single_population(
+        _draw_1d_completeness_single_population(
             [m['total_true_energy'] for m in _population_entries],
-            [m['efficiency'] for m in _population_entries],
+            [m['completeness'] for m in _population_entries],
             energy_bins, _population, output_dir,
-            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_event_{event}_{apa}.png", _population_title)
+            f"completeness_vs_true_energy_1d_{_population}_clusteringlevel_event_{event}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -706,17 +706,17 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
+        category_completenesses  = [m['completeness'] for m in category_entries]
 
-        bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+        bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
         if len(bin_centers_cat) > 0:
             label_text = f"{info['label']} ({len(category_entries)} clusters)"
             plt.plot(bin_centers_cat, mean_eff_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
                     color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel) - Event {event}, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D by Category, ClusteringLevel) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -724,19 +724,19 @@ def DrawClusterEfficiencyVsTrueEnergyPerEvent(pair_metadata_list, output_dir, ev
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_event_{event}_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_clusteringlevel_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
 
-def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_name=None, cluster_category_results=None, file_metadata_list=None):
+def DrawCompletenessVsTrueEnergyPerFile(completeness_results, output_dir, apa, file_name=None, cluster_category_results=None, file_metadata_list=None):
     """
-    File-level version: For each true cluster calculate sum of efficiency values,
-    then plot efficiency vs true cluster energy (2D and 1D) for all events in a file.
+    File-level version: For each true cluster calculate sum of completeness values,
+    then plot completeness vs true cluster energy (2D and 1D) for all events in a file.
     If cluster_category_results or file_metadata_list is provided, also plot separate 2D and 1D plots for each cluster category.
     Note: Uses (event, true_cluster_id) composite key to ensure uniqueness across multiple events in a file.
     """
-    if not efficiency_results:
+    if not completeness_results:
         return
 
     # Count unique events in this file
@@ -744,34 +744,34 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
     if file_metadata_list is not None:
         unique_events = set(m['event'] for m in file_metadata_list)
     else:
-        unique_events = set(eff.get('event', 'unknown') for eff in efficiency_results)
+        unique_events = set(eff.get('event', 'unknown') for eff in completeness_results)
     num_events_in_file = len(unique_events)
 
-    # Group efficiency by (event, true_cluster_id) to ensure uniqueness across multiple events
-    true_cluster_efficiency = {}
-    for eff in efficiency_results:
+    # Group completeness by (event, true_cluster_id) to ensure uniqueness across multiple events
+    true_cluster_completeness = {}
+    for eff in completeness_results:
         event_key = eff.get('event', 'unknown')
         true_cid = eff['true_cluster_id']
         cluster_key = (event_key, true_cid)
 
-        if cluster_key not in true_cluster_efficiency:
-            true_cluster_efficiency[cluster_key] = {
-                'total_efficiency': 0,
+        if cluster_key not in true_cluster_completeness:
+            true_cluster_completeness[cluster_key] = {
+                'total_completeness': 0,
                 'total_energy': eff.get('total_true_cluster_energy', 0),
                 'num_reco_matches': 0
             }
 
-        true_cluster_efficiency[cluster_key]['total_efficiency'] += eff['efficiency_energy_weighted']
-        true_cluster_efficiency[cluster_key]['num_reco_matches'] += 1
+        true_cluster_completeness[cluster_key]['total_completeness'] += eff['completeness_energy_weighted']
+        true_cluster_completeness[cluster_key]['num_reco_matches'] += 1
 
-    if not true_cluster_efficiency:
+    if not true_cluster_completeness:
         return
 
-    energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
-    efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
+    energies        = [data['total_energy']     for data in true_cluster_completeness.values()]
+    completenesses    = [data['total_completeness'] for data in true_cluster_completeness.values()]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, 0, apa,
                              category_name="All Clusters (File Level)", file_name=file_name, num_events=num_events_in_file,
                              num_clusters=len(energies))
 
@@ -796,7 +796,7 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
 
     # 2D plots by category (only if category info is available)
     if category_info_source is not None:
-        print(f"    [FILE LEVEL] Drawing 2D efficiency plots for categories...")
+        print(f"    [FILE LEVEL] Drawing 2D completeness plots for categories...")
         category_styles = {
             'neutrino': 'Neutrino Clusters',
             'isochronous_cosmic': 'Isochronous Cosmic Clusters',
@@ -824,20 +824,20 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
                 print(f"        → No clusters in this category, skipping...")
                 continue
 
-            # Get energies and efficiencies for this category
-            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
-            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            # Get energies and completenesses for this category
+            category_energies = [true_cluster_completeness[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_completeness]
+            category_completenesses = [true_cluster_completeness[key]['total_completeness'] for key in category_cluster_keys if key in true_cluster_completeness]
 
-            print(f"        → Matched {len(category_energies)} clusters in efficiency_results")
+            print(f"        → Matched {len(category_energies)} clusters in completeness_results")
 
             # Draw 2D plot for this category
             if category_energies:
                 print(f"        → Drawing 2D plot for {category_label}...")
-                plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+                plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, 0, apa,
                                          category_name=category_label, file_name=file_name, num_events=num_events_in_file,
                                          num_clusters=len(category_energies))
             else:
-                print(f"        → No energies/efficiencies found, skipping plot...")
+                print(f"        → No energies/completenesses found, skipping plot...")
 
     # Setup binning for 1D projections
     n_bins = 15
@@ -847,7 +847,7 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -855,8 +855,8 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection) - File Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -864,7 +864,7 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_file_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -877,15 +877,15 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
         for _population in ('neutrino', 'cosmic'):
             _population_keys = [key for key, data in category_info_source.items()
                                 if bool(data['is_neutrino']) == (_population == 'neutrino')
-                                and key in true_cluster_efficiency]
-            _population_title = f'Efficiency vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
+                                and key in true_cluster_completeness]
+            _population_title = f'Completeness vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
             if file_name:
                 _population_title += f' ({file_name})'
-            _draw_1d_efficiency_single_population(
-                [true_cluster_efficiency[key]['total_energy']     for key in _population_keys],
-                [true_cluster_efficiency[key]['total_efficiency'] for key in _population_keys],
+            _draw_1d_completeness_single_population(
+                [true_cluster_completeness[key]['total_energy']     for key in _population_keys],
+                [true_cluster_completeness[key]['total_completeness'] for key in _population_keys],
                 energy_bins, _population, output_dir,
-                f"efficiency_vs_true_energy_1d_{_population}_file_{apa}.png", _population_title)
+                f"completeness_vs_true_energy_1d_{_population}_file_{apa}.png", _population_title)
 
     # 1D Plot 2: By category (only if category info is available)
     if category_info_source is not None:
@@ -916,13 +916,13 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
             if not category_cluster_keys:
                 continue
 
-            # Get energies and efficiencies for this category
-            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
-            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            # Get energies and completenesses for this category
+            category_energies = [true_cluster_completeness[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_completeness]
+            category_completenesses = [true_cluster_completeness[key]['total_completeness'] for key in category_cluster_keys if key in true_cluster_completeness]
 
             if category_energies:
                 # Get 1D projection for this category
-                bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+                bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
 
                 if len(bin_centers_cat) > 0:
                     color = info['color']
@@ -932,8 +932,8 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
                             color=color, label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
         plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-        plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-        title = f'Efficiency vs True Energy (1D by Category) - File Level, {apa}'
+        plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+        title = f'Completeness vs True Energy (1D by Category) - File Level, {apa}'
         if file_name:
             title += f' ({file_name})'
         plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -941,19 +941,19 @@ def DrawEfficiencyVsTrueEnergyPerFile(efficiency_results, output_dir, apa, file_
         plt.legend(fontsize=10)
         plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
         plt.ylim(-0.05, 1.05)
-        plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_file_{apa}.png",
+        plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_file_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
 
-def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluster_category_results=None, job_metadata_list=None):
+def DrawCompletenessVsTrueEnergyPerJob(completeness_results, output_dir, apa, cluster_category_results=None, job_metadata_list=None):
     """
-    Job-level version: For each true cluster calculate sum of efficiency values,
-    then plot efficiency vs true cluster energy (2D and 1D) for all events in all files.
+    Job-level version: For each true cluster calculate sum of completeness values,
+    then plot completeness vs true cluster energy (2D and 1D) for all events in all files.
     If cluster_category_results or job_metadata_list is provided, also plot separate 2D and 1D plots for each cluster category.
     Note: Uses (event, true_cluster_id) composite key to ensure uniqueness across all files and events.
     """
-    if not efficiency_results:
+    if not completeness_results:
         return [], []
 
     # Count unique events across all files
@@ -961,34 +961,34 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
     if job_metadata_list is not None:
         unique_events = set(m['event'] for m in job_metadata_list)
     else:
-        unique_events = set(eff.get('event', 'unknown') for eff in efficiency_results)
+        unique_events = set(eff.get('event', 'unknown') for eff in completeness_results)
     num_events_total = len(unique_events)
 
-    # Group efficiency by (event, true_cluster_id) to ensure uniqueness across all files and events
-    true_cluster_efficiency = {}
-    for eff in efficiency_results:
+    # Group completeness by (event, true_cluster_id) to ensure uniqueness across all files and events
+    true_cluster_completeness = {}
+    for eff in completeness_results:
         event_key = eff.get('event', 'unknown')
         true_cid = eff['true_cluster_id']
         cluster_key = (event_key, true_cid)
 
-        if cluster_key not in true_cluster_efficiency:
-            true_cluster_efficiency[cluster_key] = {
-                'total_efficiency': 0,
+        if cluster_key not in true_cluster_completeness:
+            true_cluster_completeness[cluster_key] = {
+                'total_completeness': 0,
                 'total_energy': eff.get('total_true_cluster_energy', 0),
                 'num_reco_matches': 0
             }
 
-        true_cluster_efficiency[cluster_key]['total_efficiency'] += eff['efficiency_energy_weighted']
-        true_cluster_efficiency[cluster_key]['num_reco_matches'] += 1
+        true_cluster_completeness[cluster_key]['total_completeness'] += eff['completeness_energy_weighted']
+        true_cluster_completeness[cluster_key]['num_reco_matches'] += 1
 
-    if not true_cluster_efficiency:
+    if not true_cluster_completeness:
         return [], []
 
-    energies        = [data['total_energy']     for data in true_cluster_efficiency.values()]
-    efficiencies    = [data['total_efficiency'] for data in true_cluster_efficiency.values()]
+    energies        = [data['total_energy']     for data in true_cluster_completeness.values()]
+    completenesses    = [data['total_completeness'] for data in true_cluster_completeness.values()]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, 0, apa,
                              category_name="All Clusters (Job Level)", file_name=None, num_events=num_events_total,
                              num_clusters=len(energies))
 
@@ -1013,7 +1013,7 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
 
     # 2D plots by category (only if category info is available)
     if category_info_source is not None:
-        print(f"  [JOB LEVEL] Drawing 2D efficiency plots for categories...")
+        print(f"  [JOB LEVEL] Drawing 2D completeness plots for categories...")
         category_styles = {
             'neutrino': 'Neutrino Clusters',
             'isochronous_cosmic': 'Isochronous Cosmic Clusters',
@@ -1041,20 +1041,20 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
                 print(f"      → No clusters in this category, skipping...")
                 continue
 
-            # Get energies and efficiencies for this category
-            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
-            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            # Get energies and completenesses for this category
+            category_energies = [true_cluster_completeness[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_completeness]
+            category_completenesses = [true_cluster_completeness[key]['total_completeness'] for key in category_cluster_keys if key in true_cluster_completeness]
 
-            print(f"      → Matched {len(category_energies)} clusters in efficiency_results")
+            print(f"      → Matched {len(category_energies)} clusters in completeness_results")
 
             # Draw 2D plot for this category
             if category_energies:
                 print(f"      → Drawing 2D plot for {category_label}...")
-                plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+                plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, 0, apa,
                                          category_name=category_label, file_name=None, num_events=num_events_total,
                                          num_clusters=len(category_energies))
             else:
-                print(f"      → No energies/efficiencies found, skipping plot...")
+                print(f"      → No energies/completenesses found, skipping plot...")
 
     # Setup binning for 1D projections
     n_bins = 15
@@ -1064,7 +1064,7 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -1072,14 +1072,14 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection) - Job Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection) - Job Level, {apa}'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_job_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -1092,13 +1092,13 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
         for _population in ('neutrino', 'cosmic'):
             _population_keys = [key for key, data in category_info_source.items()
                                 if bool(data['is_neutrino']) == (_population == 'neutrino')
-                                and key in true_cluster_efficiency]
-            _population_title = f'Efficiency vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
-            _draw_1d_efficiency_single_population(
-                [true_cluster_efficiency[key]['total_energy']     for key in _population_keys],
-                [true_cluster_efficiency[key]['total_efficiency'] for key in _population_keys],
+                                and key in true_cluster_completeness]
+            _population_title = f'Completeness vs True Energy (1D Projection, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
+            _draw_1d_completeness_single_population(
+                [true_cluster_completeness[key]['total_energy']     for key in _population_keys],
+                [true_cluster_completeness[key]['total_completeness'] for key in _population_keys],
                 energy_bins, _population, output_dir,
-                f"efficiency_vs_true_energy_1d_{_population}_job_{apa}.png", _population_title)
+                f"completeness_vs_true_energy_1d_{_population}_job_{apa}.png", _population_title)
 
     # 1D Plot 2: By category (only if category info is available)
     if category_info_source is not None:
@@ -1129,13 +1129,13 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
             if not category_cluster_keys:
                 continue
 
-            # Get energies and efficiencies for this category
-            category_energies = [true_cluster_efficiency[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_efficiency]
-            category_efficiencies = [true_cluster_efficiency[key]['total_efficiency'] for key in category_cluster_keys if key in true_cluster_efficiency]
+            # Get energies and completenesses for this category
+            category_energies = [true_cluster_completeness[key]['total_energy'] for key in category_cluster_keys if key in true_cluster_completeness]
+            category_completenesses = [true_cluster_completeness[key]['total_completeness'] for key in category_cluster_keys if key in true_cluster_completeness]
 
             if category_energies:
                 # Get 1D projection for this category
-                bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+                bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
 
                 if len(bin_centers_cat) > 0:
                     color = info['color']
@@ -1145,32 +1145,32 @@ def DrawEfficiencyVsTrueEnergyPerJob(efficiency_results, output_dir, apa, cluste
                             color=color, label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
         plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-        plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-        title = f'Efficiency vs True Energy (1D by Category) - Job Level, {apa}'
+        plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+        title = f'Completeness vs True Energy (1D by Category) - Job Level, {apa}'
         plt.title(title, fontsize=12, fontweight='bold', wrap=True)
         plt.grid(True, linestyle='--', alpha=0.3)
         plt.legend(fontsize=10)
         plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
         plt.ylim(-0.05, 1.05)
-        plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_job_{apa}.png",
+        plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_job_{apa}.png",
                     dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
-    # Per-true-cluster (event, true_cluster_id) energies/efficiencies - the exact
-    # population plotted in efficiency_vs_true_energy_1d_job_<APA>.png ("All Clusters"),
+    # Per-true-cluster (event, true_cluster_id) energies/completenesses - the exact
+    # population plotted in completeness_vs_true_energy_1d_job_<APA>.png ("All Clusters"),
     # so callers can compute summary statistics that agree with that plot instead of
-    # re-deriving them from the raw (fragmented) efficiency_results pair rows.
-    return energies, efficiencies
+    # re-deriving them from the raw (fragmented) completeness_results pair rows.
+    return energies, completenesses
 
 
-def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa, file_name=None, all_true_metadata_list=None):
+def DrawClusterCompletenessVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa, file_name=None, all_true_metadata_list=None):
     """
     File-level version: For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster),
-    plot efficiency vs true cluster energy (2D and 1D) for all events in a file, for all clusters
+    plot completeness vs true cluster energy (2D and 1D) for all events in a file, for all clusters
     and broken down by cluster category (neutrino, isochronous/normal/prolonged cosmic).
 
     If all_true_metadata_list is provided (from add_metadata_true_clusters), true clusters
-    that never matched any reco cluster are included as well with efficiency=0.
+    that never matched any reco cluster are included as well with completeness=0.
     """
     all_entries = _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list)
     if not all_entries:
@@ -1184,10 +1184,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
     num_events_in_file = len(set(m['event'] for m in all_entries))
 
     energies        = [m['total_true_energy'] for m in all_entries]
-    efficiencies    = [m['efficiency'] for m in all_entries]
+    completenesses    = [m['completeness'] for m in all_entries]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, 0, apa,
                              category_name="All Clusters ClusteringLevel (File Level)", file_name=file_name,
                              num_events=num_events_in_file, num_clusters=len(energies))
 
@@ -1205,8 +1205,8 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
-        plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+        category_completenesses  = [m['completeness'] for m in category_entries]
+        plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, 0, apa,
                                  category_name=category_label, file_name=file_name,
                                  num_events=num_events_in_file, num_clusters=len(category_energies))
 
@@ -1218,7 +1218,7 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -1226,8 +1226,8 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel) - File Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection, ClusteringLevel) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -1235,7 +1235,7 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_file_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -1246,14 +1246,14 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
     # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
     for _population in ('neutrino', 'cosmic'):
         _population_entries = [m for m in all_entries if m['cluster_type'] == _population]
-        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
+        _population_title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
         if file_name:
             _population_title += f' ({file_name})'
-        _draw_1d_efficiency_single_population(
+        _draw_1d_completeness_single_population(
             [m['total_true_energy'] for m in _population_entries],
-            [m['efficiency'] for m in _population_entries],
+            [m['completeness'] for m in _population_entries],
             energy_bins, _population, output_dir,
-            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_file_{apa}.png", _population_title)
+            f"completeness_vs_true_energy_1d_{_population}_clusteringlevel_file_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1271,17 +1271,17 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
+        category_completenesses  = [m['completeness'] for m in category_entries]
 
-        bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+        bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
         if len(bin_centers_cat) > 0:
             label_text = f"{info['label']} ({len(category_entries)} clusters)"
             plt.plot(bin_centers_cat, mean_eff_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
                     color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel) - File Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D by Category, ClusteringLevel) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -1289,19 +1289,19 @@ def DrawClusterEfficiencyVsTrueEnergyPerFile(pair_metadata_list, output_dir, apa
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_file_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_clusteringlevel_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
 
-def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa, all_true_metadata_list=None):
+def DrawClusterCompletenessVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa, all_true_metadata_list=None):
     """
     Job-level version: For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster),
-    plot efficiency vs true cluster energy (2D and 1D) for all events in all files, for all clusters
+    plot completeness vs true cluster energy (2D and 1D) for all events in all files, for all clusters
     and broken down by cluster category (neutrino, isochronous/normal/prolonged cosmic).
 
     If all_true_metadata_list is provided (from add_metadata_true_clusters), true clusters
-    that never matched any reco cluster are included as well with efficiency=0.
+    that never matched any reco cluster are included as well with completeness=0.
     """
     all_entries = _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list)
     if not all_entries:
@@ -1315,10 +1315,10 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
     num_events_total = len(set(m['event'] for m in all_entries))
 
     energies        = [m['total_true_energy'] for m in all_entries]
-    efficiencies    = [m['efficiency'] for m in all_entries]
+    completenesses    = [m['completeness'] for m in all_entries]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, 0, apa,
                              category_name="All Clusters ClusteringLevel (Job Level)", file_name=None,
                              num_events=num_events_total, num_clusters=len(energies))
 
@@ -1336,8 +1336,8 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
-        plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+        category_completenesses  = [m['completeness'] for m in category_entries]
+        plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, 0, apa,
                                  category_name=category_label, file_name=None,
                                  num_events=num_events_total, num_clusters=len(category_energies))
 
@@ -1349,7 +1349,7 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -1357,14 +1357,14 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel) - Job Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection, ClusteringLevel) - Job Level, {apa}'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_job_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -1375,12 +1375,12 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
     # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
     for _population in ('neutrino', 'cosmic'):
         _population_entries = [m for m in all_entries if m['cluster_type'] == _population]
-        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
-        _draw_1d_efficiency_single_population(
+        _population_title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
+        _draw_1d_completeness_single_population(
             [m['total_true_energy'] for m in _population_entries],
-            [m['efficiency'] for m in _population_entries],
+            [m['completeness'] for m in _population_entries],
             energy_bins, _population, output_dir,
-            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_job_{apa}.png", _population_title)
+            f"completeness_vs_true_energy_1d_{_population}_clusteringlevel_job_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1398,34 +1398,34 @@ def DrawClusterEfficiencyVsTrueEnergyPerJob(pair_metadata_list, output_dir, apa,
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
+        category_completenesses  = [m['completeness'] for m in category_entries]
 
-        bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+        bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
         if len(bin_centers_cat) > 0:
             label_text = f"{info['label']} ({len(category_entries)} clusters)"
             plt.plot(bin_centers_cat, mean_eff_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
                     color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel) - Job Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D by Category, ClusteringLevel) - Job Level, {apa}'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_job_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_clusteringlevel_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
 
-def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_dir, event, apa, file_name=None):
+def DrawCompletenessVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_dir, event, apa, file_name=None):
     """
-    For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster), plot efficiency
+    For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster), plot completeness
     vs true cluster energy (2D and 1D), for all clusters and broken down by cluster category
     (neutrino, isochronous/normal/prolonged cosmic).
 
-    Unlike DrawClusterEfficiencyVsTrueEnergyPerEvent, this only considers matched true-reco
+    Unlike DrawClusterCompletenessVsTrueEnergyPerEvent, this only considers matched true-reco
     pairs and does not include true clusters that never matched any reco cluster.
     """
     if not pair_metadata_list:
@@ -1437,10 +1437,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
         return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
 
     energies        = [m['total_true_energy'] for m in pair_metadata_list]
-    efficiencies    = [m['efficiency'] for m in pair_metadata_list]
+    completenesses    = [m['completeness'] for m in pair_metadata_list]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, event, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, event, apa,
                              category_name="All Clusters ClusteringLevel (Pairs Only)", file_name=file_name)
 
     # 2D plots by category
@@ -1457,8 +1457,8 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
-        plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, event, apa,
+        category_completenesses  = [m['completeness'] for m in category_entries]
+        plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, event, apa,
                                  category_name=category_label, file_name=file_name)
 
     # Setup binning for 1D projections
@@ -1469,7 +1469,7 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot 1: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -1477,8 +1477,8 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - Event {event}, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -1486,7 +1486,7 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_event_{event}_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_pairs_only_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -1497,14 +1497,14 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
     # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
     for _population in ('neutrino', 'cosmic'):
         _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
-        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
+        _population_title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - Event {event}, {apa}'
         if file_name:
             _population_title += f' ({file_name})'
-        _draw_1d_efficiency_single_population(
+        _draw_1d_completeness_single_population(
             [m['total_true_energy'] for m in _population_entries],
-            [m['efficiency'] for m in _population_entries],
+            [m['completeness'] for m in _population_entries],
             energy_bins, _population, output_dir,
-            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_event_{event}_{apa}.png", _population_title)
+            f"completeness_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_event_{event}_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1522,17 +1522,17 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
+        category_completenesses  = [m['completeness'] for m in category_entries]
 
-        bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+        bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
         if len(bin_centers_cat) > 0:
             label_text = f"{info['label']} ({len(category_entries)} clusters)"
             plt.plot(bin_centers_cat, mean_eff_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
                     color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - Event {event}, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - Event {event}, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -1540,18 +1540,18 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerEvent(pair_metadata_list, output_
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_event_{event}_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_event_{event}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
 
-def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_dir, apa, file_name=None):
+def DrawCompletenessVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_dir, apa, file_name=None):
     """
     File-level version: For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster),
-    plot efficiency vs true cluster energy (2D and 1D) for all events in a file, for all clusters
+    plot completeness vs true cluster energy (2D and 1D) for all events in a file, for all clusters
     and broken down by cluster category (neutrino, isochronous/normal/prolonged cosmic).
 
-    Unlike DrawClusterEfficiencyVsTrueEnergyPerFile, this only considers matched true-reco
+    Unlike DrawClusterCompletenessVsTrueEnergyPerFile, this only considers matched true-reco
     pairs and does not include true clusters that never matched any reco cluster.
     """
     if not pair_metadata_list:
@@ -1565,10 +1565,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
     num_events_in_file = len(set(m['event'] for m in pair_metadata_list))
 
     energies        = [m['total_true_energy'] for m in pair_metadata_list]
-    efficiencies    = [m['efficiency'] for m in pair_metadata_list]
+    completenesses    = [m['completeness'] for m in pair_metadata_list]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, 0, apa,
                              category_name="All Clusters ClusteringLevel (File Level, Pairs Only)", file_name=file_name,
                              num_events=num_events_in_file, num_clusters=len(energies))
 
@@ -1586,8 +1586,8 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
-        plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+        category_completenesses  = [m['completeness'] for m in category_entries]
+        plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, 0, apa,
                                  category_name=category_label, file_name=file_name,
                                  num_events=num_events_in_file, num_clusters=len(category_energies))
 
@@ -1599,7 +1599,7 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -1607,8 +1607,8 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - File Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -1616,7 +1616,7 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_file_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_pairs_only_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -1627,14 +1627,14 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
     # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
     for _population in ('neutrino', 'cosmic'):
         _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
-        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
+        _population_title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - File Level, {apa}'
         if file_name:
             _population_title += f' ({file_name})'
-        _draw_1d_efficiency_single_population(
+        _draw_1d_completeness_single_population(
             [m['total_true_energy'] for m in _population_entries],
-            [m['efficiency'] for m in _population_entries],
+            [m['completeness'] for m in _population_entries],
             energy_bins, _population, output_dir,
-            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_file_{apa}.png", _population_title)
+            f"completeness_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_file_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1652,17 +1652,17 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
+        category_completenesses  = [m['completeness'] for m in category_entries]
 
-        bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+        bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
         if len(bin_centers_cat) > 0:
             label_text = f"{info['label']} ({len(category_entries)} clusters)"
             plt.plot(bin_centers_cat, mean_eff_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
                     color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - File Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - File Level, {apa}'
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
@@ -1670,18 +1670,18 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerFile(pair_metadata_list, output_d
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_file_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_file_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
 
-def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_dir, apa):
+def DrawCompletenessVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_dir, apa):
     """
     Job-level version: For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster),
-    plot efficiency vs true cluster energy (2D and 1D) for all events in all files, for all clusters
+    plot completeness vs true cluster energy (2D and 1D) for all events in all files, for all clusters
     and broken down by cluster category (neutrino, isochronous/normal/prolonged cosmic).
 
-    Unlike DrawClusterEfficiencyVsTrueEnergyPerJob, this only considers matched true-reco
+    Unlike DrawClusterCompletenessVsTrueEnergyPerJob, this only considers matched true-reco
     pairs and does not include true clusters that never matched any reco cluster.
     """
     if not pair_metadata_list:
@@ -1695,10 +1695,10 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     num_events_total = len(set(m['event'] for m in pair_metadata_list))
 
     energies        = [m['total_true_energy'] for m in pair_metadata_list]
-    efficiencies    = [m['efficiency'] for m in pair_metadata_list]
+    completenesses    = [m['completeness'] for m in pair_metadata_list]
 
     # 2D Histogram for all clusters
-    plot_2d_efficiency_energy(energies, efficiencies, output_dir, 0, apa,
+    plot_2d_completeness_energy(energies, completenesses, output_dir, 0, apa,
                              category_name="All Clusters ClusteringLevel (Job Level, Pairs Only)", file_name=None,
                              num_events=num_events_total, num_clusters=len(energies))
 
@@ -1716,8 +1716,8 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
-        plot_2d_efficiency_energy(category_energies, category_efficiencies, output_dir, 0, apa,
+        category_completenesses  = [m['completeness'] for m in category_entries]
+        plot_2d_completeness_energy(category_energies, category_completenesses, output_dir, 0, apa,
                                  category_name=category_label, file_name=None,
                                  num_events=num_events_total, num_clusters=len(category_energies))
 
@@ -1729,7 +1729,7 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
         energy_bins = np.linspace(0, 10, n_bins+1)
 
     # 1D Plot: All clusters (separate canvas)
-    bin_centers_all, mean_eff_all = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+    bin_centers_all, mean_eff_all = plot_1d_completeness_energy(energies, completenesses, energy_bins)
 
     plt.figure(figsize=(12, 6))
     if len(bin_centers_all) > 0:
@@ -1737,14 +1737,14 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
                 color='darkblue', label='All Clusters', markeredgecolor='black', markeredgewidth=1)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - Job Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, Pairs Only) - Job Level, {apa}'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_job_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_pairs_only_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -1755,12 +1755,12 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
     # neutrino/isochronous/normal/prolonged breakdown is the by_category plot.
     for _population in ('neutrino', 'cosmic'):
         _population_entries = [m for m in pair_metadata_list if m['cluster_type'] == _population]
-        _population_title = f'Efficiency vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
-        _draw_1d_efficiency_single_population(
+        _population_title = f'Completeness vs True Energy (1D Projection, ClusteringLevel, Pairs Only, {POPULATION_STYLES[_population]["label"]} Only) - Job Level, {apa}'
+        _draw_1d_completeness_single_population(
             [m['total_true_energy'] for m in _population_entries],
-            [m['efficiency'] for m in _population_entries],
+            [m['completeness'] for m in _population_entries],
             energy_bins, _population, output_dir,
-            f"efficiency_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_job_{apa}.png", _population_title)
+            f"completeness_vs_true_energy_1d_{_population}_clusteringlevel_pairs_only_job_{apa}.png", _population_title)
 
     # 1D Plot 2: By category
     plt.figure(figsize=(14, 7))
@@ -1778,36 +1778,36 @@ def DrawEfficiencyVsTrueEnergy_MatchedPairs_PerJob(pair_metadata_list, output_di
             continue
 
         category_energies      = [m['total_true_energy'] for m in category_entries]
-        category_efficiencies  = [m['efficiency'] for m in category_entries]
+        category_completenesses  = [m['completeness'] for m in category_entries]
 
-        bin_centers_cat, mean_eff_cat = plot_1d_efficiency_energy(category_energies, category_efficiencies, energy_bins)
+        bin_centers_cat, mean_eff_cat = plot_1d_completeness_energy(category_energies, category_completenesses, energy_bins)
         if len(bin_centers_cat) > 0:
             label_text = f"{info['label']} ({len(category_entries)} clusters)"
             plt.plot(bin_centers_cat, mean_eff_cat, marker=info['marker'], linestyle='-', linewidth=2, markersize=8,
                     color=info['color'], label=label_text, markeredgecolor='black', markeredgewidth=0.5)
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = f'Efficiency vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - Job Level, {apa}'
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = f'Completeness vs True Energy (1D by Category, ClusteringLevel, Pairs Only) - Job Level, {apa}'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.legend(fontsize=10)
     plt.xlim(0, TRUE_ENERGY_XMAX_MEV)
     plt.ylim(-0.05, 1.05)
-    plt.savefig(output_dir / f"efficiency_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_job_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_true_energy_1d_by_category_clusteringlevel_pairs_only_job_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
-    # Per-pair energies/efficiencies - the exact population plotted in
-    # efficiency_vs_true_energy_1d_clusteringlevel_pairs_only_job_<APA>.png ("All Clusters").
-    return energies, efficiencies
+    # Per-pair energies/completenesses - the exact population plotted in
+    # completeness_vs_true_energy_1d_clusteringlevel_pairs_only_job_<APA>.png ("All Clusters").
+    return energies, completenesses
 
 
 def DrawPurityVsRecoChargePerEvent(pair_metadata_list, output_dir, event, apa, file_name=None):
     """
     For each 1-to-1 true-reco pair (from add_metadata_true_reco_pair_cluster): plot purity
     vs reco cluster charge (2D and 1D). The purity value is the one corresponding to the
-    highest-efficiency reco cluster matched to each true cluster.
+    highest-completeness reco cluster matched to each true cluster.
     Draws plots for all clusters and broken down by cluster category
     (neutrino, all cosmics, isochronous/normal/prolonged cosmic).
     """
@@ -1936,7 +1936,7 @@ def _DrawPurityVsRecoChargeAggregated(pair_metadata_list, output_dir, apa, level
     """
     Shared implementation for file-level and job-level purity vs reco charge plots (2D and 1D),
     aggregated over many events, using the 1-to-1 true-reco pair metadata. The purity value is
-    the one corresponding to the highest-efficiency reco cluster matched to each true cluster.
+    the one corresponding to the highest-completeness reco cluster matched to each true cluster.
     Draws plots for all clusters and broken down by cluster category
     (neutrino, all cosmics, isochronous/normal/prolonged cosmic).
     """
@@ -2085,27 +2085,27 @@ def DrawPurityVsRecoChargePerJob(pair_metadata_list, output_dir, apa):
 # ============================================================================
 
 
-def DrawAggregatedEfficiencyPlots(efficiency_results, output_dir, level_name, apa):
-    """Draw 2D and 1D efficiency plots for aggregated results."""
-    if not efficiency_results:
+def DrawAggregatedCompletenessPlots(completeness_results, output_dir, level_name, apa):
+    """Draw 2D and 1D completeness plots for aggregated results."""
+    if not completeness_results:
         return
 
-    efficiencies = [e['efficiency_energy_weighted'] for e in efficiency_results if e['reco_cluster_id'] != 8888]
+    completenesses = [e['completeness_energy_weighted'] for e in completeness_results if e['reco_cluster_id'] != 8888]
 
-    if not efficiencies:
+    if not completenesses:
         return
 
     # 2D Histogram
     plt.figure(figsize=(10, 8))
-    plt.hist(efficiencies, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
-    plt.xlabel('Efficiency', fontsize=12, fontweight='bold')
+    plt.hist(completenesses, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
+    plt.xlabel('Completeness', fontsize=12, fontweight='bold')
     plt.ylabel('Count', fontsize=12, fontweight='bold')
-    plt.title(f'Efficiency Distribution ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
-    plt.axvline(np.mean(efficiencies), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(efficiencies):.3f}')
-    plt.axvline(np.median(efficiencies), color='green', linestyle='--', linewidth=2, label=f'Median: {np.median(efficiencies):.3f}')
+    plt.title(f'Completeness Distribution ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
+    plt.axvline(np.mean(completenesses), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(completenesses):.3f}')
+    plt.axvline(np.median(completenesses), color='green', linestyle='--', linewidth=2, label=f'Median: {np.median(completenesses):.3f}')
     plt.legend(fontsize=10)
     plt.grid(True, linestyle='--', alpha=0.3)
-    plt.savefig(output_dir / f"efficiency_distribution_{level_name.lower().replace(' ', '_')}_{apa}.png", dpi=100, bbox_inches='tight', pad_inches=0.3)
+    plt.savefig(output_dir / f"completeness_distribution_{level_name.lower().replace(' ', '_')}_{apa}.png", dpi=100, bbox_inches='tight', pad_inches=0.3)
     ##plt.show(block=False)
     plt.close()
 
@@ -2135,23 +2135,23 @@ def DrawAggregatedPurityPlots(purity_results, output_dir, level_name, apa):
     plt.close()
 
 def DrawMatchedPairsPlots(matched_pairs, output_dir, level_name, apa):
-    """Draw efficiency vs purity scatter plot for matched pairs."""
+    """Draw completeness vs purity scatter plot for matched pairs."""
     if not matched_pairs:
         return
 
-    efficiencies = [p['efficiency_energy_weighted'] for p in matched_pairs]
+    completenesses = [p['completeness_energy_weighted'] for p in matched_pairs]
     purities = [p['purity'] for p in matched_pairs]
 
     # Scatter plot
     plt.figure(figsize=(10, 8))
-    plt.scatter(efficiencies, purities, s=50, alpha=0.6, color='purple', edgecolors='black', linewidth=0.5)
-    plt.xlabel('Efficiency', fontsize=12, fontweight='bold')
+    plt.scatter(completenesses, purities, s=50, alpha=0.6, color='purple', edgecolors='black', linewidth=0.5)
+    plt.xlabel('Completeness', fontsize=12, fontweight='bold')
     plt.ylabel('Purity', fontsize=12, fontweight='bold')
-    plt.title(f'Efficiency vs Purity ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
+    plt.title(f'Completeness vs Purity ({level_name}) - {apa}', fontsize=12, fontweight='bold', wrap=True)
     plt.xlim(-0.05, 1.05)
     plt.ylim(-0.05, 1.05)
     plt.grid(True, linestyle='--', alpha=0.3)
-    plt.savefig(output_dir / f"efficiency_vs_purity_{level_name.lower().replace(' ', '_')}_{apa}.png",
+    plt.savefig(output_dir / f"completeness_vs_purity_{level_name.lower().replace(' ', '_')}_{apa}.png",
                 dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
@@ -2165,10 +2165,10 @@ _EFF_PUR_CATEGORY_STYLE = {
 
 _UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI = -0.1, 0.0  # bottom-left "no reco match" bin, both axes
 
-def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_name, apa, file_name=None,
+def DrawCompletenessVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_name, apa, file_name=None,
                                         all_true_metadata_list=None, filename_level=None):
     """
-    Draw purity-vs-efficiency (x=Purity, y=Efficiency) scatter and 2D histogram (colz)
+    Draw purity-vs-completeness (x=Purity, y=Completeness) scatter and 2D histogram (colz)
     plots from 1-to-1 true-reco pair metadata (add_metadata_true_reco_pair_cluster).
     Used at Event, File, and Job level alike - level_name controls the title/filename,
     e.g. "Event 5", "File Level", "Job Level".
@@ -2192,7 +2192,7 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
     # Nothing to draw only when there are no pairs AND no unmatched true clusters. An
     # event with zero 1-to-1 pairs (e.g. no reco cluster survived the beam-window cut)
     # still has something to show in the "including unmatched" variant: every true
-    # cluster goes in the no-match box at efficiency 0. The "excluding unmatched"
+    # cluster goes in the no-match box at completeness 0. The "excluding unmatched"
     # variant passes all_true_metadata_list=None and still returns here, as before.
     # Every inner helper already accepts empty `entries` with non-empty `unmatched_entries`.
     if not pair_metadata_list and not all_true_metadata_list:
@@ -2251,7 +2251,7 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
             _draw_unmatched_box()
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.xlabel('Purity', fontsize=20, fontweight='bold')
-        plt.ylabel('Efficiency', fontsize=20, fontweight='bold')
+        plt.ylabel('Completeness', fontsize=20, fontweight='bold')
         plt.xticks(fontsize=16)
         plt.yticks(fontsize=16)
 
@@ -2260,11 +2260,11 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
         if not entries and not unmatched_entries:
             return
         purities     = [m['purity'] for m in entries]
-        efficiencies = [m['efficiency'] for m in entries]
+        completenesses = [m['completeness'] for m in entries]
 
         plt.figure(figsize=(14, 11))
         if entries:
-            plt.scatter(purities, efficiencies, color=color, marker=marker, alpha=0.7, s=100, edgecolors='black', linewidth=0.5,
+            plt.scatter(purities, completenesses, color=color, marker=marker, alpha=0.7, s=100, edgecolors='black', linewidth=0.5,
                         label=f"Matched ({len(entries)})")
         if unmatched_entries:
             ux, uy = _jitter_unmatched(len(unmatched_entries))
@@ -2272,12 +2272,12 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
                         label=f"Unmatched ({len(unmatched_entries)})")
 
         total = len(entries) + len(unmatched_entries)
-        plt.title(f"Efficiency vs Purity - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
+        plt.title(f"Completeness vs Purity - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
                   fontsize=16, fontweight='bold', wrap=True)
         _format_axes()
         plt.legend(fontsize=12)
         plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
-        plt.savefig(output_dir / f"efficiency_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
+        plt.savefig(output_dir / f"completeness_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
                     dpi=150, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
@@ -2293,8 +2293,8 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
             entries = entries_by_cat[category_key]
             if entries:
                 purities     = [m['purity'] for m in entries]
-                efficiencies = [m['efficiency'] for m in entries]
-                plt.scatter(purities, efficiencies, color=info['color'], marker=info['marker'], alpha=0.6, s=80,
+                completenesses = [m['completeness'] for m in entries]
+                plt.scatter(purities, completenesses, color=info['color'], marker=info['marker'], alpha=0.6, s=80,
                             edgecolors='black', linewidth=0.5, label=f"{info['label']} ({len(entries)})")
 
             unmatched = unmatched_by_cat[category_key]
@@ -2304,12 +2304,12 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
                             label=f"{info['label']} unmatched ({len(unmatched)})")
 
         total = sum(len(v) for v in entries_by_cat.values()) + sum(len(v) for v in unmatched_by_cat.values())
-        plt.title(f"Efficiency vs Purity - {group_label} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
+        plt.title(f"Completeness vs Purity - {group_label} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
                   fontsize=16, fontweight='bold', wrap=True)
         _format_axes()
         plt.legend(fontsize=11)
         plt.subplots_adjust(left=0.15, right=0.95, top=0.90, bottom=0.12)
-        plt.savefig(output_dir / f"efficiency_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
+        plt.savefig(output_dir / f"completeness_vs_purity_scatter_{filename_tag}_{level_suffix}_{apa}.png",
                     dpi=150, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
@@ -2318,29 +2318,29 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
         if not entries and not unmatched_entries:
             return
         purities     = [m['purity'] for m in entries]
-        efficiencies = [m['efficiency'] for m in entries]
+        completenesses = [m['completeness'] for m in entries]
         if unmatched_entries:
             # Place all unmatched clusters at a single representative point inside the
             # dedicated no-match bin, so they collect into that one 2D-histogram cell.
             box_mid = (_UNMATCHED_BOX_LO + _UNMATCHED_BOX_HI) / 2
             purities     = purities + [box_mid] * len(unmatched_entries)
-            efficiencies = efficiencies + [box_mid] * len(unmatched_entries)
+            completenesses = completenesses + [box_mid] * len(unmatched_entries)
 
         # One wide bin covering the no-match box, then regular bins across [0, 1]
         edges = np.concatenate(([_UNMATCHED_BOX_LO, _UNMATCHED_BOX_HI], np.linspace(0, 1, 41)[1:]))
 
         plt.figure(figsize=(14, 11))
-        h = plt.hist2d(purities, efficiencies, bins=[edges, edges], cmap='YlOrRd')
+        h = plt.hist2d(purities, completenesses, bins=[edges, edges], cmap='YlOrRd')
         cbar = plt.colorbar(h[3], label='Count')
         cbar.set_label('Count', fontsize=18, fontweight='bold')
         cbar.ax.tick_params(labelsize=16)
 
         total = len(entries) + len(unmatched_entries)
-        plt.title(f"Efficiency vs Purity 2D Histogram - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
+        plt.title(f"Completeness vs Purity 2D Histogram - {category_name} ({level_name}), {apa}, {total} clusters{_title_suffix()}",
                   fontsize=16, fontweight='bold', wrap=True)
         _format_axes()
         plt.subplots_adjust(left=0.15, right=0.92, top=0.90, bottom=0.12)
-        plt.savefig(output_dir / f"efficiency_vs_purity_colz_{filename_tag}_{level_suffix}_{apa}.png",
+        plt.savefig(output_dir / f"completeness_vs_purity_colz_{filename_tag}_{level_suffix}_{apa}.png",
                     dpi=150, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
@@ -2366,22 +2366,22 @@ def DrawEfficiencyVsPurity_MatchedPairs(pair_metadata_list, output_dir, level_na
         _colz(category_entries, info['label'], category_key,
               unmatched_entries=category_unmatched)
 
-# Function to match true and reco clusters based on purity and efficiency results
+# Function to match true and reco clusters based on purity and completeness results
 # make pairing based on highest purity for each true cluster, then ensure one-to-one matching by keeping only the best pair for each reco cluster
-# TODO: we need to change matching creteria to energy-weighted efficiency instead of purity
+# TODO: we need to change matching creteria to energy-weighted completeness instead of purity
 
-def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directories_map, output_dir, apa):
+def DrawCompletenessVsTrueEnergyAllEvents(all_completeness_results, input_directories_map, output_dir, apa):
     """
-    Draw 2D colz histogram of efficiency vs TRUE cluster energy for ALL events.
-    Then create a 1D projection showing mean efficiency vs TRUE cluster energy bins.
-    Saves organized in hierarchy: output_dir/input_file/event_N/efficiency/
+    Draw 2D colz histogram of completeness vs TRUE cluster energy for ALL events.
+    Then create a 1D projection showing mean completeness vs TRUE cluster energy bins.
+    Saves organized in hierarchy: output_dir/input_file/event_N/completeness/
     X-axis: total TRUE cluster energy
-    Y-axis: efficiency (energy-weighted)
+    Y-axis: completeness (energy-weighted)
     """
 
     # Group results by event
     results_by_event = {}
-    for result in all_efficiency_results:
+    for result in all_completeness_results:
         # Parse composite event key: "input_file_name_event_number"
         event_key = result['event']
         if isinstance(event_key, str) and '_' in event_key:
@@ -2408,36 +2408,36 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
                     break
 
         if event_key not in input_directories_map:
-            print(f"Warning: No input directory found for event {event}, skipping efficiency plots")
+            print(f"Warning: No input directory found for event {event}, skipping completeness plots")
             continue
 
         input_dir, evt_num = input_directories_map[event_key]
 
         input_file_name = input_dir.parent.name
 
-        # Create hierarchical directory: output_dir/input_file/event_N/efficiency/
-        event_output_dir = output_dir / input_file_name / f"event_{event:03d}" / "efficiency"
+        # Create hierarchical directory: output_dir/input_file/event_N/completeness/
+        event_output_dir = output_dir / input_file_name / f"event_{event:03d}" / "completeness"
         event_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract efficiency and true energy information for this event
+        # Extract completeness and true energy information for this event
         true_energies = []
-        efficiencies = []
+        completenesses = []
         ghost_energies = []
 
         for result in event_results:
             true_energy = result.get('total_true_cluster_energy', 0)
-            efficiency = result.get('efficiency_energy_weighted', 0)
+            completeness = result.get('completeness_energy_weighted', 0)
 
             if true_energy > 0:
-                # Check for unmatched clusters (efficiency=-0.1 sentinel)
-                if abs(efficiency - (-0.1)) < 0.001:
+                # Check for unmatched clusters (completeness=-0.1 sentinel)
+                if abs(completeness - (-0.1)) < 0.001:
                     ghost_energies.append(true_energy)
-                elif efficiency > 0:
+                elif completeness > 0:
                     true_energies.append(true_energy)
-                    efficiencies.append(efficiency)
+                    completenesses.append(completeness)
 
         if len(true_energies) == 0 and len(ghost_energies) == 0:
-            print(f"No valid efficiency vs energy data for event {event}")
+            print(f"No valid completeness vs energy data for event {event}")
             continue
 
         print(f"\nEvent {event} ({input_file_name}):")
@@ -2448,19 +2448,19 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
         # Add ghost clusters to histogram at (0, 0)
         if len(ghost_energies) > 0:
             true_energies.extend([0] * len(ghost_energies))
-            efficiencies.extend([0] * len(ghost_energies))
+            completenesses.extend([0] * len(ghost_energies))
             print(f'  Added {len(ghost_energies)} ghost clusters at (0,0)')
         # Create 2D colz histogram
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
 
         # 2D histogram
         if true_energies:
-            h = ax1.hist2d(true_energies, efficiencies, bins=40, cmap='YlOrRd', range=[[0, max(true_energies)*1.25], [-0.2, 1.05]])
+            h = ax1.hist2d(true_energies, completenesses, bins=40, cmap='YlOrRd', range=[[0, max(true_energies)*1.25], [-0.2, 1.05]])
             cbar1 = plt.colorbar(h[3], ax=ax1, label='Count')
             cbar1.set_label('Count', fontsize=16, fontweight='bold')
             cbar1.ax.tick_params(labelsize=14)
 
-            ax1.scatter(true_energies, efficiencies, alpha=0.3, s=20, color='black', marker='.')
+            ax1.scatter(true_energies, completenesses, alpha=0.3, s=20, color='black', marker='.')
 
         # Set x-axis limits to show both matched and unmatched clusters
         all_energies = true_energies + ghost_energies if ghost_energies else true_energies
@@ -2471,8 +2471,8 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
         ax1.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
 
         ax1.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
-        ax1.set_ylabel('Efficiency (Energy-Weighted)', fontsize=18, fontweight='bold')
-        ax1.set_title(f'2D Histogram: Efficiency vs True Energy (Event {event})', fontsize=18, fontweight='bold', wrap=True)
+        ax1.set_ylabel('Completeness (Energy-Weighted)', fontsize=18, fontweight='bold')
+        ax1.set_title(f'2D Histogram: Completeness vs True Energy (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
         if len(ghost_energies) > 0:
@@ -2492,31 +2492,31 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
             energy_bins = np.linspace(-100, 10, n_bins+1)
 
         bin_centers = (energy_bins[:-1] + energy_bins[1:]) / 2
-        mean_efficiency_per_bin = []
+        mean_completeness_per_bin = []
         bin_counts = []
 
         if true_energies:
             for i in range(len(energy_bins)-1):
                 mask = (np.array(true_energies) >= energy_bins[i]) & (np.array(true_energies) < energy_bins[i+1])
                 if np.sum(mask) > 0:
-                    mean_eff = np.mean(np.array(efficiencies)[mask])
+                    mean_eff = np.mean(np.array(completenesses)[mask])
                     count = np.sum(mask)
-                    mean_efficiency_per_bin.append(mean_eff)
+                    mean_completeness_per_bin.append(mean_eff)
                     bin_counts.append(count)
                 else:
-                    mean_efficiency_per_bin.append(0)
+                    mean_completeness_per_bin.append(0)
                     bin_counts.append(0)
 
         non_empty_mask = np.array(bin_counts) > 0
         valid_bin_centers = bin_centers[non_empty_mask]
-        valid_mean_efficiency = np.array(mean_efficiency_per_bin)[non_empty_mask]
+        valid_mean_completeness = np.array(mean_completeness_per_bin)[non_empty_mask]
 
         if len(valid_bin_centers) > 0:
-            ax2.plot(valid_bin_centers, valid_mean_efficiency, 'o-', linewidth=3, markersize=12,
-                    color='darkblue', label='Mean Efficiency per Bin')
+            ax2.plot(valid_bin_centers, valid_mean_completeness, 'o-', linewidth=3, markersize=12,
+                    color='darkblue', label='Mean Completeness per Bin')
 
         if len(ghost_energies) > 0:
-            # Plot unmatched clusters at their true energy but at y=0 (zero efficiency)
+            # Plot unmatched clusters at their true energy but at y=0 (zero completeness)
             ghost_y_1d = np.zeros(len(ghost_energies))
             ax2.scatter(ghost_energies, ghost_y_1d, c='purple', s=30, alpha=0.6, marker='X',
                 label=f'Unmatched Clusters ({len(ghost_energies)})', edgecolors='darkviolet', linewidths=1)
@@ -2527,8 +2527,8 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
         ax2.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
 
         ax2.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
-        ax2.set_ylabel('Efficiency', fontsize=18, fontweight='bold')
-        ax2.set_title(f'1D Projection: Mean Efficiency vs True Energy (Event {event})', fontsize=18, fontweight='bold', wrap=True)
+        ax2.set_ylabel('Completeness', fontsize=18, fontweight='bold')
+        ax2.set_title(f'1D Projection: Mean Completeness vs True Energy (Event {event})', fontsize=18, fontweight='bold', wrap=True)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3)
         if len(valid_bin_centers) > 0:
@@ -2542,44 +2542,44 @@ def DrawEfficiencyVsTrueEnergyAllEvents(all_efficiency_results, input_directorie
                 bbox=dict(boxstyle='round', facecolor='purple', alpha=0.2))
 
         plt.tight_layout()
-        plt.savefig(event_output_dir / f"efficiency_vs_true_energy_{apa}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
+        plt.savefig(event_output_dir / f"completeness_vs_true_energy_{apa}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
     plt.close()
         # ##plt.show(block=False)
 
-def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, apa):
+def DrawCompletenessSummaryAllFilesAllEvents(all_completeness_results, output_dir, apa):
     """
-    Draw summary 2D and 1D plots aggregating efficiency across ALL files and ALL events.
+    Draw summary 2D and 1D plots aggregating completeness across ALL files and ALL events.
     Saves to top-level output_dir (not nested in file/event subdirectories).
     """
 
-    if len(all_efficiency_results) == 0:
-        print("No efficiency results for summary plots")
+    if len(all_completeness_results) == 0:
+        print("No completeness results for summary plots")
         return
 
     output_dir = Path(output_dir)
 
-    # Extract all efficiency and energy data
+    # Extract all completeness and energy data
     true_energies = []
-    efficiencies = []
+    completenesses = []
     ghost_energies = []
 
-    for result in all_efficiency_results:
+    for result in all_completeness_results:
         true_energy = result.get('total_true_cluster_energy', 0)
-        efficiency = result.get('efficiency_energy_weighted', 0)
+        completeness = result.get('completeness_energy_weighted', 0)
 
         if true_energy > 0:
-            if efficiency > 0:
+            if completeness > 0:
                 true_energies.append(true_energy)
-                efficiencies.append(efficiency)
+                completenesses.append(completeness)
             else:
                 ghost_energies.append(true_energy)
 
     if len(true_energies) == 0:
-        print("No valid efficiency data for summary")
+        print("No valid completeness data for summary")
         return
 
     print(f"\n{'='*60}")
-    print(f"SUMMARY: Efficiency across ALL files and ALL events")
+    print(f"SUMMARY: Completeness across ALL files and ALL events")
     print(f"{'='*60}")
     print(f"Total matched clusters: {len(true_energies)}")
     print(f"Ghost tracks: {len(ghost_energies)}")
@@ -2588,13 +2588,13 @@ def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, a
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
 
     # 2D histogram
-    h = ax1.hist2d(true_energies, efficiencies, bins=40, cmap='YlOrRd',
+    h = ax1.hist2d(true_energies, completenesses, bins=40, cmap='YlOrRd',
                     range=[[0, max(true_energies)*1.25], [0, 1.05]])
     cbar1 = plt.colorbar(h[3], ax=ax1, label='Count')
     cbar1.set_label('Count', fontsize=16, fontweight='bold')
     cbar1.ax.tick_params(labelsize=14)
 
-    ax1.scatter(true_energies, efficiencies, alpha=0.3, s=20, color='black', marker='.')
+    ax1.scatter(true_energies, completenesses, alpha=0.3, s=20, color='black', marker='.')
 
     if len(ghost_energies) > 0:
         ghost_y = np.full_like(ghost_energies, -0.1)
@@ -2607,8 +2607,8 @@ def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, a
     ax1.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
 
     ax1.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
-    ax1.set_ylabel('Efficiency (Energy-Weighted)', fontsize=18, fontweight='bold')
-    ax1.set_title(f'SUMMARY: Efficiency vs True Energy (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
+    ax1.set_ylabel('Completeness (Energy-Weighted)', fontsize=18, fontweight='bold')
+    ax1.set_title(f'SUMMARY: Completeness vs True Energy (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
     ax1.tick_params(labelsize=14)
     ax1.grid(True, linestyle='--', alpha=0.3)
     if len(ghost_energies) > 0:
@@ -2618,27 +2618,27 @@ def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, a
     n_bins = 20
     energy_bins = np.linspace(0, max(true_energies)*1.25, n_bins+1)
     bin_centers = (energy_bins[:-1] + energy_bins[1:]) / 2
-    mean_efficiency_per_bin = []
+    mean_completeness_per_bin = []
     bin_counts = []
 
     for i in range(len(energy_bins)-1):
         mask = (np.array(true_energies) >= energy_bins[i]) & (np.array(true_energies) < energy_bins[i+1])
         if np.sum(mask) > 0:
-            mean_eff = np.mean(np.array(efficiencies)[mask])
+            mean_eff = np.mean(np.array(completenesses)[mask])
             count = np.sum(mask)
-            mean_efficiency_per_bin.append(mean_eff)
+            mean_completeness_per_bin.append(mean_eff)
             bin_counts.append(count)
         else:
-            mean_efficiency_per_bin.append(0)
+            mean_completeness_per_bin.append(0)
             bin_counts.append(0)
 
     non_empty_mask = np.array(bin_counts) > 0
     valid_bin_centers = bin_centers[non_empty_mask]
-    valid_mean_efficiency = np.array(mean_efficiency_per_bin)[non_empty_mask]
+    valid_mean_completeness = np.array(mean_completeness_per_bin)[non_empty_mask]
 
     if len(valid_bin_centers) > 0:
-        ax2.plot(valid_bin_centers, valid_mean_efficiency, 'o-', linewidth=3, markersize=12,
-                color='darkblue', label='Mean Efficiency per Bin')
+        ax2.plot(valid_bin_centers, valid_mean_completeness, 'o-', linewidth=3, markersize=12,
+                color='darkblue', label='Mean Completeness per Bin')
 
     if len(ghost_energies) > 0:
         ghost_y_1d = np.full_like(ghost_energies, -0.1)
@@ -2651,17 +2651,17 @@ def DrawEfficiencySummaryAllFilesAllEvents(all_efficiency_results, output_dir, a
     ax2.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
 
     ax2.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
-    ax2.set_ylabel('Efficiency', fontsize=18, fontweight='bold')
+    ax2.set_ylabel('Completeness', fontsize=18, fontweight='bold')
     ax2.set_title(f'SUMMARY: 1D Projection (All Files, All Events)', fontsize=18, fontweight='bold', wrap=True)
     ax2.tick_params(labelsize=14)
     ax2.grid(True, linestyle='--', alpha=0.3)
     ax2.legend(fontsize=14, loc='lower right')
 
     plt.tight_layout()
-    plt.savefig(output_dir / f"SUMMARY_efficiency_vs_true_energy_{apa}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
+    plt.savefig(output_dir / f"SUMMARY_completeness_vs_true_energy_{apa}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
     plt.close()
     ## ##plt.show(block=False)
-    print(f"Saved: {output_dir}/SUMMARY_efficiency_vs_true_energy_{apa}.png\n")
+    print(f"Saved: {output_dir}/SUMMARY_completeness_vs_true_energy_{apa}.png\n")
 
 def DrawPuritySummaryAllFilesAllEvents(all_purity_results, output_dir, apa):
     """
@@ -2761,33 +2761,33 @@ def DrawPuritySummaryAllFilesAllEvents(all_purity_results, output_dir, apa):
     ## ##plt.show(block=False)
     print(f"Saved: {output_dir}/SUMMARY_purity_vs_reco_charge_{apa}.png\n")
 
-def DrawProblematicClusters(all_efficiency_results, output_dir, n_clusters=3):
+def DrawProblematicClusters(all_completeness_results, output_dir, n_clusters=3):
     """
-    Find and draw high-energy, low-efficiency clusters to understand why they fail.
+    Find and draw high-energy, low-completeness clusters to understand why they fail.
     Creates spatial visualizations (XZ and YZ) for the worst performers.
     """
 
     # Convert to DataFrame for easier filtering
-    df = pd.DataFrame(all_efficiency_results)
+    df = pd.DataFrame(all_completeness_results)
     df = df.sort_values('total_true_cluster_energy', ascending=False)
 
     # Find high-energy clusters (top 25% by energy)
     high_energy_threshold = df['total_true_cluster_energy'].quantile(0.75)
     high_energy_df = df[df['total_true_cluster_energy'] > high_energy_threshold].copy()
 
-    # Find those with very low efficiency (0 or < 0.2)
-    low_eff_df = high_energy_df[high_energy_df['efficiency_energy_weighted'] < 0.2].copy()
+    # Find those with very low completeness (0 or < 0.2)
+    low_eff_df = high_energy_df[high_energy_df['completeness_energy_weighted'] < 0.2].copy()
     low_eff_df = low_eff_df.sort_values('total_true_cluster_energy', ascending=False)
 
     if len(low_eff_df) == 0:
-        print("No high-energy, low-efficiency clusters found to visualize")
+        print("No high-energy, low-completeness clusters found to visualize")
         return
 
     # Select top N problematic clusters
     problematic = low_eff_df.head(n_clusters)
 
     print(f"\n{'='*80}")
-    print(f"DRAWING {len(problematic)} HIGH-ENERGY, LOW-EFFICIENCY CLUSTERS")
+    print(f"DRAWING {len(problematic)} HIGH-ENERGY, LOW-COMPLETENESS CLUSTERS")
     print(f"{'='*80}")
 
     for idx, (_, row) in enumerate(problematic.iterrows(), 1):
@@ -2796,19 +2796,19 @@ def DrawProblematicClusters(all_efficiency_results, output_dir, n_clusters=3):
         reco_cluster_id = row['reco_cluster_id']
         true_energy = row['total_true_cluster_energy']
         matched_energy = row['matched_true_cluster_energy']
-        efficiency = row['efficiency_energy_weighted']
+        completeness = row['completeness_energy_weighted']
 
         print(f"\nCluster {idx}/{len(problematic)}: Event {event}")
         print(f"  True Cluster ID: {true_cluster_id:.2f}")
         print(f"  Reco Cluster ID: {reco_cluster_id:.2f}")
         print(f"  True Energy: {true_energy:.2f} MeV")
         print(f"  Matched Energy: {matched_energy:.2f} MeV")
-        print(f"  Efficiency: {efficiency:.4f} (VERY LOW!)")
-        print(f"  Problem: High energy but only {matched_energy:.2f}/{true_energy:.2f} = {efficiency*100:.1f}% matched")
+        print(f"  Completeness: {completeness:.4f} (VERY LOW!)")
+        print(f"  Problem: High energy but only {matched_energy:.2f}/{true_energy:.2f} = {completeness*100:.1f}% matched")
 
     print(f"\n{'='*80}")
     print("ANALYSIS:")
-    print("- These clusters have HIGH true energy but VERY LOW efficiency")
+    print("- These clusters have HIGH true energy but VERY LOW completeness")
     print("- This indicates the reconstruction MISSED most of the true energy")
     print("- Likely causes:")
     print("  1. True cluster is spread across multiple reco clusters")
@@ -3107,15 +3107,15 @@ def DrawPurityVsRecoChargeAllEvents(all_purity_results, input_directories_map, o
         plt.close()
         print(f"  Saved: {event_output_dir}/purity_vs_reco_charge_{apa}.png")
 
-def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, output_dir):
+def DrawCompletenessSummaryPerFile(all_completeness_results, input_directories_map, output_dir):
     """
-    Draw summary 2D and 1D plots aggregating efficiency across ALL events within EACH file.
-    Saves to: output_dir/input_file/SUMMARY_efficiency/
+    Draw summary 2D and 1D plots aggregating completeness across ALL events within EACH file.
+    Saves to: output_dir/input_file/SUMMARY_completeness/
     """
 
     # Group results by file
     results_by_file = {}
-    for result in all_efficiency_results:
+    for result in all_completeness_results:
         event_key = result['event']
         # Extract file name from event_key (format: "input_file_name_event_num")
         if isinstance(event_key, str) and '_' in event_key:
@@ -3131,45 +3131,45 @@ def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, 
 
     # Create summary plots for each file
     for file_name, file_results in results_by_file.items():
-        # Extract efficiency and energy data for this file
+        # Extract completeness and energy data for this file
         true_energies = []
-        efficiencies = []
+        completenesses = []
         ghost_energies = []
 
         for result in file_results:
             true_energy = result.get('total_true_cluster_energy', 0)
-            efficiency = result.get('efficiency_energy_weighted', 0)
+            completeness = result.get('completeness_energy_weighted', 0)
 
             if true_energy > 0:
-                if efficiency > 0:
+                if completeness > 0:
                     true_energies.append(true_energy)
-                    efficiencies.append(efficiency)
+                    completenesses.append(completeness)
                 else:
                     ghost_energies.append(true_energy)
 
         if len(true_energies) == 0:
-            print(f"No valid efficiency data for file {file_name}")
+            print(f"No valid completeness data for file {file_name}")
             continue
 
-        print(f"\nFile Summary: Efficiency for {file_name}")
+        print(f"\nFile Summary: Completeness for {file_name}")
         print(f"  Total matched clusters: {len(true_energies)}")
         print(f"  Ghost tracks: {len(ghost_energies)}")
 
-        # Create output directory: output_dir/input_file/SUMMARY_efficiency/
-        file_output_dir = output_dir / file_name / "SUMMARY_efficiency"
+        # Create output directory: output_dir/input_file/SUMMARY_completeness/
+        file_output_dir = output_dir / file_name / "SUMMARY_completeness"
         file_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Create 2D and 1D plots
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
 
         # 2D histogram
-        h = ax1.hist2d(true_energies, efficiencies, bins=40, cmap='YlOrRd',
+        h = ax1.hist2d(true_energies, completenesses, bins=40, cmap='YlOrRd',
                         range=[[0, max(true_energies)*1.25], [0, 1.05]])
         cbar1 = plt.colorbar(h[3], ax=ax1, label='Count')
         cbar1.set_label('Count', fontsize=16, fontweight='bold')
         cbar1.ax.tick_params(labelsize=14)
 
-        ax1.scatter(true_energies, efficiencies, alpha=0.3, s=20, color='black', marker='.')
+        ax1.scatter(true_energies, completenesses, alpha=0.3, s=20, color='black', marker='.')
 
         if len(ghost_energies) > 0:
             ghost_y = np.full_like(ghost_energies, -0.1)
@@ -3180,8 +3180,8 @@ def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, 
         ax1.set_ylim(-0.2, 1.05)
         ax1.axvline(x=0, color='gray', linestyle='--', linewidth=1, alpha=0.5)
         ax1.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
-        ax1.set_ylabel('Efficiency (Energy-Weighted)', fontsize=18, fontweight='bold')
-        ax1.set_title(f'File Summary: Efficiency vs True Energy ({file_name})', fontsize=18, fontweight='bold', wrap=True)
+        ax1.set_ylabel('Completeness (Energy-Weighted)', fontsize=18, fontweight='bold')
+        ax1.set_title(f'File Summary: Completeness vs True Energy ({file_name})', fontsize=18, fontweight='bold', wrap=True)
         ax1.tick_params(labelsize=14)
         ax1.grid(True, linestyle='--', alpha=0.3)
         if len(ghost_energies) > 0:
@@ -3191,32 +3191,32 @@ def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, 
         n_bins = 20
         energy_bins = np.linspace(0, max(true_energies)*1.25, n_bins+1)
         bin_centers = (energy_bins[:-1] + energy_bins[1:]) / 2
-        mean_efficiency_per_bin = []
+        mean_completeness_per_bin = []
         bin_counts = []
 
         for i in range(len(energy_bins)-1):
             mask = (np.array(true_energies) >= energy_bins[i]) & (np.array(true_energies) < energy_bins[i+1])
             if np.sum(mask) > 0:
-                mean_eff = np.mean(np.array(efficiencies)[mask])
+                mean_eff = np.mean(np.array(completenesses)[mask])
                 count = np.sum(mask)
-                mean_efficiency_per_bin.append(mean_eff)
+                mean_completeness_per_bin.append(mean_eff)
                 bin_counts.append(count)
             else:
-                mean_efficiency_per_bin.append(0)
+                mean_completeness_per_bin.append(0)
                 bin_counts.append(0)
 
         # Plot 1D projection
-        ax2.bar(bin_centers, mean_efficiency_per_bin, width=energy_bins[1]-energy_bins[0],
+        ax2.bar(bin_centers, mean_completeness_per_bin, width=energy_bins[1]-energy_bins[0],
                 alpha=0.7, color='steelblue', edgecolor='black')
 
         # Add count labels on bars
-        for i, (x, y, count) in enumerate(zip(bin_centers, mean_efficiency_per_bin, bin_counts)):
+        for i, (x, y, count) in enumerate(zip(bin_centers, mean_completeness_per_bin, bin_counts)):
             if count > 0:
                 ax2.text(x, y + 0.03, f'n={int(count)}', ha='center', fontsize=10, fontweight='bold')
 
         ax2.set_xlabel('True Cluster Energy [MeV]', fontsize=18, fontweight='bold')
-        ax2.set_ylabel('Mean Efficiency', fontsize=18, fontweight='bold')
-        ax2.set_title(f'File Summary: Mean Efficiency vs Energy Bins ({file_name})', fontsize=18, fontweight='bold', wrap=True)
+        ax2.set_ylabel('Mean Completeness', fontsize=18, fontweight='bold')
+        ax2.set_title(f'File Summary: Mean Completeness vs Energy Bins ({file_name})', fontsize=18, fontweight='bold', wrap=True)
         ax2.set_ylim(0, 1.1)
         ax2.tick_params(labelsize=14)
         ax2.grid(True, linestyle='--', alpha=0.3, axis='y')
@@ -3224,7 +3224,7 @@ def DrawEfficiencySummaryPerFile(all_efficiency_results, input_directories_map, 
         plt.tight_layout()
 
         # Save plot
-        filename = f"efficiency_summary_{file_name}.png"
+        filename = f"completeness_summary_{file_name}.png"
         plt.savefig(file_output_dir / filename, dpi=100, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
@@ -3354,17 +3354,17 @@ def DrawPuritySummaryPerFile(all_purity_results, input_directories_map, output_d
 
 
 
-def summarize_cluster_efficiency_by_energy(pair_metadata_list, all_true_metadata_list=None,
+def summarize_cluster_completeness_by_energy(pair_metadata_list, all_true_metadata_list=None,
                                            energy_threshold=500):
     """
-    Mean efficiency below vs above an energy threshold, for the SAME cluster
-    population the efficiency_2d_1d_clusteringlevel 1D plots are drawn from:
+    Mean completeness below vs above an energy threshold, for the SAME cluster
+    population the completeness_2d_1d_clusteringlevel 1D plots are drawn from:
     _combine_pairs_with_unmatched(pair_metadata_list, all_true_metadata_list),
     i.e. 1-to-1 matched true-reco pairs PLUS true clusters that never matched
-    any reco cluster, the latter entering at efficiency=0. Pass the same two
-    lists given to DrawClusterEfficiencyVsTrueEnergyPerJob and these numbers
+    any reco cluster, the latter entering at completeness=0. Pass the same two
+    lists given to DrawClusterCompletenessVsTrueEnergyPerJob and these numbers
     describe exactly the curves in
-    efficiency_vs_true_energy_1d_clusteringlevel_job_*.png and its by-category
+    completeness_vs_true_energy_1d_clusteringlevel_job_*.png and its by-category
     companion -- drop all_true_metadata_list and it instead describes the
     pairs-only directory's plots.
 
@@ -3372,7 +3372,7 @@ def summarize_cluster_efficiency_by_energy(pair_metadata_list, all_true_metadata
     threshold), not the unweighted mean of the plotted per-bin means: the 1D
     plot's bins hold wildly different cluster counts, so averaging the bin
     values would let a bin holding one cluster count as much as a bin holding
-    hundreds. Reading a single "average efficiency below/above X MeV" off that
+    hundreds. Reading a single "average completeness below/above X MeV" off that
     curve by eye is really this number.
 
     Returns a list of dicts, one for all clusters plus one per category present:
@@ -3391,8 +3391,8 @@ def summarize_cluster_efficiency_by_energy(pair_metadata_list, all_true_metadata
         return metadata['cluster_type'] == 'cosmic' and metadata['cluster_category'] == category_key.replace('_cosmic', '')
 
     def _summarize(entries, label):
-        below = [m['efficiency'] for m in entries if m['total_true_energy'] < energy_threshold]
-        above = [m['efficiency'] for m in entries if m['total_true_energy'] >= energy_threshold]
+        below = [m['completeness'] for m in entries if m['total_true_energy'] < energy_threshold]
+        above = [m['completeness'] for m in entries if m['total_true_energy'] >= energy_threshold]
         return {
             'category':   label,
             'n_total':    len(entries),
@@ -3417,9 +3417,9 @@ def summarize_cluster_efficiency_by_energy(pair_metadata_list, all_true_metadata
     return records
 
 
-def format_cluster_efficiency_by_energy(records, energy_threshold=500):
+def format_cluster_completeness_by_energy(records, energy_threshold=500):
     """
-    Render summarize_cluster_efficiency_by_energy()'s records as text lines for
+    Render summarize_cluster_completeness_by_energy()'s records as text lines for
     job_summary/summary.txt. Returns [] for empty records so the caller can
     extend() unconditionally.
     """
@@ -3427,8 +3427,8 @@ def format_cluster_efficiency_by_energy(records, energy_threshold=500):
         return []
 
     lines = [
-        f"Efficiency vs True Energy (clusteringlevel 1D plots, split at {energy_threshold} MeV):",
-        "  Mean efficiency, cluster-weighted; includes unmatched true clusters at efficiency=0",
+        f"Completeness vs True Energy (clusteringlevel 1D plots, split at {energy_threshold} MeV):",
+        "  Mean completeness, cluster-weighted; includes unmatched true clusters at completeness=0",
         f"  {'category':<22} {'<'+str(energy_threshold)+' MeV':>12} {'n':>7} {'>='+str(energy_threshold)+' MeV':>13} {'n':>7}",
     ]
     for r in records:
@@ -3451,7 +3451,7 @@ def format_cluster_efficiency_by_energy(records, energy_threshold=500):
 #
 # Both take records that were computed ONCE against the full true and reco
 # populations and merely filtered (see metadata.filter_records_by_label) --
-# nothing here recomputes an efficiency or a purity, so a curve drawn here is the
+# nothing here recomputes an completeness or a purity, so a curve drawn here is the
 # same curve as in that population's own directory, on shared bins.
 #
 # SHARED BINNING is the point of these functions: bins and x-limit are derived
@@ -3473,7 +3473,7 @@ def _order_legend_like(ax, keys, styles, population_note=None, fontsize=15):
     legend text starts with.
 
     PLACEMENT -- both go in the reserved band above y=1.05 that the callers open
-    up with their y-limit. Efficiency and purity are both bounded by 1, so nothing
+    up with their y-limit. Completeness and purity are both bounded by 1, so nothing
     can ever be drawn there and the legend cannot cover a curve. That is why the
     band exists rather than relying on loc='best', which only minimises overlap
     and still lands on top of a curve when the plot is busy.
@@ -3524,21 +3524,21 @@ CHANNEL_COMPARISON_STYLES = {
 }
 
 
-def DrawClusterEfficiencyVsTrueEnergy_PopulationComparison(populations, output_dir, apa,
+def DrawClusterCompletenessVsTrueEnergy_PopulationComparison(populations, output_dir, apa,
                                                            level_name="Job Level", file_name=None,
                                                            n_bins=15, styles=None,
                                                            comparison_label="In vs Out of Volume",
                                                            filename_suffix="in_vs_out_volume",
                                                            population_note=None):
     """
-    Clusteringlevel 1D efficiency-vs-true-energy curves for several true neutrino
+    Clusteringlevel 1D completeness-vs-true-energy curves for several true neutrino
     populations, overlaid on one canvas: in-volume vs out-of-volume vertices, or
     the numu CC / nue CC / NC channels.
 
-    "Clusteringlevel" means the same population DrawClusterEfficiencyVsTrueEnergyPerJob
+    "Clusteringlevel" means the same population DrawClusterCompletenessVsTrueEnergyPerJob
     uses: the 1-to-1 matched pairs PLUS the true clusters that matched nothing,
-    entered at efficiency 0 via _combine_pairs_with_unmatched -- so a neutrino that
-    reconstructed to nothing counts against its population's efficiency instead of
+    entered at completeness 0 via _combine_pairs_with_unmatched -- so a neutrino that
+    reconstructed to nothing counts against its population's completeness instead of
     quietly leaving the plot.
 
     Parameters:
@@ -3559,7 +3559,7 @@ def DrawClusterEfficiencyVsTrueEnergy_PopulationComparison(populations, output_d
       neutrinos"). The title says it too; the note is there so a plot pulled out
       of its directory still states what it is.
 
-    Writes efficiency_vs_true_energy_1d_clusteringlevel_{filename_suffix}_{apa}.png
+    Writes completeness_vs_true_energy_1d_clusteringlevel_{filename_suffix}_{apa}.png
     and does nothing at all if no population has an entry.
     """
     styles = styles or VOLUME_COMPARISON_STYLES
@@ -3586,14 +3586,14 @@ def DrawClusterEfficiencyVsTrueEnergy_PopulationComparison(populations, output_d
             continue
         style = styles[key]
         energies     = [m['total_true_energy'] for m in entries]
-        efficiencies = [m['efficiency'] for m in entries]
-        bin_centers, mean_efficiency = plot_1d_efficiency_energy(energies, efficiencies, energy_bins)
+        completenesses = [m['completeness'] for m in entries]
+        bin_centers, mean_completeness = plot_1d_completeness_energy(energies, completenesses, energy_bins)
         if len(bin_centers) == 0:
             continue
         drawn_any = True
-        plt.plot(bin_centers, mean_efficiency, marker=style['marker'], linestyle='-',
+        plt.plot(bin_centers, mean_completeness, marker=style['marker'], linestyle='-',
                  linewidth=2.5, markersize=9, color=style['color'],
-                 label=f"{style['label']} ({len(entries)} clusters, mean {np.mean(efficiencies):.3f})",
+                 label=f"{style['label']} ({len(entries)} clusters, mean {np.mean(completenesses):.3f})",
                  markeredgecolor='black', markeredgewidth=1)
 
     if not drawn_any:
@@ -3601,21 +3601,21 @@ def DrawClusterEfficiencyVsTrueEnergy_PopulationComparison(populations, output_d
         return None
 
     plt.xlabel('True Cluster Energy [MeV]', fontsize=12, fontweight='bold')
-    plt.ylabel('Efficiency', fontsize=12, fontweight='bold')
-    title = (f'Efficiency vs True Energy (1D, ClusteringLevel) - True Neutrinos, '
+    plt.ylabel('Completeness', fontsize=12, fontweight='bold')
+    title = (f'Completeness vs True Energy (1D, ClusteringLevel) - True Neutrinos, '
              f'{comparison_label} - {level_name}, {apa}')
     if file_name:
         title += f' ({file_name})'
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
-    # TRUE_ENERGY_XMAX_MEV is the scale the per-population 1D efficiency plots
+    # TRUE_ENERGY_XMAX_MEV is the scale the per-population 1D completeness plots
     # use, kept here so this reads against them -- but extended when the data runs
     # past it. A
     # comparison plot that silently drops a whole population off the right edge
     # (the single nue CC cluster of this dataset sits at 3059 MeV) is worse than
     # one with an unfamiliar axis.
     plt.xlim(0, max(TRUE_ENERGY_XMAX_MEV, energy_bins[-1]))
-    # Headroom above y=1 for the legend and the population note. Efficiency cannot
+    # Headroom above y=1 for the legend and the population note. Completeness cannot
     # exceed 1, so this band is guaranteed empty and the legend cannot cover a
     # curve -- set BEFORE the legend, which measures itself against these limits.
     plt.ylim(-0.05, 1.55)
@@ -3624,7 +3624,7 @@ def DrawClusterEfficiencyVsTrueEnergy_PopulationComparison(populations, output_d
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"efficiency_vs_true_energy_1d_clusteringlevel_{filename_suffix}_{apa}.png"
+    out_path = output_dir / f"completeness_vs_true_energy_1d_clusteringlevel_{filename_suffix}_{apa}.png"
     plt.savefig(out_path, dpi=100, bbox_inches='tight', pad_inches=0.3)
     plt.close()
     return out_path
@@ -3639,10 +3639,10 @@ def DrawPurityVsRecoCharge_PopulationComparison(populations, output_dir, apa,
     """
     1D purity-vs-reco-charge curves for several true neutrino populations,
     overlaid on one canvas. Counterpart to
-    DrawClusterEfficiencyVsTrueEnergy_PopulationComparison above.
+    DrawClusterCompletenessVsTrueEnergy_PopulationComparison above.
 
     Purity comes from the 1-to-1 matched pairs only: an unmatched true neutrino has
-    no reco cluster and therefore no purity to plot (it is in the efficiency plot at
+    no reco cluster and therefore no purity to plot (it is in the completeness plot at
     0, which is where that failure belongs). The purity values themselves were
     computed against the FULL reco population, so they still measure the cosmic
     contamination of the matched reco cluster.
@@ -3665,7 +3665,7 @@ def DrawPurityVsRecoCharge_PopulationComparison(populations, output_dir, apa,
 
     plt.figure(figsize=(12, 7.5))
     drawn_any = False
-    # Smallest population last -- see the efficiency drawer above.
+    # Smallest population last -- see the completeness drawer above.
     for key, pairs in sorted(populations, key=lambda item: -len(item[1])):
         if not pairs:
             continue
@@ -3694,7 +3694,7 @@ def DrawPurityVsRecoCharge_PopulationComparison(populations, output_dir, apa,
     plt.title(title, fontsize=12, fontweight='bold', wrap=True)
     plt.grid(True, linestyle='--', alpha=0.3)
     plt.xlim(0, x_max)
-    # Headroom for legend + note -- see the efficiency drawer above.
+    # Headroom for legend + note -- see the completeness drawer above.
     plt.ylim(-0.05, 1.55)
     _order_legend_like(plt.gca(), [key for key, _ in populations], styles,
                        population_note=population_note)
@@ -3711,5 +3711,5 @@ def DrawPurityVsRecoCharge_PopulationComparison(populations, output_dir, apa,
 # volume. Kept so existing callers keep working; both default to the volume
 # styles, labels and filenames, so a call written for the volume split behaves
 # exactly as before.
-DrawClusterEfficiencyVsTrueEnergy_VolumeComparison = DrawClusterEfficiencyVsTrueEnergy_PopulationComparison
+DrawClusterCompletenessVsTrueEnergy_VolumeComparison = DrawClusterCompletenessVsTrueEnergy_PopulationComparison
 DrawPurityVsRecoCharge_VolumeComparison            = DrawPurityVsRecoCharge_PopulationComparison

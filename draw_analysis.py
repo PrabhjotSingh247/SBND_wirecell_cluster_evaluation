@@ -4,16 +4,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 
-# Function to match true and reco clusters based on purity and efficiency results
+# Function to match true and reco clusters based on purity and completeness results
 # make pairing based on highest purity for each true cluster, then ensure one-to-one matching by keeping only the best pair for each reco cluster
-# TODO: we need to change matching creteria to energy-weighted efficiency instead of purity
+# TODO: we need to change matching creteria to energy-weighted completeness instead of purity
 def MatchRecoTruePairs(all_purity_results, all_eff_results):
-    # Convert lists of purity and efficiency results to DataFrames
+    # Convert lists of purity and completeness results to DataFrames
     purity_df = pd.DataFrame(all_purity_results)
-    efficiency_df = pd.DataFrame(all_eff_results)
+    completeness_df = pd.DataFrame(all_eff_results)
     
     # Merge the two DataFrames on event, true_cluster_id, and reco_cluster_id
-    merged_df = pd.merge(purity_df, efficiency_df, on=['event', 'true_cluster_id', 'reco_cluster_id'])
+    merged_df = pd.merge(purity_df, completeness_df, on=['event', 'true_cluster_id', 'reco_cluster_id'])
     
     # Keep only pairs with non-zero purity
     matched_pairs = merged_df[merged_df['purity'] > 0]

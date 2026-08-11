@@ -2,9 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-BEAM_WINDOW_MIN_US = 0.33
-BEAM_WINDOW_MAX_US = 1.93
-BEAM_WINDOW_WIDTH_US = BEAM_WINDOW_MAX_US - BEAM_WINDOW_MIN_US  # 1.6 us
+# The beam window, in us. Widened from [0.33, 1.93] (1.6 us) to [0.20, 2.20]
+# (2.0 us): 7 of the 11 true neutrinos that found no reco match were lost to the
+# beam-window cut rather than to reconstruction -- the charge was there, its
+# charge-light flash simply fell outside the window -- so the edges are worth
+# opening up. Everything downstream reads these two constants: the reco-side cut
+# in the evaluation notebooks, the beam-window counts in SelectionAnalysis, both
+# investigation scripts, and the shaded band plus the flash-offset columns in the
+# plots and tables here.
+BEAM_WINDOW_MIN_US = 0.20
+BEAM_WINDOW_MAX_US = 2.20
+BEAM_WINDOW_WIDTH_US = BEAM_WINDOW_MAX_US - BEAM_WINDOW_MIN_US  # 2.0 us
 FINE_BIN_WIDTH_US = 0.010  # 10 ns
 
 

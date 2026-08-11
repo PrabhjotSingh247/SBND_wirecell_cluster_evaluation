@@ -13,7 +13,7 @@ Variables per RECO cluster: avg_x, avg_y, avg_z (the cluster's mean position,
 cm), flash_time (us, the bridged optical flash time of that cluster) and
 total_charge (ADC).
 Variables per TRUE cluster: avg_x, avg_y, avg_z and total_energy (MeV, summed
-from the true points -- the same quantity the energy cut and every efficiency
+from the true points -- the same quantity the energy cut and every completeness
 plot use). There is deliberately no true-side flash_time: true clusters carry
 no flash and no time (build_true_points_charge_light fills the time column with
 zeros). See metadata.build_true_cluster_type_records for why beam/flash timing
@@ -251,7 +251,7 @@ def build_reco_cluster_variable_records(clusters_reco, file_name, event, event_k
     Parameters:
     - clusters_reco: dict {cluster_id: points}, points columns [x, y, z, cluster_id, charge],
         post-selection and post reassign_cluster_ID_reco -- i.e. the very same
-        dict the efficiency/purity evaluation runs on, so these distributions
+        dict the completeness/purity evaluation runs on, so these distributions
         describe exactly the clusters that evaluation scored.
     - file_name, event, event_key, apa: identification, as elsewhere in the pipeline
     - flash_time_by_reco_id: output of build_reco_flash_time_lookup(); None

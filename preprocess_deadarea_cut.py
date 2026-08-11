@@ -18,7 +18,7 @@ before this script existed): a true cluster's energy is now summed over
 dead-area-filtered points, so the energy cut sees slightly less energy per
 cluster and some clusters near the threshold will now fail it. That is the
 intended consequence -- the threshold becomes a statement about recoverable
-energy rather than deposited energy -- but it does mean efficiency/purity
+energy rather than deposited energy -- but it does mean completeness/purity
 numbers shift versus older runs. It is a physics change, not a refactor.
 
 WHAT IT WRITES

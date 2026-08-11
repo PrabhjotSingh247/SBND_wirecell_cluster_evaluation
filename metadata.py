@@ -5,12 +5,12 @@ from scipy.spatial import KDTree
 from variable_pca_linearity import calculate_pca_linearity
 from DrawRecoTrueFlashes import BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US
 
-def add_metadata_true_clusters(efficiency_results, cluster_category_results, file_name, event, apa, view, event_key=None):
+def add_metadata_true_clusters(completeness_results, cluster_category_results, file_name, event, apa, view, event_key=None):
     """
     Create metadata for each true cluster.
 
     Args:
-        efficiency_results: List of efficiency result dictionaries from EvaluateEfficiency
+        completeness_results: List of completeness result dictionaries from EvaluateCompleteness
         cluster_category_results: Dictionary mapping cluster IDs to category info (is_neutrino, track_type)
         file_name: Name of the input file (e.g., "file1")
         event: Event number
@@ -24,26 +24,26 @@ def add_metadata_true_clusters(efficiency_results, cluster_category_results, fil
     # Construct full event_key if not provided
     if event_key is None:
         event_key = f"{file_name}_{event}"
-    if not efficiency_results:
+    if not completeness_results:
         return []
 
-    # Group efficiency data by true cluster
+    # Group completeness data by true cluster
     true_cluster_data = {}
-    for eff in efficiency_results:
+    for eff in completeness_results:
         true_cid = eff['true_cluster_id']
 
         if true_cid not in true_cluster_data:
             true_cluster_data[true_cid] = {
-                'total_efficiency': 0,
+                'total_completeness': 0,
                 'reco_match_count': 0,
                 'total_true_energy': eff.get('total_true_cluster_energy', 0)
             }
 
-        true_cluster_data[true_cid]['total_efficiency'] += eff['efficiency_energy_weighted']
-        # The 8888 row is EvaluateEfficiency's "this true cluster matched nothing"
+        true_cluster_data[true_cid]['total_completeness'] += eff['completeness_energy_weighted']
+        # The 8888 row is EvaluateCompleteness's "this true cluster matched nothing"
         # sentinel, not a reco cluster, so it must not count towards num_reco_matches --
         # an unmatched true cluster has 0 matches, not 1. (The multiplicity bar chart and
-        # non_one_match_*.txt already corrected for this via total_efficiency <= 0; the
+        # non_one_match_*.txt already corrected for this via total_completeness <= 0; the
         # count is now correct at the source, so those corrections simply agree with it.)
         if eff['reco_cluster_id'] != 8888:
             true_cluster_data[true_cid]['reco_match_count'] += 1
@@ -70,7 +70,7 @@ def add_metadata_true_clusters(efficiency_results, cluster_category_results, fil
             'true_cluster_id': true_cid,
             'cluster_type': cluster_type,  # neutrino or cosmic
             'cluster_category': track_type,  # isochronous, prolonged, normal (only for cosmic)
-            'total_efficiency': cluster_info['total_efficiency'],
+            'total_completeness': cluster_info['total_completeness'],
             'num_reco_matches': cluster_info['reco_match_count'],
             'total_true_energy': cluster_info['total_true_energy']
         }
@@ -86,7 +86,7 @@ def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results,
 
     Args:
         matched_pairs: List of matched pair dictionaries from MatchTrueToReco1to1, each
-            containing true_cluster_id, reco_cluster_id, efficiency_energy_weighted, purity,
+            containing true_cluster_id, reco_cluster_id, completeness_energy_weighted, purity,
             total_true_cluster_energy, and total_reco_cluster_charge
         cluster_category_results: Dictionary mapping cluster IDs to category info (is_neutrino, track_type)
         file_name: Name of the input file (e.g., "file1")
@@ -129,7 +129,7 @@ def add_metadata_true_reco_pair_cluster(matched_pairs, cluster_category_results,
             'reco_cluster_id': reco_cid,
             'cluster_type': cluster_type,  # neutrino or cosmic
             'cluster_category': track_type,  # isochronous, prolonged, normal (only for cosmic)
-            'efficiency': pair.get('efficiency_energy_weighted', 0),
+            'completeness': pair.get('completeness_energy_weighted', 0),
             'purity': pair.get('purity', 0),
             'total_true_energy': pair.get('total_true_cluster_energy', 0),
             'total_reco_charge': pair.get('total_reco_cluster_charge', 0)
@@ -144,7 +144,7 @@ def add_metadata_reco_clusters(purity_results, file_name, event, apa, view, even
     """
     Create metadata for each reco cluster. Symmetric counterpart to add_metadata_true_clusters,
     aggregated from purity_results (EvaluatePurity) the same way the true-side function
-    aggregates from efficiency_results (EvaluateEfficiency).
+    aggregates from completeness_results (EvaluateCompleteness).
 
     Args:
         purity_results: List of purity result dictionaries from EvaluatePurity
@@ -232,7 +232,7 @@ def categorize_extra_reco_clusters(clusters_true, clusters_reco, purity_results,
       - fragment_of_neutrino: purity > 0 (from purity_results) against a true
         neutrino cluster, but a DIFFERENT reco cluster won that true cluster's
         1-to-1 slot. clusterpairmatching.MatchTrueToReco1to1 keeps only the
-        highest-efficiency reco per true cluster, so the others read as "extra"
+        highest-completeness reco per true cluster, so the others read as "extra"
         here even though they genuinely overlap the neutrino.
       - matched_cosmic_only: purity > 0 only against cosmic true cluster(s),
         never a neutrino -- correctly reconstructed in-spill cosmic activity,
@@ -361,19 +361,19 @@ def _beam_window_offset_us(flash_time):
     return 0.0
 
 
-def _true_reco_overlap_metrics(true_points, reco_points, radius_efficiency, min_recopoints_threshold):
+def _true_reco_overlap_metrics(true_points, reco_points, radius_completeness, min_recopoints_threshold):
     """
     Energy-weighted overlap of one true cluster with one reco cluster, at two
     strictnesses, from a single KDTree pass.
 
     Returns (strict, relaxed):
-      - strict : EXACTLY EvaluateEfficiency's efficiency_energy_weighted -- the
+      - strict : EXACTLY EvaluateCompleteness's completeness_energy_weighted -- the
         energy fraction of the true cluster whose points have MORE than
-        min_recopoints_threshold reco points within radius_efficiency. This is
+        min_recopoints_threshold reco points within radius_completeness. This is
         the quantity MatchTrueToReco1to1 needs to be > 0 for a pair to form, so
         strict == 0 means "this reco cluster cannot match this true cluster".
       - relaxed : the same energy fraction but requiring only >=1 reco point
-        within radius_efficiency. relaxed > 0 while strict == 0 is the signature
+        within radius_completeness. relaxed > 0 while strict == 0 is the signature
         of a broken/sparse reconstruction -- reco charge IS sitting on the true
         neutrino, just never densely enough to clear the neighbor threshold.
     """
@@ -385,7 +385,7 @@ def _true_reco_overlap_metrics(true_points, reco_points, radius_efficiency, min_
 
     tree = KDTree(np.asarray(reco_points)[:, :3])
     neighbor_counts = np.fromiter(
-        (len(n) for n in tree.query_ball_point(true_points[:, :3], r=radius_efficiency)),
+        (len(n) for n in tree.query_ball_point(true_points[:, :3], r=radius_completeness)),
         dtype=int, count=len(true_points))
 
     strict  = true_energies[neighbor_counts > min_recopoints_threshold].sum() / total_true_energy
@@ -393,7 +393,7 @@ def _true_reco_overlap_metrics(true_points, reco_points, radius_efficiency, min_
     return float(strict), float(relaxed)
 
 
-def _true_reco_yz_overlap_metrics(true_points, reco_points, radius_efficiency):
+def _true_reco_yz_overlap_metrics(true_points, reco_points, radius_completeness):
     """
     Same energy-weighted overlap as _true_reco_overlap_metrics' `relaxed`, but
     computed in the YZ PROJECTION ONLY -- X is dropped entirely.
@@ -409,14 +409,14 @@ def _true_reco_yz_overlap_metrics(true_points, reco_points, radius_efficiency):
     a long cosmic track crossing the YZ region of a small neutrino blob covers
     ~100% of that blob while only ~1% of the track lies on it. That is a
     coincidental crossing, not a drift-shifted reconstruction of the neutrino.
-    Requiring both fractions to be high is the same efficiency/purity pairing
-    EvaluateEfficiency/EvaluatePurity already use, applied to the YZ projection.
+    Requiring both fractions to be high is the same completeness/purity pairing
+    EvaluateCompleteness/EvaluatePurity already use, applied to the YZ projection.
 
     Returns (yz_overlap, yz_reco_frac, dx_mean):
       - yz_overlap : energy fraction of the TRUE cluster with >=1 reco point
-        within radius_efficiency in YZ (the efficiency-like direction)
+        within radius_completeness in YZ (the completeness-like direction)
       - yz_reco_frac : fraction of the RECO cluster's points lying within
-        radius_efficiency of a true point in YZ (the purity-like direction --
+        radius_completeness of a true point in YZ (the purity-like direction --
         this is what a passing cosmic track fails)
       - dx_mean : mean (reco_x - true_x) over the overlapping true points, each
         against its nearest-in-YZ reco point -- how far the reco sits from the
@@ -433,11 +433,11 @@ def _true_reco_yz_overlap_metrics(true_points, reco_points, radius_efficiency):
     reco_yz = reco_points[:, 1:3]
 
     dists, idx = KDTree(reco_yz).query(true_yz)
-    within = dists <= radius_efficiency
+    within = dists <= radius_completeness
     yz_overlap = true_energies[within].sum() / total_true_energy
 
     reco_dists, _ = KDTree(true_yz).query(reco_yz)
-    yz_reco_frac = float((reco_dists <= radius_efficiency).mean())
+    yz_reco_frac = float((reco_dists <= radius_completeness).mean())
 
     if not within.any():
         return float(yz_overlap), yz_reco_frac, None
@@ -460,7 +460,7 @@ YZ_ALIGNED_MIN_OVERLAP = 0.1
 def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, clusters_reco_all,
                                          reco_provenance, beam_window_real_ids, flash_times_by_real_id,
                                          matched_pairs, file_name, event, apa="Combined", event_key=None,
-                                         radius_efficiency=2, min_recopoints_threshold=5):
+                                         radius_completeness=2, min_recopoints_threshold=5):
     """
     Categorize every TRUE NEUTRINO cluster in one event by whether it found a
     1-to-1 reco match and, if not, why not.
@@ -471,14 +471,14 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
     argmax-per-true-cluster with no reco-side deduplication, so unlike the reco
     side there is no "lost the 1-to-1 slot to a competitor" failure mode here:
     a true cluster is unmatched if and only if NO selected reco cluster reaches
-    efficiency_energy_weighted > 0 against it.
+    completeness_energy_weighted > 0 against it.
 
     Categories (a true neutrino gets exactly one, tested in this order):
       - matched: this true neutrino IS in a MatchTrueToReco1to1 pair. Not a
         failure -- carried in the returned rows so one list describes all of
         them, same as categorize_extra_reco_clusters' 'matched_winner'.
       - reco_outside_beam_window: a reco cluster in the FULL set reaches
-        efficiency > 0 against this true neutrino, but it was removed by the
+        completeness > 0 against this true neutrino, but it was removed by the
         beam-window cut because its charge-light-matched flash sits outside
         [BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US]. winner_flash_time and
         winner_flash_offset_us (signed distance to the nearest window edge)
@@ -495,7 +495,7 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
         at all, so the beam-window ID filter dropped it for having no time.
         A pure charge-light failure, distinct from a timing failure.
       - broken_or_sparse_reco: no reco cluster in the full set reaches
-        efficiency > 0, yet reco points DO sit on the true neutrino
+        completeness > 0, yet reco points DO sit on the true neutrino
         (best_relaxed_overlap > 0). The reconstruction is there but fragmented
         or too sparse to clear min_recopoints_threshold -- the "highly
         scattered / broken neutrino" case. n_overlapping_reco_clusters says how
@@ -508,13 +508,13 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
         the signature of a wrong flash. yz_dx is how far the reco sits from the
         truth along the drift direction.
       - no_reco_overlap: not a single reco point in the full set lands within
-        radius_efficiency of this true neutrino, in 3D or in YZ -- the neutrino
+        radius_completeness of this true neutrino, in 3D or in YZ -- the neutrino
         was simply never reconstructed. nearest_reco_* / min_dist / dx,dy,dz
         come from a KDTree search against every reco cluster in the event (same
         technique as categorize_extra_reco_clusters' no_true_overlap block,
         true-centric here) and are filled for this category and the one above.
       - unexplained: defensive only. A reco cluster that IS in the selected set
-        reaches efficiency > 0 yet no pair formed -- impossible given the
+        reaches completeness > 0 yet no pair formed -- impossible given the
         matching code above, so it would signal that this script and the
         notebook pipeline have drifted apart rather than a physics effect.
 
@@ -536,8 +536,8 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
         matched_pairs: MatchTrueToReco1to1() output for this event
         file_name, event, apa: same convention as add_metadata_true_clusters
         event_key: full event key like "file1_0" (constructed if None)
-        radius_efficiency, min_recopoints_threshold: must be the SAME values the
-            driver passed to EvaluateEfficiency, or the strict overlap recomputed
+        radius_completeness, min_recopoints_threshold: must be the SAME values the
+            driver passed to EvaluateCompleteness, or the strict overlap recomputed
             here won't reproduce the matching it is trying to explain
 
     Returns:
@@ -570,7 +570,7 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
             'linearity': calculate_pca_linearity(true_points),
             'extent_x': float(extent[0]), 'extent_y': float(extent[1]), 'extent_z': float(extent[2]),
             'matched_reco_cluster_id': None,
-            'efficiency': None,
+            'completeness': None,
             # Best overlap found anywhere in the PRE-cut reco set, at both strictnesses.
             'best_strict_reco_cluster_id': None,
             'best_strict_overlap': 0.0,
@@ -598,14 +598,14 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
             pair = next(p for p in matched_pairs if p['true_cluster_id'] == true_cid)
             row['category'] = 'matched'
             row['matched_reco_cluster_id'] = pair['reco_cluster_id']
-            row['efficiency'] = pair['efficiency_energy_weighted']
+            row['completeness'] = pair['completeness_energy_weighted']
             rows.append(row)
             continue
 
         # --- Unmatched: re-test against every PRE-cut reco cluster ---
         for reco_cid, reco_points in clusters_reco_all.items():
             strict, relaxed = _true_reco_overlap_metrics(true_points, reco_points,
-                                                          radius_efficiency, min_recopoints_threshold)
+                                                          radius_completeness, min_recopoints_threshold)
             if relaxed > 0:
                 row['n_overlapping_reco_clusters'] += 1
                 if any(rid in beam_window_real_ids for rid in reco_provenance.get(reco_cid, [])):
@@ -669,7 +669,7 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
                 best_balance = -1.0
                 for reco_cid, reco_points in clusters_reco_all.items():
                     yz_overlap, yz_reco_frac, yz_dx = _true_reco_yz_overlap_metrics(
-                        true_points, reco_points, radius_efficiency)
+                        true_points, reco_points, radius_completeness)
                     balance = min(yz_overlap, yz_reco_frac)
                     if balance > best_balance:
                         best_balance = balance
@@ -745,11 +745,11 @@ def aggregate_metadata(metadata_list):
             'prolonged': 0,
             'normal': 0
         },
-        'efficiency_stats': {
-            'mean': np.mean([m['total_efficiency'] for m in metadata_list]),
-            'median': np.median([m['total_efficiency'] for m in metadata_list]),
-            'min': np.min([m['total_efficiency'] for m in metadata_list]),
-            'max': np.max([m['total_efficiency'] for m in metadata_list])
+        'completeness_stats': {
+            'mean': np.mean([m['total_completeness'] for m in metadata_list]),
+            'median': np.median([m['total_completeness'] for m in metadata_list]),
+            'min': np.min([m['total_completeness'] for m in metadata_list]),
+            'max': np.max([m['total_completeness'] for m in metadata_list])
         },
         'reco_matches_stats': {
             'mean': np.mean([m['num_reco_matches'] for m in metadata_list]),
@@ -1039,7 +1039,7 @@ def build_true_cluster_type_records(clusters_true, file_name, event, event_key=N
     and no time (build_true_points_charge_light fills the time column with
     zeros), so any "true cluster in the beam window" flag could only be inferred
     by spatially matching to a reco cluster whose flash landed in the window --
-    which mixes beam timing with reconstruction + flash-matching efficiency
+    which mixes beam timing with reconstruction + flash-matching completeness
     while reading as a truth-level timing selection. Beam-window membership is
     a RECO-side quantity only (see build_img_cluster_flash_metadata and
     writeinformation.write_reco_cluster_info); do not reintroduce it here.
@@ -1215,7 +1215,7 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
     ENERGY -- read this before using any energy from here:
       - cluster_energy_MeV is the TRUE cluster energy summed from the
         sed-sce_drift_smear_readout points (column 5), i.e. the same quantity
-        apply_energy_cutoff and every efficiency plot use. THIS is the energy for
+        apply_energy_cutoff and every completeness plot use. THIS is the energy for
         evaluation and selection.
       - mc_total_energy_MeV ('Etot') and mc_edep_MeV ('Edep') are copied from
         mc.json's root text for reference only -- Etot is the incident neutrino's
@@ -1373,7 +1373,7 @@ def build_neutrino_volume_map(vertex_records):
 
     The key is exact, not spatial: reassign_cluster_ID_true_charge_light gives
     interaction nu_idx the cluster_id 99990+nu_idx, and that same id is what
-    efficiency/purity/metadata records carry as 'true_cluster_id'.
+    completeness/purity/metadata records carry as 'true_cluster_id'.
 
     Interactions whose vertex_in_volume is None -- no vertex in mc.json, or no
     volume bounds passed to build_neutrino_vertex_records -- are LEFT OUT rather
@@ -1461,7 +1461,7 @@ def filter_records_by_label(records, label_map, label, id_key='true_cluster_id')
     build_neutrino_volume_map, 'numu_CC'/'nue_CC'/'NC' from
     build_neutrino_channel_map -- so one filter serves every split.
 
-    Nothing is recalculated here: efficiency, purity and every matching decision
+    Nothing is recalculated here: completeness, purity and every matching decision
     were made against the FULL true and reco populations, and this only selects
     which of those finished records a given output root shows. In particular the
     reco side is never cut -- a purity value kept here still reflects the cosmic
@@ -1472,7 +1472,7 @@ def filter_records_by_label(records, label_map, label, id_key='true_cluster_id')
     - label_map: build_neutrino_volume_map / build_neutrino_channel_map output
     - label: the population to keep, or 'all' to return the list unchanged
     - id_key: the record's true-cluster id field -- 'true_cluster_id' for
-      efficiency / purity / metadata / pair / 1-to-many records, 'cluster_id' for
+      completeness / purity / metadata / pair / 1-to-many records, 'cluster_id' for
       build_true_cluster_type_records and build_neutrino_vertex_records output
 
     Returns:
@@ -1483,10 +1483,10 @@ def filter_records_by_label(records, label_map, label, id_key='true_cluster_id')
       - EvaluatePurity's unmatched-reco rows (true_cluster_id=8888), which
         describe reco clusters that touched no true cluster and so belong to no
         neutrino population
-    An unmatched true NEUTRINO is kept: EvaluateEfficiency's unmatched row is
+    An unmatched true NEUTRINO is kept: EvaluateCompleteness's unmatched row is
     keyed by the neutrino's own cluster id (only its reco_cluster_id is the 8888
     sentinel), so a neutrino that reconstructed to nothing stays in the
-    efficiency denominator at 0.
+    completeness denominator at 0.
     """
     if label == 'all':
         return list(records or [])

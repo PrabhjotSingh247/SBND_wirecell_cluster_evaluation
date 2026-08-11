@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate summary tables from existing per-event efficiency and purity tables.
+Generate summary tables from existing per-event completeness and purity tables.
 This aggregates all per-event data into summary tables.
 """
 
@@ -11,14 +11,14 @@ import numpy as np
 def generate_summary_tables():
     output_base = Path("/exp/sbnd/data/users/prabhjot/wirecell_clustering/cluster_evaluation/multi_file_plots_without_deghosting/2view/2view/apa_APA0")
 
-    # Find all per-event efficiency tables
-    eff_tables = list(output_base.glob("*/event_*/efficiency/EfficiencyTable.txt"))
+    # Find all per-event completeness tables
+    eff_tables = list(output_base.glob("*/event_*/completeness/CompletenessTable.txt"))
     pur_tables = list(output_base.glob("*/event_*/purity/PurityTable.txt"))
 
-    print(f"Found {len(eff_tables)} efficiency tables")
+    print(f"Found {len(eff_tables)} completeness tables")
     print(f"Found {len(pur_tables)} purity tables")
 
-    # Read and combine efficiency tables
+    # Read and combine completeness tables
     eff_data = []
     for table_file in eff_tables:
         try:
@@ -55,24 +55,24 @@ def generate_summary_tables():
 
     if eff_data:
         eff_all = pd.concat(eff_data, ignore_index=True)
-        print(f"Total efficiency data: {len(eff_all)} rows")
+        print(f"Total completeness data: {len(eff_all)} rows")
 
-        # Generate summary efficiency table
+        # Generate summary completeness table
         output_text = "\n" + "="*120 + "\n"
-        output_text += "SUMMARY EFFICIENCY TABLE - ALL FILES AND ALL EVENTS\n"
+        output_text += "SUMMARY COMPLETENESS TABLE - ALL FILES AND ALL EVENTS\n"
         output_text += "Sorted by True Cluster Energy (descending)\n"
         output_text += "="*120 + "\n\n"
 
-        output_text += f"{'Event':<8} {'True ID':<12} {'Reco ID':<12} {'True Energy':<15} {'Matched Energy':<18} {'Efficiency':<12} {'Status':<20}\n"
+        output_text += f"{'Event':<8} {'True ID':<12} {'Reco ID':<12} {'True Energy':<15} {'Matched Energy':<18} {'Completeness':<12} {'Status':<20}\n"
         output_text += "-"*120 + "\n"
 
         for _, row in eff_all.iterrows():
-            output_text += f"{str(row.get('Event', '')):<8} {str(row.get('True ID', '')):<12} {str(row.get('Reco ID', '')):<12} {str(row.get('True Energy', '')):<15} {str(row.get('Matched Energy', '')):<18} {str(row.get('Efficiency', '')):<12} {str(row.get('Status', '')):<20}\n"
+            output_text += f"{str(row.get('Event', '')):<8} {str(row.get('True ID', '')):<12} {str(row.get('Reco ID', '')):<12} {str(row.get('True Energy', '')):<15} {str(row.get('Matched Energy', '')):<18} {str(row.get('Completeness', '')):<12} {str(row.get('Status', '')):<20}\n"
 
         output_text += "-"*120 + "\n\n"
         output_text += f"Total pairs: {len(eff_all)}\n"
 
-        eff_file = output_base / "SUMMARY_EfficiencyTable.txt"
+        eff_file = output_base / "SUMMARY_CompletenessTable.txt"
         with open(eff_file, 'w') as f:
             f.write(output_text)
         print(f"✓ Created {eff_file.name}")

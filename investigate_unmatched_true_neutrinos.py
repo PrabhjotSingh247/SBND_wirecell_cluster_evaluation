@@ -17,7 +17,7 @@ metadata.categorize_unmatched_true_neutrinos() into:
   - reco_no_flash_match      : same, but charge-light matching attached NO flash at all,
                                 so the beam-window filter dropped it for having no time
   - broken_or_sparse_reco    : reco charge DOES sit on the neutrino, but split into pieces
-                                too sparse to clear the efficiency neighbor threshold
+                                too sparse to clear the completeness neighbor threshold
                                 (the "highly scattered / broken neutrino" case)
   - no_reco_overlap          : not one reco point lands on it; nearest-reco offset
                                 (dx-dominated => X-mis-assignment candidate) is reported
@@ -71,7 +71,7 @@ from selections import (
     apply_wire_readout_sensitive_yz_plane_cut_reco,
     apply_deadarea_cut_true_charge_light,
 )
-from efficiency_purity_estimate import EvaluateEfficiency, EvaluatePurity
+from completeness_purity_estimate import EvaluateCompleteness, EvaluatePurity
 from clusterpairmatching import MatchTrueToReco1to1
 from metadata import (
     build_cluster_flash_metadata, build_img_cluster_flash_metadata,
@@ -102,7 +102,7 @@ EVENT_HIGH  = None    # exclusive; None = auto-detect
 OUTPUT_DIR  = Path("multi_file_plots_charge_light_matching/unmatched_true_neutrino_investigation")
 APA_LABEL   = "Combined"
 
-radius_efficiency        = 2
+radius_completeness        = 2
 radius_purity_xz         = 2
 radius_purity_yz         = 5
 radius_purity_xy         = 5
@@ -341,15 +341,15 @@ def process_event(input_dir, file_name, evt):
         clusters_reco = {cid: points for cid, points in clusters_reco_all.items()
                           if any(rid in clu_beam_window_ids for rid in reco_provenance[cid])}
 
-    efficiency_results = EvaluateEfficiency(clusters_true, clusters_reco, event_key, radius_efficiency, min_recopoints_threshold)
+    completeness_results = EvaluateCompleteness(clusters_true, clusters_reco, event_key, radius_completeness, min_recopoints_threshold)
     purity_results     = EvaluatePurity(clusters_true, clusters_reco, event_key, radius_purity_xz, radius_purity_yz, radius_purity_xy)
-    matched_pairs      = MatchTrueToReco1to1(efficiency_results, purity_results)
+    matched_pairs      = MatchTrueToReco1to1(completeness_results, purity_results)
 
     neutrino_rows = categorize_unmatched_true_neutrinos(
         clusters_true, clusters_reco, clusters_reco_all, reco_provenance,
         clu_beam_window_ids, flash_times_by_real_id, matched_pairs,
         file_name, evt, apa=APA_LABEL, event_key=event_key,
-        radius_efficiency=radius_efficiency, min_recopoints_threshold=min_recopoints_threshold)
+        radius_completeness=radius_completeness, min_recopoints_threshold=min_recopoints_threshold)
 
     # --- Interaction vertices (mc.json), for the in/out-of-volume split ---
     # Same builder and same bounds as the evaluation notebook, so "in volume"

@@ -20,7 +20,7 @@ gets its own subdirectory at every level:
     *_npoints_vs_energy_count_*.png              (true: n_points vs energy, color=#clusters)
     *_npoints_vs_charge_count_*.png              (reco: n_points vs charge, color=#clusters)
     *_npoints_vs_charge_colz_job_<APA>.png        (reco: n_points vs charge, color=mean linearity; job-level only)
-    *_linearity_vs_efficiency_*.png              (true cluster linearity vs. matched-reco efficiency)
+    *_linearity_vs_completeness_*.png              (true cluster linearity vs. matched-reco completeness)
     flagged_true_clusters_*.txt                  (metadata table for flagged true clusters only)
     job_level/summary.txt                        (job start/end time and duration - not per-APA)
     <file>/event_NNN/<APA>/true_cluster_<id>_views_*.png   (XZ/YZ/XY views of each flagged true cluster)
@@ -45,7 +45,7 @@ from selections import (
     reassign_cluster_ID_true, reassign_cluster_ID_reco, GroupClustersByID,
     apply_deadarea_cut_true,
 )
-from efficiency_purity_estimate import EvaluateEfficiency
+from completeness_purity_estimate import EvaluateCompleteness
 
 # Same cut configuration as Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb (cell 3), so the
 # diagnostic reflects the cluster shapes a removal cut would actually see.
@@ -55,7 +55,7 @@ MIN_RECO_POINTS_CUTOFF   = 200
 X_MIN, X_MAX = -250.0, 250.0
 Y_MIN, Y_MAX = -200.0, 200.0
 Z_MIN, Z_MAX = 0.15, 500.85
-RADIUS_EFFICIENCY        = 2
+RADIUS_COMPLETENESS        = 2
 MIN_RECOPOINTS_THRESHOLD = 5
 
 # Candidate thresholds carried over from the single-event check (file1, event 1,
@@ -186,7 +186,7 @@ def main():
 
     true_rows = []
     reco_rows = []
-    efficiency_rows = []
+    completeness_rows = []
     flagged_true_xyz = {}  # (file, event, apa, cluster_id) -> xyz points, for the per-cluster view plots
     flagged_reco_xyz = {}  # same, for reco clusters
 
@@ -251,19 +251,19 @@ def main():
                             flagged_reco_xyz[(file_name, evt, apa, cluster_id)] = xyz.copy()
 
                 if true_clusters:
-                    eff_results = EvaluateEfficiency(
+                    eff_results = EvaluateCompleteness(
                         true_clusters, reco_clusters, evt,
-                        radius_efficiency=RADIUS_EFFICIENCY,
+                        radius_completeness=RADIUS_COMPLETENESS,
                         min_recopoints_threshold=MIN_RECOPOINTS_THRESHOLD)
                     for row in eff_results:
                         shape = true_shape_by_id.get(row["true_cluster_id"])
                         if shape is None:
                             continue
-                        efficiency_rows.append({
+                        completeness_rows.append({
                             "file": file_name, "event": evt, "apa": apa,
                             "true_cluster_id": row["true_cluster_id"],
                             "reco_cluster_id": row["reco_cluster_id"],
-                            "efficiency": row["efficiency_energy_weighted"],
+                            "completeness": row["completeness_energy_weighted"],
                             "linearity": shape["linearity"],
                             "is_neutrino": shape["is_neutrino"],
                             "flagged": shape["flagged"],
@@ -271,15 +271,15 @@ def main():
 
     true_df = pd.DataFrame(true_rows)
     reco_df = pd.DataFrame(reco_rows)
-    efficiency_df = pd.DataFrame(efficiency_rows)
+    completeness_df = pd.DataFrame(completeness_rows)
     print(f"\nProcessed {len(true_df)} true cluster rows, {len(reco_df)} reco cluster rows, "
-          f"{len(efficiency_df)} true-to-reco efficiency matches")
+          f"{len(completeness_df)} true-to-reco completeness matches")
 
     # Join flagged true-cluster matches with their true/reco cluster metadata, for
     # the flagged-cluster .txt reports. reco_cluster_id == 8888 (unmatched) simply
     # won't be found in reco_df, so those rows keep NaN reco columns.
-    if not efficiency_df.empty:
-        flagged_metadata_df = efficiency_df[efficiency_df["flagged"]].copy()
+    if not completeness_df.empty:
+        flagged_metadata_df = completeness_df[completeness_df["flagged"]].copy()
         true_lookup = true_df.set_index(["file", "event", "apa", "cluster_id"])[["n_points", "energy"]]
         true_lookup = true_lookup.rename(columns={"n_points": "n_true_points", "energy": "true_energy"})
         flagged_metadata_df = flagged_metadata_df.join(
@@ -297,8 +297,8 @@ def main():
     # (the unmatched sentinel).
     true_match_lookup = {}
     reco_match_lookup = {}
-    if not efficiency_df.empty:
-        matched = efficiency_df[efficiency_df["reco_cluster_id"] != 8888]
+    if not completeness_df.empty:
+        matched = completeness_df[completeness_df["reco_cluster_id"] != 8888]
         for _, r in matched.iterrows():
             true_key = (r["file"], r["event"], r["apa"], r["true_cluster_id"])
             true_match_lookup.setdefault(true_key, []).append(r["reco_cluster_id"])
@@ -396,14 +396,14 @@ def main():
                 title=(f"Reco cluster {row['cluster_id']:.0f} with true {true_label} - "
                        f"{file_name}, event {evt}, {apa}"),
                 out_path=evt_dir / f"reco_cluster_{row['cluster_id']:.0f}_with_true_{true_label}_views_{tag}.png")
-    if not efficiency_df.empty:
-        for (file_name, evt, apa), eff_group in efficiency_df.groupby(["file", "event", "apa"]):
+    if not completeness_df.empty:
+        for (file_name, evt, apa), eff_group in completeness_df.groupby(["file", "event", "apa"]):
             evt_dir = out_dir / file_name / f"event_{int(evt):03d}" / apa
             evt_dir.mkdir(parents=True, exist_ok=True)
             tag = f"{file_name}_{apa}_event{int(evt)}"
-            plot_linearity_vs_efficiency_scatter(
-                eff_group, title=f"True cluster linearity vs. efficiency - {file_name}, event {evt}, {apa}",
-                out_path=evt_dir / f"true_cluster_linearity_vs_efficiency_{tag}.png")
+            plot_linearity_vs_completeness_scatter(
+                eff_group, title=f"True cluster linearity vs. completeness - {file_name}, event {evt}, {apa}",
+                out_path=evt_dir / f"true_cluster_linearity_vs_completeness_{tag}.png")
             flagged_group = flagged_metadata_df[
                 (flagged_metadata_df["file"] == file_name) & (flagged_metadata_df["event"] == evt)
                 & (flagged_metadata_df["apa"] == apa)]
@@ -411,7 +411,7 @@ def main():
                 flagged_group, title=f"Flagged true clusters - {file_name}, event {evt}, {apa}",
                 out_path=evt_dir / f"flagged_true_clusters_{tag}.txt")
 
-    # File-Level: colz plots (+ linearity vs efficiency scatter, + flagged metadata
+    # File-Level: colz plots (+ linearity vs completeness scatter, + flagged metadata
     # .txt) per (file, apa), aggregating all events in that file. (No bar chart at
     # this level - too many bars across events to be readable/meaningful.)
     for (file_name, apa), true_group in true_df.groupby(["file", "apa"]):
@@ -439,11 +439,11 @@ def main():
                            x_label="Number of points", y_label="Reco cluster charge [ADC]",
                            title=f"Reco clusters: n_points vs charge (color=#clusters) - {file_name}, all events, {apa}",
                            out_path=file_dir / f"reco_cluster_npoints_vs_charge_count_{tag}.png")
-        if not efficiency_df.empty:
-            eff_group = efficiency_df[(efficiency_df["file"] == file_name) & (efficiency_df["apa"] == apa)]
-            plot_linearity_vs_efficiency_scatter(
-                eff_group, title=f"True cluster linearity vs. efficiency - {file_name}, all events, {apa}",
-                out_path=file_dir / f"true_cluster_linearity_vs_efficiency_{tag}.png")
+        if not completeness_df.empty:
+            eff_group = completeness_df[(completeness_df["file"] == file_name) & (completeness_df["apa"] == apa)]
+            plot_linearity_vs_completeness_scatter(
+                eff_group, title=f"True cluster linearity vs. completeness - {file_name}, all events, {apa}",
+                out_path=file_dir / f"true_cluster_linearity_vs_completeness_{tag}.png")
         flagged_group = flagged_metadata_df[
             (flagged_metadata_df["file"] == file_name) & (flagged_metadata_df["apa"] == apa)]
         write_flagged_metadata_txt(
@@ -513,13 +513,13 @@ def main():
                            x_label="Number of points", y_label="Reco cluster charge [ADC]",
                            title=f"Reco clusters: n_points vs charge (color=#clusters) - all files, all events, {apa}",
                            out_path=job_dir / f"reco_cluster_npoints_vs_charge_count_job_{apa}.png")
-    if not efficiency_df.empty:
-        for apa, eff_group in efficiency_df.groupby("apa"):
+    if not completeness_df.empty:
+        for apa, eff_group in completeness_df.groupby("apa"):
             job_dir = job_base_dir / apa
             job_dir.mkdir(parents=True, exist_ok=True)
-            plot_linearity_vs_efficiency_scatter(
-                eff_group, title=f"True cluster linearity vs. efficiency - all files, all events, {apa}",
-                out_path=job_dir / f"true_cluster_linearity_vs_efficiency_job_{apa}.png")
+            plot_linearity_vs_completeness_scatter(
+                eff_group, title=f"True cluster linearity vs. completeness - all files, all events, {apa}",
+                out_path=job_dir / f"true_cluster_linearity_vs_completeness_job_{apa}.png")
     for apa in apa_list:
         job_dir = job_base_dir / apa
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -681,10 +681,10 @@ def plot_cluster_three_views(xyz, info, title, out_path):
     print(f"Saved {out_path}")
 
 
-def plot_linearity_vs_efficiency_scatter(df, title, out_path):
-    """Scatter of true-cluster linearity (x) vs its energy-weighted efficiency (y)
+def plot_linearity_vs_completeness_scatter(df, title, out_path):
+    """Scatter of true-cluster linearity (x) vs its energy-weighted completeness (y)
     matching to reco clusters (one point per true-to-reco match, from
-    EvaluateEfficiency; unmatched true clusters appear at efficiency=0)."""
+    EvaluateCompleteness; unmatched true clusters appear at completeness=0)."""
     if len(df) == 0:
         print(f"No rows to plot for {out_path}, skipping.")
         return
@@ -696,12 +696,12 @@ def plot_linearity_vs_efficiency_scatter(df, title, out_path):
     # cluster is drawn once, as neutrino (violet), not also as flagged (red).
     regular_mask = (~df["flagged"]) & (~df["is_neutrino"])
     flagged_mask = df["flagged"] & (~df["is_neutrino"])
-    ax.scatter(df.loc[regular_mask, "linearity"], df.loc[regular_mask, "efficiency"],
+    ax.scatter(df.loc[regular_mask, "linearity"], df.loc[regular_mask, "completeness"],
                s=18, alpha=0.5, color=COLOR_REGULAR, edgecolors="none", label="True cluster match")
-    ax.scatter(df.loc[flagged_mask, "linearity"], df.loc[flagged_mask, "efficiency"],
+    ax.scatter(df.loc[flagged_mask, "linearity"], df.loc[flagged_mask, "completeness"],
                s=28, alpha=0.85, color=COLOR_FLAGGED, edgecolors="none",
                label=f"Flagged (linearity<{LINEARITY_THRESHOLD})")
-    ax.scatter(df.loc[df["is_neutrino"], "linearity"], df.loc[df["is_neutrino"], "efficiency"],
+    ax.scatter(df.loc[df["is_neutrino"], "linearity"], df.loc[df["is_neutrino"], "completeness"],
                s=32, alpha=0.9, color=COLOR_NEUTRINO, edgecolors="none",
                label="Neutrino cluster (9999)")
 
@@ -709,7 +709,7 @@ def plot_linearity_vs_efficiency_scatter(df, title, out_path):
     ax.set_xlim(-0.02, 1.02)
     ax.set_ylim(-0.02, 1.05)
     ax.set_xlabel("PCA linearity", color=INK_PRIMARY)
-    ax.set_ylabel("Efficiency (energy-weighted match to reco)", color=INK_PRIMARY)
+    ax.set_ylabel("Completeness (energy-weighted match to reco)", color=INK_PRIMARY)
     ax.set_title(title, color=INK_PRIMARY, fontsize=11)
     ax.tick_params(colors=INK_MUTED)
     for spine in ax.spines.values():
@@ -777,7 +777,7 @@ def plot_linearity_vs_energy_by_match_count(df, title, out_path, y_max=None, onl
 
 
 FLAGGED_METADATA_COLUMNS = [
-    "file", "event", "true_cluster_id", "reco_cluster_id", "efficiency", "linearity",
+    "file", "event", "true_cluster_id", "reco_cluster_id", "completeness", "linearity",
     "n_true_points", "true_energy", "n_reco_points", "reco_charge",
 ]
 

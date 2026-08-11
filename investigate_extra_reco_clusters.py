@@ -31,7 +31,7 @@ from selections import (
     apply_wire_readout_sensitive_yz_plane_cut_reco,
     apply_deadarea_cut_true_charge_light,
 )
-from efficiency_purity_estimate import EvaluateEfficiency, EvaluatePurity
+from completeness_purity_estimate import EvaluateCompleteness, EvaluatePurity
 from clusterpairmatching import MatchTrueToReco1to1
 from metadata import (
     build_cluster_flash_metadata, build_img_cluster_flash_metadata, categorize_extra_reco_clusters,
@@ -53,7 +53,7 @@ EVENT_HIGH  = None    # exclusive; None = auto-detect
 OUTPUT_DIR  = Path("multi_file_plots_charge_light_matching/extra_reco_investigation")
 APA_LABEL   = "Combined"
 
-radius_efficiency        = 2
+radius_completeness        = 2
 radius_purity_xz         = 2
 radius_purity_yz         = 5
 radius_purity_xy         = 5
@@ -135,9 +135,9 @@ def process_event(input_dir, file_name, evt):
         predicted_points = reassign_cluster_ID_reco(predicted_points)
         clusters_reco    = GroupClustersByID(predicted_points)
 
-    efficiency_results = EvaluateEfficiency(clusters_true, clusters_reco, event_key, radius_efficiency, min_recopoints_threshold)
+    completeness_results = EvaluateCompleteness(clusters_true, clusters_reco, event_key, radius_completeness, min_recopoints_threshold)
     purity_results      = EvaluatePurity(clusters_true, clusters_reco, event_key, radius_purity_xz, radius_purity_yz, radius_purity_xy)
-    matched_pairs        = MatchTrueToReco1to1(efficiency_results, purity_results)
+    matched_pairs        = MatchTrueToReco1to1(completeness_results, purity_results)
 
     categorized_rows = categorize_extra_reco_clusters(clusters_true, clusters_reco, purity_results, matched_pairs,
                                                         file_name, evt, apa=APA_LABEL, event_key=event_key)

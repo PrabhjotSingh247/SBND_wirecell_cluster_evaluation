@@ -8,8 +8,8 @@ distribution of true energy (y) against reco charge (x), one point per 1-to-1
 matched true-reco pair.
 
 WHICH PAIRS: only pairs whose TRUE side is a neutrino cluster, and only those
-reconstructed well enough to be worth calibrating against -- efficiency above
-EFFICIENCY_THRESHOLD_DEFAULT (0.8). A pair at 30% efficiency has most of its
+reconstructed well enough to be worth calibrating against -- completeness above
+COMPLETENESS_THRESHOLD_DEFAULT (0.8). A pair at 30% completeness has most of its
 true energy sitting in some other reco cluster (or in none), so its charge
 cannot be expected to track its energy and it would only smear the relation.
 The reco side of every pair is a SELECTED reco cluster by construction: the
@@ -21,7 +21,7 @@ over every pair including cosmics -- see CLUSTER_SELECTIONS.
 
 WHICH ENERGY: true_energy_MeV, the TRUE CLUSTER energy summed from the sed true
 points. That is what the detector actually saw, and what every cut and
-efficiency number in this pipeline uses, so it is the right target for a
+completeness number in this pipeline uses, so it is the right target for a
 charge-to-energy calibration. mc.json's 'Etot' (the INCIDENT neutrino energy) is
 carried on each record and printed in the text table for reference, but is
 deliberately NOT plotted: most of it may never be deposited in the active volume
@@ -50,8 +50,8 @@ from pathlib import Path
 # the scheme, and both copies must follow it.
 NEUTRINO_CLUSTER_ID_BASE = 99990.0
 
-# Minimum efficiency for a pair to enter the plots -- see the module docstring.
-EFFICIENCY_THRESHOLD_DEFAULT = 0.8
+# Minimum completeness for a pair to enter the plots -- see the module docstring.
+COMPLETENESS_THRESHOLD_DEFAULT = 0.8
 
 # Bin widths for the 2D histogram. Same widths as the 1D distributions in
 # AnalysisDistributions_Reco_True, so a projection of this plot is comparable to
@@ -104,11 +104,11 @@ def nu_idx_from_true_cluster_id(true_cluster_id):
 # ============================================================================
 
 def build_matched_pair_energy_records(pair_metadata_list, vertex_records=None,
-                                      efficiency_threshold=EFFICIENCY_THRESHOLD_DEFAULT,
+                                      completeness_threshold=COMPLETENESS_THRESHOLD_DEFAULT,
                                       neutrino_only=True):
     """
     One record per 1-to-1 true-reco pair that survives the neutrino and
-    efficiency selections -- the points of the 2D plots.
+    completeness selections -- the points of the 2D plots.
 
     The pairing is not recomputed here: it is read off the same
     clusterpairmatching.MatchTrueToReco1to1 ->
@@ -118,19 +118,19 @@ def build_matched_pair_energy_records(pair_metadata_list, vertex_records=None,
 
     Parameters:
     - pair_metadata_list: from metadata.add_metadata_true_reco_pair_cluster(),
-        each with 'event', 'true_cluster_id', 'reco_cluster_id', 'efficiency',
+        each with 'event', 'true_cluster_id', 'reco_cluster_id', 'completeness',
         'purity', 'total_true_energy', 'total_reco_charge'
     - vertex_records: from metadata.build_neutrino_vertex_records(), joined by
         (event, nu_idx) -- an exact key -- to carry mc.json's Etot/Edep and the
         vertex_in_volume flag onto each record. None leaves those fields None,
         and the mc-energy variant of the plot then has nothing to draw.
-    - efficiency_threshold: keep pairs with efficiency STRICTLY ABOVE this
-        (0.8 = "more than 80% efficiency"). Pass 0 to keep every pair.
+    - completeness_threshold: keep pairs with completeness STRICTLY ABOVE this
+        (0.8 = "more than 80% completeness"). Pass 0 to keep every pair.
     - neutrino_only: keep only pairs whose true cluster is a neutrino
 
     Returns:
         List of dicts: {file_name, event, event_num, apa, nu_idx,
-        true_cluster_id, reco_cluster_id, efficiency, purity,
+        true_cluster_id, reco_cluster_id, completeness, purity,
         true_energy_MeV, reco_charge_ADC, mc_total_energy_MeV, mc_edep_MeV,
         vertex_in_volume}
     """
@@ -148,8 +148,8 @@ def build_matched_pair_energy_records(pair_metadata_list, vertex_records=None,
         if neutrino_only and nu_idx is None:
             continue
 
-        efficiency = pair.get('efficiency', 0) or 0
-        if efficiency <= efficiency_threshold:
+        completeness = pair.get('completeness', 0) or 0
+        if completeness <= completeness_threshold:
             continue
 
         vertex = vertex_by_event_nu.get((pair['event'], nu_idx), {})
@@ -161,7 +161,7 @@ def build_matched_pair_energy_records(pair_metadata_list, vertex_records=None,
             'nu_idx':              nu_idx,
             'true_cluster_id':     float(pair['true_cluster_id']),
             'reco_cluster_id':     float(pair['reco_cluster_id']),
-            'efficiency':          float(efficiency),
+            'completeness':          float(completeness),
             'purity':              float(pair.get('purity', 0) or 0),
             'true_energy_MeV':     float(pair.get('total_true_energy', 0) or 0),
             'reco_charge_ADC':     float(pair.get('total_reco_charge', 0) or 0),
@@ -190,13 +190,13 @@ def _bin_edges(values, bin_width):
     return np.arange(low, high + bin_width / 2, bin_width)
 
 
-def _stats_text(x_values, y_values, efficiency_threshold=None):
+def _stats_text(x_values, y_values, completeness_threshold=None):
     """Entry count, per-axis mean/std, and the linear correlation between them."""
     x = np.asarray(x_values, dtype=float)
     y = np.asarray(y_values, dtype=float)
     lines = [f"pairs   = {len(x)}"]
-    if efficiency_threshold is not None:
-        lines.append(f"eff     > {efficiency_threshold:.2f}")
+    if completeness_threshold is not None:
+        lines.append(f"eff     > {completeness_threshold:.2f}")
     lines.append(f"<charge>= {x.mean():.3g}")
     lines.append(f"<energy>= {y.mean():.1f}")
     # Pearson r needs two distinct values on each axis; a single pair, or a
@@ -220,7 +220,7 @@ def _finish_axes(ax, xlabel, ylabel, title):
 def draw_true_energy_vs_reco_charge(records, output_dir, level_name, filename_prefix, apa,
                                     file_name=None, selection_label='true neutrino clusters',
                                     filename_tag='true_cluster_energy',
-                                    efficiency_threshold=EFFICIENCY_THRESHOLD_DEFAULT,
+                                    completeness_threshold=COMPLETENESS_THRESHOLD_DEFAULT,
                                     write_text_table=True, write_root=False):
     """
     The 2D histogram of true cluster energy (y) against reco cluster charge (x),
@@ -244,7 +244,7 @@ def draw_true_energy_vs_reco_charge(records, output_dir, level_name, filename_pr
     - file_name: optional input file name for the title
     - selection_label: which true-cluster population these pairs are, for the title
     - filename_tag: stem of the output filenames
-    - efficiency_threshold: shown in the title and stats box only; the cut
+    - completeness_threshold: shown in the title and stats box only; the cut
         itself was applied by build_matched_pair_energy_records
     - write_text_table: also write the pair-by-pair table behind the histogram
     - write_root: also write the histogram to a .root file as a TH2D, for
@@ -260,7 +260,7 @@ def draw_true_energy_vs_reco_charge(records, output_dir, level_name, filename_pr
 
     if write_text_table:
         _write_pair_energy_info(records, output_dir, level_name, selection_label,
-                                efficiency_threshold, file_name, filename_tag)
+                                completeness_threshold, file_name, filename_tag)
 
     if not records:
         print(f"  [draw_energy_reconstruction] {filename_tag} / {selection_label} / {level_name}: "
@@ -273,7 +273,7 @@ def draw_true_energy_vs_reco_charge(records, output_dir, level_name, filename_pr
     title = f'True Energy vs Reco Charge: {level_name}, {apa}'
     if file_name:
         title += f' ({file_name})'
-    title += f'\n1-to-1 pairs, {selection_label}, efficiency > {efficiency_threshold:.0%}'
+    title += f'\n1-to-1 pairs, {selection_label}, completeness > {completeness_threshold:.0%}'
 
     x_label = 'Reco cluster charge [ADC]'
     y_label = 'True cluster energy [MeV]'
@@ -287,7 +287,7 @@ def draw_true_energy_vs_reco_charge(records, output_dir, level_name, filename_pr
     colorbar.set_label('Number of pairs', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     colorbar.ax.tick_params(labelsize=_TICK_LABEL_FONTSIZE)
     _finish_axes(ax, x_label, y_label, title)
-    ax.text(0.98, 0.02, _stats_text(x, y, efficiency_threshold), transform=ax.transAxes,
+    ax.text(0.98, 0.02, _stats_text(x, y, completeness_threshold), transform=ax.transAxes,
             fontsize=_STATS_BOX_FONTSIZE, family='monospace', ha='right', va='bottom',
             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     fig.savefig(output_dir / f'{filename_tag}_vs_reco_charge_hist2d_{filename_prefix}_{apa}.png',
@@ -341,7 +341,7 @@ def select_neutrino_pair_records(records):
 
 def draw_all_energy_reconstruction_plots(records, output_dir, level_name, filename_prefix, apa,
                                          file_name=None,
-                                         efficiency_threshold=EFFICIENCY_THRESHOLD_DEFAULT,
+                                         completeness_threshold=COMPLETENESS_THRESHOLD_DEFAULT,
                                          write_root=False):
     """
     Draw the 2D histogram for both true-cluster populations of ONE aggregation
@@ -363,11 +363,11 @@ def draw_all_energy_reconstruction_plots(records, output_dir, level_name, filena
         draw_true_energy_vs_reco_charge(
             selected, output_dir / dirname, level_name, filename_prefix, apa,
             file_name=file_name, selection_label=selection_label,
-            efficiency_threshold=efficiency_threshold, write_root=write_root)
+            completeness_threshold=completeness_threshold, write_root=write_root)
 
 
 def _write_pair_energy_info(records, output_dir, level_name, selection_label,
-                            efficiency_threshold, file_name, filename_tag):
+                            completeness_threshold, file_name, filename_tag):
     """
     {filename_tag}_vs_reco_charge.txt: one row per pair behind the histogram, so
     the entries can be checked cluster by cluster instead of only read off a
@@ -378,7 +378,7 @@ def _write_pair_energy_info(records, output_dir, level_name, selection_label,
     """
     path = Path(output_dir) / f'{filename_tag}_vs_reco_charge.txt'
     columns = [('event', 15), ('nu_idx', 8), ('true_cluster_id', 17), ('reco_cluster_id', 17),
-               ('efficiency', 12), ('purity', 10), ('reco_charge_ADC', 18),
+               ('completeness', 12), ('purity', 10), ('reco_charge_ADC', 18),
                ('true_energy_MeV', 18), ('mc_Etot_MeV', 14), ('vertex_in_volume', 18)]
 
     with open(path, 'w') as f:
@@ -386,7 +386,7 @@ def _write_pair_energy_info(records, output_dir, level_name, selection_label,
         f.write(f'# y axis: true_energy_MeV (true cluster energy, summed from the sed points)\n')
         f.write(f'# x axis: reco_charge_ADC (matched reco cluster charge)\n')
         f.write(f'# selection: 1-to-1 matched pairs, {selection_label}, '
-                f'efficiency > {efficiency_threshold}\n')
+                f'completeness > {completeness_threshold}\n')
         if file_name:
             f.write(f'# file: {file_name}\n')
         f.write(f'# pairs: {len(records)}\n')
@@ -395,7 +395,7 @@ def _write_pair_energy_info(records, output_dir, level_name, selection_label,
             values = [
                 str(record['event']), str(record['nu_idx']),
                 f"{record['true_cluster_id']:.0f}", f"{record['reco_cluster_id']:.3f}",
-                f"{record['efficiency']:.4f}", f"{record['purity']:.4f}",
+                f"{record['completeness']:.4f}", f"{record['purity']:.4f}",
                 f"{record['reco_charge_ADC']:.2f}",
                 f"{record['true_energy_MeV']:.2f}",
                 'n/a' if record.get('mc_total_energy_MeV') is None else f"{record['mc_total_energy_MeV']:.1f}",

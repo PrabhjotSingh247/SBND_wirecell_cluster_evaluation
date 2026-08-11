@@ -2,12 +2,12 @@
 Phase B helper (see project plan): reconstructs the in-memory shapes
 Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb's plotting code expects - clusters_true/clusters_reco
 point dicts, cluster_category_results, matched_info, and the true/reco/pair metadata lists -
-from the Phase A ROOT file (process_events_to_root.py), so efficiency_purity_draw.py and
+from the Phase A ROOT file (process_events_to_root.py), so completeness_purity_draw.py and
 DrawRecoTrueClusters.py can be called unmodified with reconstructed arguments instead of
 recomputing selections/KDTree matching/category classification from raw JSON.
 
-matched_pairs_exact() gives the exact per-(true,reco)-pair efficiency and purity by joining
-true_cluster_metadata's matched_reco_ids/matched_reco_efficiencies (efficiency lives on the
+matched_pairs_exact() gives the exact per-(true,reco)-pair completeness and purity by joining
+true_cluster_metadata's matched_reco_ids/matched_reco_completenesses (completeness lives on the
 true side) with reco_cluster_metadata's matched_true_ids/matched_true_purities (purity lives
 on the reco side) - no aggregate approximation needed.
 """
@@ -143,9 +143,9 @@ class RootEventStore:
 
     def matched_pairs_exact(self, file_name, event_num, apa):
         """One row per exact matched (true, reco) pair - {true_cluster_id, reco_cluster_id,
-        efficiency_energy_weighted, purity} - by joining the true side's matched_reco_ids/
-        matched_reco_efficiencies with the reco side's matched_true_ids/matched_true_purities
-        (Phase A stores efficiency on the true side and purity on the reco side)."""
+        completeness_energy_weighted, purity} - by joining the true side's matched_reco_ids/
+        matched_reco_completenesses with the reco side's matched_true_ids/matched_true_purities
+        (Phase A stores completeness on the true side and purity on the reco side)."""
         purity_lookup = {}
         for r in self.reco_cluster_rows(file_name, event_num, apa):
             true_ids = r.get("matched_true_ids")
@@ -158,14 +158,14 @@ class RootEventStore:
         pairs = []
         for r in self.true_cluster_rows(file_name, event_num, apa):
             matched_ids = r.get("matched_reco_ids")
-            matched_effs = r.get("matched_reco_efficiencies")
+            matched_effs = r.get("matched_reco_completenesses")
             if matched_ids is None or len(matched_ids) == 0:
                 continue
             for rid, eff in zip(matched_ids, matched_effs):
                 pairs.append({
                     "true_cluster_id": r["true_cluster_id"],
                     "reco_cluster_id": rid,
-                    "efficiency_energy_weighted": eff,
+                    "completeness_energy_weighted": eff,
                     "purity": purity_lookup.get((rid, r["true_cluster_id"]), 0),
                 })
         return pairs
@@ -179,7 +179,7 @@ class RootEventStore:
         for p in self.matched_pairs_exact(file_name, event_num, apa):
             grouped.setdefault(p["true_cluster_id"], []).append({
                 "reco_cluster_id": p["reco_cluster_id"],
-                "efficiency_energy_weighted": p["efficiency_energy_weighted"],
+                "completeness_energy_weighted": p["completeness_energy_weighted"],
                 "purity": p["purity"],
             })
 

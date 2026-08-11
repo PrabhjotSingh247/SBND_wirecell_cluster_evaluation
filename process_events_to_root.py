@@ -1,7 +1,7 @@
 """
 Phase A of the processing/analysis split (see project plan / CLAUDE.md).
 
-Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb currently redoes selections, KDTree efficiency/purity
+Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb currently redoes selections, KDTree completeness/purity
 matching, category classification, and metadata computation from scratch every time it's
 run, plus draws ~10 plots per event - this is the reason a 10-file run takes >30 minutes,
 which won't scale to hundreds of files. This script runs that same expensive, point-cloud-
@@ -13,7 +13,7 @@ The per-event accumulation (accumulate_event_points, build_event_metadata) and t
 ROOT write (write_root_file) are plain functions, not inlined in main() - so
 Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb can import and call them directly from inside its own
 existing loop (reusing the clusters_true/clusters_reco/cluster_category_results/
-efficiency_results/purity_results it already computes for plotting) and get the same ROOT
+completeness_results/purity_results it already computes for plotting) and get the same ROOT
 file as a side output, without recomputing anything or duplicating this logic.
 
 Usage:
@@ -58,7 +58,7 @@ from selections import (
     apply_deadarea_cut_true, apply_time_window_cut,
 )
 from cluster_category import cluster_category
-from efficiency_purity_estimate import EvaluateEfficiency, EvaluatePurity
+from completeness_purity_estimate import EvaluateCompleteness, EvaluatePurity
 from clusterpairmatching import MatchTrueToReco1to1, MatchTruetoReco_OneToMany
 from metadata import (
     add_metadata_true_clusters, add_metadata_reco_clusters,
@@ -68,7 +68,7 @@ from variable_pca_linearity import calculate_pca_linearity
 
 # Same cut configuration and selection flags as Evaluation_BeforeChargeLightMatching_BeforeBeamWindowCut.ipynb (cell 3),
 # so this script reproduces identical selections/metrics, just without drawing.
-RADIUS_EFFICIENCY        = 2
+RADIUS_COMPLETENESS        = 2
 RADIUS_PURITY_XZ         = 2
 RADIUS_PURITY_YZ         = 5
 RADIUS_PURITY_XY         = 5
@@ -239,12 +239,12 @@ def accumulate_event_points(true_points_cols, reco_points_cols, true_points_befo
 
 def build_event_metadata(file_name, evt, apa, view, event_key,
                           clusters_true, clusters_reco, cluster_category_results,
-                          efficiency_results, purity_results, deadarea_info,
+                          completeness_results, purity_results, deadarea_info,
                           true_linearity_lookup=None, reco_linearity_lookup=None):
     """
     Builds one event's true_cluster_metadata, reco_cluster_metadata, and
     true_reco_pair_metadata rows from data the caller already has in memory (clusters,
-    category classification, KDTree efficiency/purity results, dead-area before/after
+    category classification, KDTree completeness/purity results, dead-area before/after
     info). Pass true_linearity_lookup/reco_linearity_lookup if the caller already computed
     PCA linearity for other purposes (e.g. plotting); otherwise it's computed here.
 
@@ -265,7 +265,7 @@ def build_event_metadata(file_name, evt, apa, view, event_key,
     after_counts = deadarea_info.get("after", {})
 
     event_true_metadata = add_metadata_true_clusters(
-        efficiency_results, cluster_category_results,
+        completeness_results, cluster_category_results,
         file_name=file_name, event=evt, apa=apa, view=view, event_key=event_key)
     add_single_metadata(event_true_metadata, "linearity", true_linearity_lookup)
 
@@ -291,22 +291,22 @@ def build_event_metadata(file_name, evt, apa, view, event_key,
     add_single_metadata(event_true_metadata, "x_at_z_max", x_at_z_max_lookup, default=np.nan)
 
     # Full one-to-many match set (every reco cluster id a true cluster matched, not just
-    # the 1-to-1 best), with the exact per-pair efficiency and purity - so
+    # the 1-to-1 best), with the exact per-pair completeness and purity - so
     # DrawTrueClusterWithMatchedReco and the heatmaps can be reproduced from metadata alone
     # at analysis time, without an aggregate approximation.
-    matched_true_reco_clusters = MatchTruetoReco_OneToMany(purity_results, efficiency_results)
+    matched_true_reco_clusters = MatchTruetoReco_OneToMany(purity_results, completeness_results)
     matched_reco_ids_lookup = {
         (file_name, event_key, apa, m["true_cluster_id"]):
             [rc["reco_cluster_id"] for rc in m["matched_reco_clusters"]]
         for m in matched_true_reco_clusters
     }
-    matched_reco_efficiencies_lookup = {
+    matched_reco_completenesses_lookup = {
         (file_name, event_key, apa, m["true_cluster_id"]):
-            [rc["efficiency_energy_weighted"] for rc in m["matched_reco_clusters"]]
+            [rc["completeness_energy_weighted"] for rc in m["matched_reco_clusters"]]
         for m in matched_true_reco_clusters
     }
     add_single_metadata(event_true_metadata, "matched_reco_ids", matched_reco_ids_lookup, default=None)
-    add_single_metadata(event_true_metadata, "matched_reco_efficiencies", matched_reco_efficiencies_lookup, default=None)
+    add_single_metadata(event_true_metadata, "matched_reco_completenesses", matched_reco_completenesses_lookup, default=None)
 
     # Reco-centric inversion of the same one-to-many match set: for each reco cluster,
     # every true cluster it matched and that pair's exact purity.
@@ -332,7 +332,7 @@ def build_event_metadata(file_name, evt, apa, view, event_key,
     add_single_metadata(event_reco_metadata, "matched_true_purities", matched_true_purities_lookup, default=None,
                         key_fields=("file_name", "event", "apa", "reco_cluster_id"))
 
-    matched_pairs = MatchTrueToReco1to1(efficiency_results, purity_results)
+    matched_pairs = MatchTrueToReco1to1(completeness_results, purity_results)
     event_pair_metadata = add_metadata_true_reco_pair_cluster(
         matched_pairs, cluster_category_results,
         file_name=file_name, event=evt, apa=apa, view=view, event_key=event_key)
@@ -469,10 +469,10 @@ def main():
                 # ---- category classification (needs point clouds -> must run here) ----
                 cluster_category_results = cluster_category(clusters_true, output_dir=None, event=evt, apa=apa, file_name=file_name)
 
-                # ---- KDTree efficiency/purity matching (the expensive part) ----
-                efficiency_results = EvaluateEfficiency(
+                # ---- KDTree completeness/purity matching (the expensive part) ----
+                completeness_results = EvaluateCompleteness(
                     clusters_true, clusters_reco, event_key,
-                    radius_efficiency=RADIUS_EFFICIENCY, min_recopoints_threshold=MIN_RECOPOINTS_THRESHOLD)
+                    radius_completeness=RADIUS_COMPLETENESS, min_recopoints_threshold=MIN_RECOPOINTS_THRESHOLD)
                 purity_results = EvaluatePurity(
                     clusters_true, clusters_reco, event_key,
                     radius_purity_xz=RADIUS_PURITY_XZ, radius_purity_yz=RADIUS_PURITY_YZ, radius_purity_xy=RADIUS_PURITY_XY)
@@ -480,7 +480,7 @@ def main():
                 event_true_metadata, event_reco_metadata, event_pair_metadata = build_event_metadata(
                     file_name, evt, apa, args.view, event_key,
                     clusters_true, clusters_reco, cluster_category_results,
-                    efficiency_results, purity_results, deadarea_info)
+                    completeness_results, purity_results, deadarea_info)
                 true_cluster_metadata_list.extend(event_true_metadata)
                 reco_cluster_metadata_list.extend(event_reco_metadata)
                 true_reco_pair_metadata_list.extend(event_pair_metadata)

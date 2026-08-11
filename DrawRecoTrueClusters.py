@@ -329,21 +329,21 @@ def DrawNeutrinoRecoClusters(true_clusters, predicted_clusters, event, apa, PLOT
 
 
 def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, output_dir, event, apa, file_name=None,
-                                    radius_efficiency=1, min_recopoints_threshold=5,
+                                    radius_completeness=1, min_recopoints_threshold=5,
                                     neutrino_records=None):
     """
     Draw a single true cluster with all its matched reco clusters (1-to-many).
     True cluster in red, matched reco clusters in distinct colors.
-    Shows efficiency/purity values in legend. Zooms to true cluster bounds ±30%.
+    Shows completeness/purity values in legend. Zooms to true cluster bounds ±30%.
     A second row of views below shows only the true points that did not match
-    any reco cluster (i.e. the points that were missed in the efficiency estimation).
+    any reco cluster (i.e. the points that were missed in the completeness estimation).
     A true point is considered matched if, for at least one matched reco cluster,
-    it has more than `min_recopoints_threshold` reco points within `radius_efficiency`
-    - mirrors the per-point criterion used in EvaluateEfficiency.
+    it has more than `min_recopoints_threshold` reco points within `radius_completeness`
+    - mirrors the per-point criterion used in EvaluateCompleteness.
 
     Parameters:
     - matched_info: Dict from MatchTruetoReco_OneToMany with keys:
-        'event', 'true_cluster_id', 'matched_reco_clusters' (list of dicts with reco_cluster_id, efficiency_energy_weighted, purity)
+        'event', 'true_cluster_id', 'matched_reco_clusters' (list of dicts with reco_cluster_id, completeness_energy_weighted, purity)
     - clusters_true: Dict of {true_cid: array of points}
     - clusters_reco: Dict of {reco_cid: array of points}
     - output_dir: Output directory
@@ -368,13 +368,13 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
     fig, ((ax_xz, ax_yz, ax_xy), (ax_missed_xz, ax_missed_yz, ax_missed_xy)) = plt.subplots(
         2, 3, figsize=(24, 12), sharex='col', sharey='col')
 
-    # Track which true points matched at least one reco cluster (same criterion as EvaluateEfficiency)
+    # Track which true points matched at least one reco cluster (same criterion as EvaluateCompleteness)
     matched_mask = np.zeros(len(true_points), dtype=bool)
 
     # Plot each matched reco cluster with different colors (first)
     for idx, reco_info in enumerate(matched_reco_list):
         reco_cid    = reco_info['reco_cluster_id']
-        eff         = reco_info['efficiency_energy_weighted']
+        eff         = reco_info['completeness_energy_weighted']
         pur         = reco_info['purity']
 
         if reco_cid not in clusters_reco:
@@ -393,7 +393,7 @@ def DrawTrueClusterWithMatchedReco(matched_info, clusters_true, clusters_reco, o
                       label=label)
 
         reco_tree = KDTree(reco_coords)
-        neighbors = reco_tree.query_ball_point(true_coords, r=radius_efficiency)
+        neighbors = reco_tree.query_ball_point(true_coords, r=radius_completeness)
         matched_mask |= np.array([len(n) > min_recopoints_threshold for n in neighbors])
 
     missed_points = true_points[~matched_mask]
@@ -968,7 +968,7 @@ def _draw_match_multiplicity_bar(metadata_list, output_dir, apa, level_name, fil
     """
     Single bar chart of true-reco match multiplicity for one cluster category.
     Bins: 0 (unmatched), 1, 2, 3, 4, 5, and 5+ (more than 5) matched reco clusters.
-    Unmatched true clusters (total_efficiency == 0, whose single metadata entry is the
+    Unmatched true clusters (total_completeness == 0, whose single metadata entry is the
     8888 sentinel) fill the '0' bin.
     """
     if not metadata_list:
@@ -979,7 +979,7 @@ def _draw_match_multiplicity_bar(metadata_list, output_dir, apa, level_name, fil
     bin_labels = ['0', '1', '2', '3', '4', '5', '5+']
     counts     = [0] * len(bin_labels)
     for m in metadata_list:
-        if m['total_efficiency'] <= 0:
+        if m['total_completeness'] <= 0:
             counts[0] += 1
         elif m['num_reco_matches'] <= 5:
             counts[m['num_reco_matches']] += 1
@@ -1054,14 +1054,14 @@ def _write_non_one_match_clusters(metadata_list, output_dir, level_name, filenam
     cluster's cosmic sub-category (isochronous, normal, prolonged).
 
     Match count is corrected the same way as the multiplicity bar charts: a true cluster with
-    total_efficiency <= 0 (unmatched, 8888 sentinel) counts as 0 matches rather than the raw
+    total_completeness <= 0 (unmatched, 8888 sentinel) counts as 0 matches rather than the raw
     num_reco_matches value of 1.
     """
     if not metadata_list:
         return
 
     def _corrected_count(m):
-        return 0 if m['total_efficiency'] <= 0 else m['num_reco_matches']
+        return 0 if m['total_completeness'] <= 0 else m['num_reco_matches']
 
     flagged = [m for m in metadata_list if _corrected_count(m) != 1]
     if not flagged:

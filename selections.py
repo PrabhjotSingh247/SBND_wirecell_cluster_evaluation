@@ -434,7 +434,7 @@ def apply_deadarea_cut_true(true_points, apa, view_type="2view", output_dir=None
 # build_true_points_charge_light() derives q_true from that namespace and
 # assembles the same 7-column [x, y, z, cluster_id, q_true, energy, time] layout
 # reassign_cluster_ID_true() already expects, so the existing reassignment /
-# selection / efficiency / purity pipeline runs unmodified on charge-light data.
+# selection / completeness / purity pipeline runs unmodified on charge-light data.
 # There is no per-point true time in this format, so the time column is filled
 # with 0.0 -- apply_time_window_cut should stay disabled for charge-light data
 # until a real per-point timing source is identified.

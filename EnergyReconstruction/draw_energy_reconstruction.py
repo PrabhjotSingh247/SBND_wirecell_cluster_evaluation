@@ -45,7 +45,7 @@ from pathlib import Path
 # interaction nu_idx the true cluster_id 99990+nu_idx, so `true_cluster_id >=
 # 99990` is exactly "this true cluster is a neutrino" and the remainder is its
 # nu_idx -- an exact key, no spatial matching and no tolerance to tune. Kept
-# here rather than imported from AnalysisDistributions_Reco_True/draw_variables.py
+# here rather than imported from AnalysisDistributions/draw_variables.py
 # so this directory stands on its own; selections.py is the source of truth for
 # the scheme, and both copies must follow it.
 NEUTRINO_CLUSTER_ID_BASE = 99990.0
@@ -54,7 +54,7 @@ NEUTRINO_CLUSTER_ID_BASE = 99990.0
 COMPLETENESS_THRESHOLD_DEFAULT = 0.8
 
 # Bin widths for the 2D histogram. Same widths as the 1D distributions in
-# AnalysisDistributions_Reco_True, so a projection of this plot is comparable to
+# AnalysisDistributions, so a projection of this plot is comparable to
 # those. Neither axis has a fixed detector range to bin over, so the WIDTH is
 # fixed and the range follows the data (see _bin_edges): a high-energy
 # interaction gets its own bin instead of falling off the end of a fixed axis.
@@ -62,7 +62,7 @@ CHARGE_BIN_WIDTH_ADC = 2.0e6
 ENERGY_BIN_WIDTH_MEV = 100.0
 
 # Font sizes and marker styling, in one place so every plot here stays consistent
-# (same values as AnalysisDistributions_Reco_True/draw_variables.py).
+# (same values as AnalysisDistributions/draw_variables.py).
 _AXIS_LABEL_FONTSIZE = 15
 _TITLE_FONTSIZE      = 16
 _TICK_LABEL_FONTSIZE = 13

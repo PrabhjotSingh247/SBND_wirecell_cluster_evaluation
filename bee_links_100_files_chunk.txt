@@ -1,0 +1,24 @@
+# BEE event display links -- MCP2025C Fall production, Tagger included, 100 files
+#
+# Production: Haiwang_files_charge_light_matching_Tagger_Included_MCP2025C_FallProd_100files
+# Uploaded:   2026-08-14 16:16:29 CDT
+#
+# One BEE set per chunk zip. Event numbers inside a set are the chunk's own
+# numbering, i.e. the directory names under chunkN/data/ -- they do NOT
+# continue across chunks. Check the event count below matches the set.
+#
+# This file maps CHUNKS. bee_links.txt in the same directory maps ROOT
+# filenames from a different, 10-file production -- the two are unrelated.
+#
+# chunk      events  BEE_link
+
+chunk0          149  https://www.phy.bnl.gov/twister/bee/set/3a3bfcd4-5020-4f10-a4de-890170f1563c/event/list/
+chunk1          128  https://www.phy.bnl.gov/twister/bee/set/e9b85cf3-b24f-4de0-a910-b4b331ed01f1/event/list/
+chunk2          142  https://www.phy.bnl.gov/twister/bee/set/475290c8-dcc3-4b4f-a281-e54176f065c2/event/list/
+chunk3          121  https://www.phy.bnl.gov/twister/bee/set/70266b71-2a5b-4727-aff1-fafa492e0e8d/event/list/
+chunk4          153  https://www.phy.bnl.gov/twister/bee/set/d09b074a-a038-49c3-bd11-10e0074d94c7/event/list/
+chunk5          130  https://www.phy.bnl.gov/twister/bee/set/b2f4722e-6bb9-4242-878e-64931dafa398/event/list/
+chunk6          135  https://www.phy.bnl.gov/twister/bee/set/928a5320-9808-424c-bb27-505f59417b8d/event/list/
+chunk7          131  https://www.phy.bnl.gov/twister/bee/set/49499b89-73f1-4cdc-bfe2-fa4c151be281/event/list/
+chunk8          146  https://www.phy.bnl.gov/twister/bee/set/37802e26-1757-4d04-806e-f25ea1b89679/event/list/
+chunk9          128  https://www.phy.bnl.gov/twister/bee/set/0eb1066b-9ba4-40e9-9614-7b198ae0fa6a/event/list/

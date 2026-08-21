@@ -208,7 +208,7 @@ def add_metadata_reco_clusters(purity_results, file_name, event, apa, view, even
 # (see reassign_cluster_ID_true_charge_light in selections.py, 99990 + nu_idx).
 # This threshold check is the same pattern already used by
 # EnergyReconstruction/draw_energy_reconstruction.py and
-# AnalysisDistributions_Reco_True/draw_variables.py to split neutrino vs cosmic
+# AnalysisDistributions/draw_variables.py to split neutrino vs cosmic
 # matched pairs, reused here instead of taking cluster_category_results as an
 # extra dependency.
 NEUTRINO_CLUSTER_ID_BASE = 99990

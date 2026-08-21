@@ -1,6 +1,6 @@
 """
 Cluster-level VARIABLE DISTRIBUTIONS (reco and true) for the charge-light
-matching pipeline -- driven by AnalysisDistributions_Reco_True/Reco_Distributions.ipynb.
+matching pipeline -- driven by AnalysisDistributions/Reco_Distributions.ipynb.
 
 This module is additive: it adds no behaviour to, and changes nothing in, the
 existing evaluation modules. It takes the SAME post-selection objects the

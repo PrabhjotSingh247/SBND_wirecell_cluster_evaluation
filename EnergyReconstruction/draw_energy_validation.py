@@ -35,7 +35,7 @@ applied here to the AFTER-cut, neutrino-dominated one. That is the point of the
 exercise -- a calibration is only useful if it transfers -- but it does mean a
 mismatch here can come from the transfer rather than from the model's shape.
 
-DRAWING is delegated to AnalysisDistributions_Reco_True/draw_variables.py, the
+DRAWING is delegated to AnalysisDistributions/draw_variables.py, the
 same module behind the Reco_Distributions.ipynb plots, so these come out in
 identical style (step line for reco, points with sqrt(N) uncertainties for true,
 same fonts, same stats box, same text tables) rather than being a second

@@ -214,12 +214,19 @@ def read_sed_sce_from_json(json_file):
 
 def read_sed_smear_from_json(json_file):
     """
-    Reads combined-APA true cluster points (sed-smear_readout, WITHOUT the
-    space-charge-effect correction that sed-sce_drift_smear_readout has) from
-    JSON file. Same schema/fields as read_sed_sce_from_json() (x, y, z,
-    cluster_id, q, real_cluster_id, e, nu_idx) and identical cluster_id/q/e
-    values point-for-point -- only x/y/z differ (mean |dx| ~80cm, up to
-    ~230cm in a spot check), since SCE correction is a position-only effect.
+    Reads combined-APA true cluster points (sed-smear_readout) from JSON file --
+    TRUE positions, with neither the space-charge displacement nor the drift
+    transform applied. Same schema/fields as read_sed_sce_from_json() (x, y, z,
+    cluster_id, q, real_cluster_id, e, nu_idx) and identical cluster_id/q/e values
+    point-for-point; only x/y/z differ.
+
+    The ~80 cm mean |dx| against sed-sce_drift_smear_readout is NOT space charge,
+    which this docstring used to claim. Space charge is the sub-cm part (0.6 cm in
+    x, 0.3 cm in y/z -- see read_sed_sce_smear_from_json); the 80 cm is the DRIFT
+    transform, and it is a per-cluster constant set by the cluster's t0. Measured
+    over 10 events: neutrino clusters, which sit at the beam t0, move 7.6 cm on
+    average, while cosmics move 76.9 cm and up to 225.5 cm, implying |t0| up to
+    ~1410 us -- the cosmic readout window.
 
     Used for CLUSTERING-LEVEL (post charge-light-matching) evaluation, paired
     with clustering-global's reco points -- as opposed to sed-sce, which is
@@ -253,9 +260,68 @@ _MC_TEXT_RE = re.compile(r'^(.*?)\s+(?:Edep\s+)?([\d.]+)\s*MeV$')
 
 # Newer file format's interaction-vertex root text, which adds a neutrino index
 # (to tell multiple neutrino interactions in the same event apart) and the
-# neutrino's total energy ahead of Edep, e.g.
-# "1 numu Etot 1821.6 MeV Edep 19.8 MeV" -- groups: (nu_idx, flavor, total_energy, deposited_energy)
-_MC_ROOT_TEXT_RE = re.compile(r'^(\d+)\s+(\S+)\s+Etot\s+([\d.]+)\s*MeV\s+Edep\s+([\d.]+)\s*MeV$')
+# neutrino's total energy ahead of Edep. TWO producer versions are read by this
+# one pattern:
+#
+#   "1 numu Etot 1821.6 MeV Edep 19.8 MeV"                  (MCP2025C Fall production)
+#   "1 numu MEC Etot 953.2 MeV Edep 803.1 MeV T 1.335 us"   (Tagger-included production)
+#
+# The newer one inserts the interaction MODE (QE / RES / DIS / MEC / COH ...)
+# after the flavour and appends the true interaction TIME. Both are optional here
+# so the same pattern reads either file, and a producer that adds one of them
+# again does not silently break the parse -- which is exactly what happened
+# before this was relaxed: the anchored pattern simply failed to match, nu_idx
+# came out None, and every neutrino true cluster then failed to join to its
+def read_sed_sce_smear_from_json(json_file):
+    """
+    Reads combined-APA true cluster points (sed-sce_smear_readout) from JSON file.
+
+    The THIRD truth variant. The three form a chain, each stage adding one effect
+    on the way to the readout, and they differ ONLY in x/y/z -- cluster_id, q, e
+    and nu_idx are identical point-for-point across all three:
+
+      sed-smear_readout            true positions, nothing applied
+      sed-sce_smear_readout        + space charge   (this one)
+      sed-sce_drift_smear_readout  + space charge + drift
+
+    Measured on chunk0 event 1: the SCE step moves points by 0.6 cm in x and
+    ~0.3 cm in y/z, staying inside the physical volume; the drift step then moves
+    x by ~78 cm on average and pushes the range out to +-234 cm, outside the
+    detector, because it converts to an apparent position from drift time.
+
+    WHICH TO PAIR WITH clustering-global: measured, not assumed. Matching every
+    clustering-global point to its nearest true point under both non-drift
+    variants over 8 events (225,633 points) gives a median residual of 0.394 cm
+    against sed-sce_smear and 0.555 cm against sed-smear, with 81.2% vs 70.3%
+    inside 1 cm. Reco carries the space-charge displacement -- nothing in the
+    clustering stage undoes it -- so sed-sce_smear is the matching truth. Same
+    schema and same missing-field behaviour as read_sed_sce_from_json.
+    """
+    with open(json_file, 'r') as f:
+        data = json.load(f)
+
+    _x = np.array(data.get('x', []))
+    _y = np.array(data.get('y', []))
+    _z = np.array(data.get('z', []))
+    _id = np.array(data.get('cluster_id', []))
+    _q = np.array(data.get('q', []))
+    _real_id = np.array(data.get('real_cluster_id', []))
+    _e = np.array(data.get('e', []))
+    _nu_idx = np.array(data.get('nu_idx', []))
+    return _x, _y, _z, _id, _q, _real_id, _e, _nu_idx
+
+
+# mc.json interaction. Nothing raised; the neutrino categories just came out
+# empty. Named groups, so adding another optional field cannot renumber the rest.
+#
+# The (?!Etot) stops the optional mode from swallowing the "Etot" keyword when
+# the mode is absent.
+_MC_ROOT_TEXT_RE = re.compile(
+    r'^(?P<nu_idx>\d+)\s+(?P<flavor>\S+)'
+    r'(?:\s+(?P<mode>(?!Etot)\S+))?'
+    r'\s+Etot\s+(?P<etot>[\d.]+)\s*MeV'
+    r'\s+Edep\s+(?P<edep>[\d.]+)\s*MeV'
+    r'(?:\s+T\s+(?P<time_us>[-+\d.eE]+)\s*us)?$')
 
 
 def flatten_mc_tree(mc_tree):
@@ -289,13 +355,19 @@ def flatten_mc_tree(mc_tree):
         is_root = parent_trackid is None
         nu_idx = None
         total_energy_MeV = None
+        interaction_mode = None
+        interaction_time_us = None
 
         root_match = _MC_ROOT_TEXT_RE.match(text) if is_root else None
         if root_match:
-            nu_idx = int(root_match.group(1))
-            particle = root_match.group(2)
-            total_energy_MeV = float(root_match.group(3))
-            energy_MeV = float(root_match.group(4))
+            nu_idx = int(root_match.group('nu_idx'))
+            particle = root_match.group('flavor')
+            total_energy_MeV = float(root_match.group('etot'))
+            energy_MeV = float(root_match.group('edep'))
+            # Only the Tagger-included format carries these; None otherwise.
+            interaction_mode = root_match.group('mode')
+            time_text = root_match.group('time_us')
+            interaction_time_us = float(time_text) if time_text is not None else None
         else:
             match = _MC_TEXT_RE.match(text)
             if match:
@@ -321,6 +393,11 @@ def flatten_mc_tree(mc_tree):
             'energy_MeV': energy_MeV,
             'total_energy_MeV': total_energy_MeV,
             'nu_idx': nu_idx,
+            # Interaction mode ('QE', 'RES', 'MEC', ...) and the true interaction
+            # time in us. Present only in the Tagger-included production's root
+            # text; None everywhere else, including on every non-root node.
+            'interaction_mode': interaction_mode,
+            'interaction_time_us': interaction_time_us,
             'is_interaction_vertex': is_root,
             'parent_trackid': parent_trackid,
             'root_trackid': root_trackid,
@@ -360,16 +437,24 @@ def read_charge_light_files_for_event(input_dir, evt):
       input_dir/data/{evt}/{evt}-img-global.json
       input_dir/data/{evt}/{evt}-sed-sce_drift_smear_readout.json
       input_dir/data/{evt}/{evt}-sed-smear_readout.json
+      input_dir/data/{evt}/{evt}-sed-sce_smear_readout.json   (optional)
       input_dir/data/{evt}/{evt}-mc.json
       input_dir/data/{evt}/{evt}-op.json
       input_dir/data/{evt}/{evt}-clustering-global.json
 
-    Returns a dict with keys 'reco', 'true', 'true_clustering', 'mc', 'op',
-    'clustering', or None if the event directory or any of the six required
-    files is missing. 'true'/'reco' (sed-sce/img-global) are the IMAGING-LEVEL
-    (pre charge-light-matching) true/reco pair; 'true_clustering'/'clustering'
-    (sed-smear/clustering-global) are the CLUSTERING-LEVEL (post
-    charge-light-matching) true/reco pair.
+    Returns a dict with keys 'reco', 'true', 'true_clustering',
+    'true_clustering_sce', 'mc', 'op', 'clustering', or None if the event
+    directory or any of the six REQUIRED files is missing. 'true'/'reco'
+    (sed-sce/img-global) are the IMAGING-LEVEL (pre charge-light-matching)
+    true/reco pair; 'true_clustering'/'clustering' (sed-smear/clustering-global)
+    are the CLUSTERING-LEVEL (post charge-light-matching) true/reco pair.
+
+    'true_clustering_sce' (sed-sce_smear_readout) is the clustering-level truth
+    WITH the space-charge displacement -- the variant that actually matches
+    clustering-global's positions, see read_sed_sce_smear_from_json. It is
+    OPTIONAL: it comes back None when the file is absent rather than skipping the
+    event, so callers that do not ask for it keep working on productions that
+    predate the file.
     """
     input_dir = Path(input_dir)
     event_dir = input_dir / "data" / str(evt)
@@ -381,6 +466,7 @@ def read_charge_light_files_for_event(input_dir, evt):
     img_json = event_dir / f"{evt}-img-global.json"
     sed_json = event_dir / f"{evt}-sed-sce_drift_smear_readout.json"
     sed_smear_json = event_dir / f"{evt}-sed-smear_readout.json"
+    sed_sce_smear_json = event_dir / f"{evt}-sed-sce_smear_readout.json"
     mc_json  = event_dir / f"{evt}-mc.json"
     op_json  = event_dir / f"{evt}-op.json"
     clustering_json = event_dir / f"{evt}-clustering-global.json"
@@ -394,6 +480,9 @@ def read_charge_light_files_for_event(input_dir, evt):
         x_reco, y_reco, z_reco, id_reco, q_reco, real_id_reco = read_img_global_from_json(img_json)
         x_true, y_true, z_true, id_true, q_true, real_id_true, e_true, nu_idx_true = read_sed_sce_from_json(sed_json)
         x_true_clu, y_true_clu, z_true_clu, id_true_clu, q_true_clu, real_id_true_clu, e_true_clu, nu_idx_true_clu = read_sed_smear_from_json(sed_smear_json)
+        # Optional -- absent in older productions, so its loss must not cost the event.
+        true_clustering_sce = (read_sed_sce_smear_from_json(sed_sce_smear_json)
+                               if sed_sce_smear_json.exists() else None)
         mc_tree = read_mc_json(mc_json)
         op_data = read_op_json(op_json)
         x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu = read_cluster_global_from_json(clustering_json)
@@ -417,6 +506,7 @@ def read_charge_light_files_for_event(input_dir, evt):
             'reco': (x_reco, y_reco, z_reco, id_reco, q_reco, real_id_reco),
             'true': (x_true, y_true, z_true, id_true, q_true, real_id_true, e_true, nu_idx_true),
             'true_clustering': (x_true_clu, y_true_clu, z_true_clu, id_true_clu, q_true_clu, real_id_true_clu, e_true_clu, nu_idx_true_clu),
+            'true_clustering_sce': true_clustering_sce,
             'mc': mc_tree,
             'op': op_data,
             'clustering': (x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu),

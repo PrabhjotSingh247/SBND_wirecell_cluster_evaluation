@@ -67,7 +67,7 @@ from readfiles import read_charge_light_files_for_event, flatten_mc_tree
 from selections import (
     GroupClustersByID, build_true_points_charge_light,
     reassign_cluster_ID_true_charge_light, reassign_cluster_ID_reco,
-    apply_energy_cutoff, apply_wire_readout_sensitive_yz_plane_cut_true,
+    apply_energy_cutoff, apply_true_pointwise_energy_cutoff, apply_wire_readout_sensitive_yz_plane_cut_true,
     apply_wire_readout_sensitive_yz_plane_cut_reco,
     apply_deadarea_cut_true_charge_light,
 )
@@ -108,6 +108,7 @@ radius_purity_yz         = 5
 radius_purity_xy         = 5
 min_recopoints_threshold = 5
 min_cluster_energy       = 100
+min_true_point_energy    = 0.02   # MeV per true POINT -- see selections.py
 x_min, x_max = -250.0, 250.0
 y_min, y_max = -200.0, 200.0
 z_min, z_max = 0.15, 500.85
@@ -312,6 +313,9 @@ def process_event(input_dir, file_name, evt):
     true_points = build_true_points_charge_light(x_true, y_true, z_true, real_id_true, q_true,
                                                   energy=e_true, nu_idx=nu_idx_true)
     true_points = reassign_cluster_ID_true_charge_light(true_points)
+    # POINT-wise first, so the cluster total the cluster cut tests is the
+    # total of the points that survive. 0.01 MeV -- see selections.py.
+    true_points = apply_true_pointwise_energy_cutoff(true_points, min_true_point_energy)
     true_points = apply_energy_cutoff(true_points, min_cluster_energy)
     true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points, x_min, x_max, y_min, y_max, z_min, z_max)
     true_points = apply_deadarea_cut_true_charge_light(true_points, output_dir=None, event=evt, file_name=file_name)

@@ -601,7 +601,8 @@ def draw_completeness_vs_purity(categorized_records, output_dir, level_name, fil
                                 threshold=HIGH_SIGNAL_THRESHOLD,
                                 reco_cuts_label='AfterBeamWindowCut',
                                 filename='selection_completeness_vs_purity',
-                                multi_neutrino_events=None, multi_neutrino_only=False):
+                                multi_neutrino_events=None, multi_neutrino_only=False,
+                                channel_only=None):
     """
     Scatter of pair completeness (y) against pair purity (x), one point per
     IN-VOLUME reco-true pair, coloured by interaction channel, with the cosmic
@@ -619,6 +620,13 @@ def draw_completeness_vs_purity(categorized_records, output_dir, level_name, fil
     anywhere in particular on the plane. They keep their channel MARKER, so the
     channel is still readable, and the channel counts in the legend exclude them
     to keep the totals consistent. The filename gains '_multinu'.
+
+    channel_only, when given ('numu_CC', 'nue_CC' or 'NC'), keeps ONLY that
+    channel's pairs and drops the cosmics. The combined plot is dominated by numu
+    CC -- 409 of the 553 in-volume pairs on the full sample -- so the handful of
+    nue CC and the NC population are invisible under it. Filename gains
+    '_<channel>'. The axes and limits are unchanged, so a per-channel plot can be
+    laid over the combined one.
 
     multi_neutrino_only additionally DROPS everything else -- single-neutrino
     pairs and cosmics -- leaving just the red population on the same axes, so the
@@ -642,6 +650,12 @@ def draw_completeness_vs_purity(categorized_records, output_dir, level_name, fil
 
     multi = ({r['event'] for r in in_volume if r['event'] in multi_neutrino_events}
              if multi_neutrino_events else set())
+    if channel_only:
+        # Cosmics have no channel, so a per-channel plot cannot show them --
+        # dropping them is what keeps the plot about that channel.
+        in_volume = [r for r in in_volume if r['channel'] == channel_only]
+        demoted, cosmics = [], []
+        multi &= {r['event'] for r in in_volume}
     if multi_neutrino_only:
         # Cosmics are not attributable to a neutrino, so a multi-neutrino-only
         # plot cannot show them; dropping them keeps the plot honest rather than
@@ -707,7 +721,10 @@ def draw_completeness_vs_purity(categorized_records, output_dir, level_name, fil
 
     ax.set_xlabel('Purity', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     ax.set_ylabel('Completeness', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    channel_label = {'numu_CC': r'$\nu_\mu$ CC', 'nue_CC': r'$\nu_e$ CC',
+                     'NC': 'NC'}.get(channel_only, channel_only)
     population = ('in-volume, MULTI NEUTRINO events only' if multi_neutrino_only
+                  else f'in-volume {channel_label}' if channel_only
                   else 'in-volume')
     set_fitted_title(ax, f'Reco-True Pairs, {population} -- reco: {reco_cuts_label}',
                      _TITLE_FONTSIZE, fontweight='bold')
@@ -719,6 +736,8 @@ def draw_completeness_vs_purity(categorized_records, output_dir, level_name, fil
 
     suffix = ('_multinu_only' if multi_neutrino_only
               else '_multinu' if multi_neutrino_events else '')
+    if channel_only:
+        suffix += f'_{channel_only}'
     path = output_dir / f"{filename}{suffix}_{reco_cuts_label}_{filename_prefix}_{apa}.png"
     fig.savefig(path, dpi=150, bbox_inches='tight', pad_inches=0.3)
     plt.close(fig)

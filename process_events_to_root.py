@@ -52,7 +52,7 @@ import uproot
 
 from readfiles import read_files_for_event
 from selections import (
-    apply_energy_cutoff, apply_min_true_points_cutoff, apply_min_reco_points_cutoff,
+    apply_energy_cutoff, apply_true_pointwise_energy_cutoff, apply_min_true_points_cutoff, apply_min_reco_points_cutoff,
     apply_wire_readout_sensitive_yz_plane_cut_true, apply_wire_readout_sensitive_yz_plane_cut_reco,
     reassign_cluster_ID_true, reassign_cluster_ID_reco, GroupClustersByID,
     apply_deadarea_cut_true, apply_time_window_cut,
@@ -74,6 +74,7 @@ RADIUS_PURITY_YZ         = 5
 RADIUS_PURITY_XY         = 5
 MIN_RECOPOINTS_THRESHOLD = 5
 MIN_CLUSTER_ENERGY       = 100
+MIN_TRUE_POINT_ENERGY = 0.02   # MeV per true POINT
 MIN_TRUE_POINTS_CUTOFF   = 200
 MIN_RECO_POINTS_CUTOFF   = 200
 
@@ -121,6 +122,9 @@ def process_true_clusters(x, y, z, cid, q, e, t, apa, view):
     points = np.column_stack([x, y, z, cid, q, e, t])
     points = reassign_cluster_ID_true(points)
     if APPLY_ENERGY_CUTOFF:
+        # POINT-wise first, so the cluster total the cluster cut tests is the
+        # total of the points that survive. 0.01 MeV -- see selections.py.
+        points = apply_true_pointwise_energy_cutoff(points, MIN_TRUE_POINT_ENERGY)
         points = apply_energy_cutoff(points, MIN_CLUSTER_ENERGY)
     if len(points) == 0:
         return {}, {}

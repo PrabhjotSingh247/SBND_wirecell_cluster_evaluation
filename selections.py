@@ -13,6 +13,36 @@ def apply_energy_cutoff(true_points, energy_cutoff):
     true_points = np.array([point for point in true_points if cluster_sums[point[3]] >= energy_cutoff])
     return true_points
 
+# Drop individual true POINTS depositing less than min_point_energy MeV.
+#
+# Distinct from apply_energy_cutoff above, which is a CLUSTER cut: that one drops
+# a whole cluster whose total is too small, this one thins a cluster by removing
+# its smallest deposits while leaving the cluster in place.
+#
+# WHY 0.02 MeV IS THE DEFAULT ELSEWHERE. Measured over the full 100-file sample
+# (1363 events, 782 paired neutrino clusters, 5.8M true points): the per-point
+# spectrum has a sharp edge at ~0.03 MeV with the bulk of points above it and a
+# thin shelf running three decades below. A 0.02 MeV cut sits at the top of that
+# shelf, just under the edge -- it removes 1.8% of the points a reco cluster
+# covers and 0.12% of their energy, so cluster totals and every energy-binned
+# quantity are effectively unchanged, while removing 32% of the true points no
+# reco cluster covers at all.
+#
+# Do NOT raise it much further without re-measuring: 0.02 MeV is close to the
+# edge, and by 0.05 MeV the cut has crossed it and removes 48% of covered points
+# and 25% of covered energy -- rewriting the completeness denominator rather than
+# tidying it. The measurement is
+# AnalysisDistributions/draw_true_pointwise_energy_cut.py.
+#
+# Applied BEFORE apply_energy_cutoff wherever both are used, so the cluster total
+# the cluster cut tests is the total of the points that survive -- the other
+# order would admit clusters on the strength of energy this cut then discards.
+def apply_true_pointwise_energy_cutoff(true_points, min_point_energy):
+    if true_points is None or len(true_points) == 0:
+        return true_points
+    true_points = np.asarray(true_points)
+    return true_points[true_points[:, 5] > min_point_energy]
+
 # Filter true clusters by minimum point count threshold.
 # Removes clusters with fewer than min_points points.
 def apply_min_true_points_cutoff(true_points, min_points):

@@ -47,6 +47,8 @@ from readfiles import read_charge_light_files_for_event
 from selections import (
     build_true_points_charge_light, reassign_cluster_ID_true_charge_light,
     GroupClustersByID, apply_wire_readout_sensitive_yz_plane_cut_true,
+    Fiducial_X_MIN, Fiducial_X_MAX, Fiducial_Y_MIN,
+    Fiducial_Y_MAX, Fiducial_Z_MIN, Fiducial_Z_MAX,
     apply_energy_cutoff,
 )
 from metadata import build_cluster_flash_metadata, build_img_cluster_flash_metadata
@@ -62,8 +64,9 @@ RADIUS_PURITY_XY         = 5
 PURITY_MIN_PROJECTIONS   = 2
 MIN_RECOPOINTS_THRESHOLD = 5
 MIN_CLUSTER_ENERGY       = 100
-FIDUCIAL = dict(x_min=-250.0, x_max=250.0, y_min=-200.0, y_max=200.0,
-                z_min=0.15, z_max=500.85)
+FIDUCIAL = dict(x_min=Fiducial_X_MIN, x_max=Fiducial_X_MAX,
+                y_min=Fiducial_Y_MIN, y_max=Fiducial_Y_MAX,
+                z_min=Fiducial_Z_MIN, z_max=Fiducial_Z_MAX)
 
 # The per-point thresholds this study is about, in MeV. Row 2 is the uncut
 # cluster, so 0.0 leads the list and every later entry adds one row.
@@ -119,9 +122,7 @@ def load_event(base_dir, evt, file_name='chunk0', reco_id_field='cluster_id',
     true_points = build_true_points_charge_light(
         x_t, y_t, z_t, real_id_t, q_t, energy=e_t, nu_idx=nu_idx_t)
     true_points = reassign_cluster_ID_true_charge_light(true_points)
-    true_points = apply_wire_readout_sensitive_yz_plane_cut_true(
-        true_points, FIDUCIAL['x_min'], FIDUCIAL['x_max'], FIDUCIAL['y_min'],
-        FIDUCIAL['y_max'], FIDUCIAL['z_min'], FIDUCIAL['z_max'])
+    true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points)
     true_points = apply_energy_cutoff(true_points, MIN_CLUSTER_ENERGY)
     clusters_true = GroupClustersByID(true_points)
 

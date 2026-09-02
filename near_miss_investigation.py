@@ -20,6 +20,8 @@ from selections import (
     GroupClustersByID, build_true_points_charge_light,
     reassign_cluster_ID_true_charge_light, reassign_cluster_ID_reco,
     apply_energy_cutoff, apply_true_pointwise_energy_cutoff, apply_wire_readout_sensitive_yz_plane_cut_true,
+    Fiducial_X_MIN, Fiducial_X_MAX, Fiducial_Y_MIN,
+    Fiducial_Y_MAX, Fiducial_Z_MIN, Fiducial_Z_MAX,
     apply_wire_readout_sensitive_yz_plane_cut_reco,
     apply_deadarea_cut_true_charge_light,
 )
@@ -38,9 +40,9 @@ radius_completeness        = 2
 min_recopoints_threshold = 5
 min_cluster_energy       = 100
 min_true_point_energy    = 0.02   # MeV per true POINT -- see selections.py
-x_min, x_max = -250.0, 250.0
-y_min, y_max = -200.0, 200.0
-z_min, z_max = 0.15, 500.85
+x_min, x_max = Fiducial_X_MIN, Fiducial_X_MAX
+y_min, y_max = Fiducial_Y_MIN, Fiducial_Y_MAX
+z_min, z_max = Fiducial_Z_MIN, Fiducial_Z_MAX
 
 
 def find_input_files():
@@ -174,7 +176,7 @@ def main():
             # total of the points that survive. 0.01 MeV -- see selections.py.
             true_points = apply_true_pointwise_energy_cutoff(true_points, min_true_point_energy)
             true_points = apply_energy_cutoff(true_points, min_cluster_energy)
-            true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points, x_min, x_max, y_min, y_max, z_min, z_max)
+            true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points)
             true_points = apply_deadarea_cut_true_charge_light(true_points, output_dir=None, event=evt, file_name=file_name)
             if len(true_points) == 0:
                 continue
@@ -182,7 +184,7 @@ def main():
 
             x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu = result['clustering']
             predicted_points = np.column_stack((x_clu, y_clu, z_clu, real_id_clu, q_clu))
-            predicted_points = apply_wire_readout_sensitive_yz_plane_cut_reco(predicted_points, x_min, x_max, y_min, y_max, z_min, z_max)
+            predicted_points = apply_wire_readout_sensitive_yz_plane_cut_reco(predicted_points)
             predicted_points = reassign_cluster_ID_reco(predicted_points)
             clusters_reco = GroupClustersByID(predicted_points)
 

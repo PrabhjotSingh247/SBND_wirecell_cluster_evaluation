@@ -11,8 +11,7 @@ HOW PAIRS ARE CHOSEN
 
 The completeness-purity square is divided into a 10x10 grid of 10% cells. For
 each interaction channel, ONE pair is saved per cell -- 100 cells x 3 channels at
-most, in practice far fewer since most cells are empty. Plus a handful of cosmic
-reco clusters, which have no pair and are drawn alone.
+most, in practice far fewer since most cells are empty.
 
 FIRST ENCOUNTERED, NOT UNIFORMLY RANDOM. The event loop sees each event once and
 the point clouds are far too large to keep to the end of the job, so a cell is
@@ -23,27 +22,42 @@ is not a uniform draw from the cell, and a cell holding 200 pairs shows the same
 one every run. Drawing a genuinely random pair would need a second pass over the
 selected events, which is a bigger change than the pictures are worth.
 
-The cosmics ARE a uniform random draw -- see ClusterViewSampler.offer_cosmic.
+The two-neutrino events ARE a uniform random draw -- see
+ClusterViewSampler.offer_two_neutrino.
 
 DIRECTORY LAYOUT
 
-    Saved_Clusters/
-        completeness_100_90_purity_100_90_event_chunk0_37/
-            pair_numu_CC_chunk0_37.png
-        completeness_100_90_purity_90_80_event_chunk0_12/
-            pair_NC_chunk0_12.png
-        ...
-        cosmics_true_energy_above_100MeV/
-            cosmic_reco<id>_chunk0_5.png
-        completeness_purity.txt
+    job_summary/
+        Saved_Clusters/
+            completeness_100_90_purity_100_90_event_chunk0_37/
+                pair_numu_CC_chunk0_37.png
+            completeness_100_90_purity_90_80_event_chunk0_12/
+                pair_NC_chunk0_12.png
+            ...
+        selection_completeness_vs_purity/
+            completeness_purity.txt
+        two_neutrino_in_beam/
+            two_neutrino_chunk0_21.png
+        unselected_nue_CC/
+            unselected_nue_chunk0_9.png
 
-One directory per (cell, event), holding that event's pair view for every channel
-that landed in the cell. In practice that is ONE file per directory: a cell is
+Saved_Clusters holds the completeness-purity grid and nothing else: one directory
+per (cell, event), with that event's pair view for every channel that landed in
+the cell.  The two per-event sets are not cells of that grid, so they sit beside
+it rather than inside it, directly under job_summary.  The index goes next to the
+scatter plot it explains, and lists all of them with paths written relative to
+itself. In practice that is ONE file per directory: a cell is
 filled once per channel, the three channels are filled by different events, and
 only the event's FIRST neutrino is ever drawn (FIRST_NEUTRINO_CLUSTER_ID), so two
 channels can only share a directory if one event's first neutrino somehow served
 both -- which cannot happen. The per-channel filename is what makes the picture
 identifiable; the directory name is what makes the cell browsable.
+
+WHAT LEFT. The cosmic candidate views (Draw_Selection_Cosmics.ipynb, via
+draw_selection_cosmics.py) and the below-60%-completeness pairs
+(DrawRecoTrueClusters_Below_60pc_Completeness.ipynb) used to be drawn here. Both
+are per-cluster pictures rather than a sampled illustration of a distribution,
+and both now live with the other per-cluster views under their own notebooks.
 
 WHY A SEPARATE MODULE. draw_selection_performance.py counts clusters;
 this draws them. They share no code and have opposite cost profiles -- one figure
@@ -51,10 +65,12 @@ here is three panels of a full point cloud -- so the switch that turns these off
 (SAVE_CLUSTER_VIEWS in the notebook) can skip this import path entirely.
 """
 
+import os
 from collections import Counter
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from pathlib import Path
 
 # The three projections, as (x index, y index, x label, y label). Columns of the
@@ -76,23 +92,6 @@ _GRID_CELLS = 10          # 10 x 10 cells of 10% each
 # second-neutrino pair.
 FIRST_NEUTRINO_CLUSTER_ID = 99991.0
 
-# A cosmic candidate is only worth a picture above this TRUE deposited energy, in
-# MeV. The cosmic category is mostly small fragments -- the smallest in one chunk
-# was 2 MeV -- and a three-panel view of a handful of points shows nothing. This
-# keeps the saved cosmics to clusters with enough energy to have a visible shape.
-#
-# The energy tested is that of the true cluster the reco cluster overlaps MOST (by
-# purity), summed over all its points -- not the reco cluster's own charge, and
-# not just the overlapping part. A cosmic reco cluster is by construction a
-# fragment, so its own energy says how much was reconstructed, while the true
-# cluster's says how much was there to reconstruct, which is the thing worth
-# looking at. A candidate overlapping no true cluster at all has no true energy
-# and is never drawn.
-MIN_COSMIC_VIEW_ENERGY_MEV = 100.0
-
-# Where the random cosmic sample is written, under the Saved_Clusters root.
-COSMIC_DIR_NAME = 'cosmics_true_energy_above_100MeV'
-
 # How many pair views each completeness-purity cell keeps. The cell directory no
 # longer carries an event, so several examples of the same region live together
 # and can be compared without opening three directories.
@@ -101,41 +100,95 @@ PAIRS_PER_CELL = 3
 # Events where two or more in-volume true neutrinos both have a selected reco
 # cluster in the beam window. Their own directory and quota, drawn like the
 # cosmics: these are the cases where one flash covers two interactions, and a
-# coarse grouping cannot tell them apart.
+# coarse grouping cannot tell them apart. Selected per EVENT rather than per cell,
+# so the directory sits directly under the job summary (job_root), not under
+# Saved_Clusters.
 TWO_NEUTRINO_DIR_NAME = 'two_neutrino_in_beam'
 SAVED_TWO_NEUTRINO_VIEWS = 5
 
-# Fixed so a re-run of the same input draws the same five cosmics. Change it to
-# get a different draw from the same job.
-COSMIC_SAMPLE_SEED = 12345
-
-# EVERY in-volume pair below this completeness gets a view -- no sampling, no
-# quota. These are the pairs the selection is losing, and the question they raise
-# ("what does a badly reconstructed neutrino look like?") is not answered by one
-# example per cell.
-LOW_COMPLETENESS_MAX = 0.60
-# ...and only above this RECO energy. Below it a poorly reconstructed cluster is
-# a handful of points and the view shows nothing; the interesting failures are
-# the ones that reconstructed a substantial cluster and still missed most of the
-# true one. Cutting on the RECO side rather than the true side keeps the gate on
-# what is actually drawn in the lower panel.
-#
-# 200 MeV, measured rather than guessed: over the full sample the 17 pairs below
-# the completeness bar top out at 432 MeV of reco energy, so anything near 500
-# empties the directory. Low completeness and a large reco cluster are close to
-# mutually exclusive by construction -- one pair is 521 MeV true against 7 MeV
-# reco -- so this gate has to sit low to select anything at all.
-LOW_COMPLETENESS_MIN_RECO_ENERGY_MEV = 200.0
-LOW_COMPLETENESS_DIR_NAME = 'pairs_below_60pc_completeness'
+# Fixed so a re-run of the same input draws the same two-neutrino events. Change
+# it to get a different draw from the same job.
+VIEW_SAMPLE_SEED = 12345
 
 # Every in-volume nue CC interaction that produced NO selected reco cluster.
 # There are only a handful of nue CC in the whole sample, so losing one matters
-# and each deserves a picture and a line in the index.
+# and each deserves a picture and a line in the index. Written under the job
+# summary (job_root): these are LOSSES rather than pairs, so they have no cell in
+# the grid, and they are drawn whether or not the grid is.
 UNSELECTED_NUE_DIR_NAME = 'unselected_nue_CC'
 _ZOOM_MARGIN = 0.15       # padding around the drawn points, as a fraction of span
 
 _TRUE_STYLE = dict(color='tab:red',  marker='.', s=8,  alpha=0.55, label='true cluster')
 _RECO_STYLE = dict(color='tab:blue', marker='.', s=8,  alpha=0.55, label='reco cluster')
+
+# The true interaction vertex, from mc.json's root node -- a single black star on
+# the true panels. Big, opaque and drawn on top (zorder) because it has to be
+# findable inside a cloud of hundreds of red points, and outlined in white so it
+# stays visible where the cloud is dense enough to swallow a plain black marker.
+_VERTEX_STYLE = dict(color='black', marker='*', s=260, zorder=5, alpha=1.0,
+                     edgecolors='white', linewidths=0.8)
+
+# Its legend entry, as a proxy rather than the scatter's own label: the row
+# legend uses markerscale=3 so the s=8 cluster dots can be seen at all, and the
+# s=260 star put through that scaling fills the legend box. Sized here to sit
+# beside the dots instead.
+_VERTEX_LEGEND_MARKERSIZE = 5
+
+# The fiducial boundary, dotted, on every XZ / YZ / XY panel -- true and reco
+# alike. The bounds come from selections.FIDUCIAL_BOUNDS_BY_AXIS, the same six
+# numbers vertex_in_volume is decided on, so a picture cannot show a boundary
+# the pipeline did not use.
+#
+# It is a REFERENCE LINE, not a cut line: the points are not filtered against it
+# (they are cut by the wire-readout volume), so a cluster crossing it is normal
+# and expected. What the boundary tells you is whether the true VERTEX -- the
+# black star on the true row -- is inside, which is what makes the interaction
+# signal or out-of-volume background.
+_FIDUCIAL_LINE_STYLE = dict(color='0.30', linestyle=':', linewidth=1.5,
+                            alpha=0.9, zorder=1)
+
+
+def _draw_fiducial_boundary(ax, ix, iy):
+    """
+    The fiducial edges for one panel, as dotted axis-spanning lines: the two
+    bounds of the panel's x coordinate as vertical lines, the two of its y
+    coordinate as horizontal ones.
+
+    axvline/axhline rather than a rectangle, deliberately. These panels are
+    ZOOMED to the cluster, which is small next to the detector, so a rectangle
+    would almost always be drawn entirely outside the frame and its corners are
+    never visible anyway; spanning lines show the one or two edges the cluster is
+    actually near. They also span the axes in figure fraction rather than data
+    coordinates, so they cannot pull the autoscale around -- the limits stay the
+    ones computed from the points.
+
+    Returns True when at least one edge falls inside the current limits, so the
+    caller can add a legend entry only on the panels that show something.
+    """
+    from selections import FIDUCIAL_BOUNDS_BY_AXIS, FIDUCIAL_EXCLUDED_BY_AXIS
+
+    drawn = False
+    for axis, line, get_lim in ((ix, ax.axvline, ax.get_xlim),
+                                (iy, ax.axhline, ax.get_ylim)):
+        bounds = FIDUCIAL_BOUNDS_BY_AXIS.get(axis)
+        if bounds is None:
+            continue
+        lo_lim, hi_lim = get_lim()
+        # The outer edges, plus the cathode gap in the middle of x -- the
+        # fiducial volume is one box per TPC, not one box, and a boundary drawn
+        # without the gap would show an accepted band straight through the
+        # cathode (see selections.in_fiducial_volume).
+        edges = list(bounds) + list(FIDUCIAL_EXCLUDED_BY_AXIS.get(axis, ()))
+        for value in edges:
+            line(value, **_FIDUCIAL_LINE_STYLE)
+            if lo_lim <= value <= hi_lim:
+                drawn = True
+    return drawn
+
+
+_FIDUCIAL_LEGEND_HANDLE_KWARGS = dict(color=_FIDUCIAL_LINE_STYLE['color'],
+                                      linestyle=_FIDUCIAL_LINE_STYLE['linestyle'],
+                                      linewidth=_FIDUCIAL_LINE_STYLE['linewidth'])
 
 _TITLE_FONTSIZE = 15
 _LABEL_FONTSIZE = 12
@@ -184,38 +237,22 @@ class ClusterViewSampler:
     again instead of silently drawing nothing the second time.
     """
 
-    def __init__(self, cells=_GRID_CELLS, max_cosmics=5, seed=COSMIC_SAMPLE_SEED,
+    def __init__(self, cells=_GRID_CELLS, seed=VIEW_SAMPLE_SEED,
                  per_cell=PAIRS_PER_CELL, max_two_neutrino=SAVED_TWO_NEUTRINO_VIEWS):
         self.cells = cells
-        self.max_cosmics = max_cosmics
         self.per_cell = per_cell
         self.filled = Counter()      # (completeness index, purity index) -> count
         self.n_pairs = 0
-        # Two-neutrino events get their own reservoir, same scheme as the cosmics.
+        # Two-neutrino events are a reservoir sample -- see offer_two_neutrino.
         self.max_two_neutrino = max_two_neutrino
         self.two_neutrino_slots = []
         self.n_two_neutrino_candidates = 0
-        # No quota on these two: every case is drawn.
-        self.n_low_completeness = 0
-        # Pairs below the completeness bar BEFORE the reco-energy gate, so the
-        # summary distinguishes "no badly reconstructed pairs" from "plenty, but
-        # all of them too small to be worth a picture" -- which is the usual
-        # case, since low completeness and a large reco cluster rarely coincide.
-        self.n_low_completeness_candidates = 0
+        # No quota: every unselected nue CC is drawn.
         self.n_unselected_nue = 0
-        # Cosmic reservoir: max_cosmics slots, each holding the metadata of the
-        # cosmic currently occupying it. n_cosmic_candidates counts every cosmic
-        # OFFERED, which is what makes the draw uniform.
-        self.cosmic_slots = []
-        self.n_cosmic_candidates = 0
         self._rng = np.random.default_rng(seed)
         # What was actually saved, for the index file. Metadata only -- no point
         # clouds -- so this stays small however many views are drawn.
         self.saved = []
-
-    @property
-    def n_cosmics(self):
-        return len(self.cosmic_slots)
 
     def wants_pair(self, channel, completeness, purity):
         """
@@ -249,63 +286,22 @@ class ClusterViewSampler:
                 'path':             str(path) if path else None,
             })
 
-    def offer_cosmic(self):
-        """
-        Offer a cosmic candidate. Returns the reservoir slot it should be drawn
-        into, or None if it is not in the sample.
-
-        RESERVOIR SAMPLING (Algorithm R), so the max_cosmics kept at the end are a
-        uniform random draw from every candidate the job saw -- unlike the pairs,
-        which are first-encountered. The first max_cosmics candidates fill the
-        reservoir; candidate k > max_cosmics replaces a random existing one with
-        probability max_cosmics / k.
-
-        The cost of uniformity is redrawing: a replaced figure is deleted and the
-        new one drawn in its place, so a job pays for roughly
-        max_cosmics * (1 + ln(N / max_cosmics)) figures rather than max_cosmics.
-        For five cosmics out of a few thousand candidates that is ~35 figures --
-        cheap enough to be worth an unbiased sample.
-        """
-        self.n_cosmic_candidates += 1
-        if len(self.cosmic_slots) < self.max_cosmics:
-            return len(self.cosmic_slots)
-        slot = int(self._rng.integers(0, self.n_cosmic_candidates))
-        return slot if slot < self.max_cosmics else None
-
-    def take_cosmic(self, slot, record=None, path=None, event_label=None,
-                    true_energy=None):
-        """Fill a reservoir slot, deleting the figure the evicted cosmic left behind."""
-        entry = {
-            'kind':             'cosmic',
-            'channel':          None,
-            'completeness_bin': None,
-            'purity_bin':       None,
-            'event':            event_label,
-            'completeness':     None,
-            'purity':           None,
-            'true_cluster_id':  None,
-            'true_energy_mev':  true_energy,
-            'reco_cluster_id':  record.get('reco_cluster_id') if record else None,
-            'reco_energy_mev':  record.get('reco_energy_mev') if record else None,
-            'category':         'cosmic',
-            'path':             str(path) if path else None,
-        }
-        if slot < len(self.cosmic_slots):
-            evicted = self.cosmic_slots[slot]
-            if evicted.get('path'):
-                Path(evicted['path']).unlink(missing_ok=True)
-            self.saved.remove(evicted)
-            self.cosmic_slots[slot] = entry
-        else:
-            self.cosmic_slots.append(entry)
-        self.saved.append(entry)
-
     @property
     def n_two_neutrino(self):
         return len(self.two_neutrino_slots)
 
     def offer_two_neutrino(self):
-        """Reservoir slot for a two-neutrino event, or None. See offer_cosmic."""
+        """
+        Reservoir slot for a two-neutrino event, or None if it is not in the
+        sample.
+
+        RESERVOIR SAMPLING (Algorithm R), so the events kept at the end are a
+        uniform random draw from every candidate the job saw -- unlike the pairs,
+        which are first-encountered. The first max_two_neutrino candidates fill
+        the reservoir; candidate k beyond that replaces a random existing one with
+        probability max_two_neutrino / k. The cost of uniformity is redrawing: a
+        replaced figure is deleted and the new one drawn in its place.
+        """
         self.n_two_neutrino_candidates += 1
         if len(self.two_neutrino_slots) < self.max_two_neutrino:
             return len(self.two_neutrino_slots)
@@ -338,19 +334,6 @@ class ClusterViewSampler:
             self.two_neutrino_slots.append(entry)
         self.saved.append(entry)
 
-    def take_low_completeness(self, record, path, event_label, true_energy):
-        self.n_low_completeness += 1
-        self.saved.append({
-            'kind': 'low_completeness', 'channel': record.get('channel'),
-            'completeness_bin': None, 'purity_bin': None, 'event': event_label,
-            'completeness': record.get('pair_completeness'),
-            'purity': record.get('pair_purity'),
-            'true_cluster_id': record.get('pair_true_cluster_id'),
-            'true_energy_mev': true_energy,
-            'reco_cluster_id': record.get('reco_cluster_id'),
-            'reco_energy_mev': record.get('reco_energy_mev'),
-            'category': record.get('category'), 'path': str(path) if path else None})
-
     def take_unselected_nue(self, vertex, path, event_label, true_energy, detail):
         self.n_unselected_nue += 1
         self.saved.append({
@@ -364,18 +347,21 @@ class ClusterViewSampler:
             'path': str(path) if path else None})
 
     def summary(self):
-        return (f"{self.n_pairs} pair view(s), {self.n_cosmics} cosmic view(s) "
-                f"from {self.n_cosmic_candidates} candidate(s), "
+        return (f"{self.n_pairs} pair view(s), "
                 f"{self.n_two_neutrino} two-neutrino view(s) "
                 f"from {self.n_two_neutrino_candidates} candidate(s), "
-                f"{self.n_low_completeness} below-{LOW_COMPLETENESS_MAX:.0%}-completeness view(s) "
-                f"from {self.n_low_completeness_candidates} such pair(s), "
                 f"{self.n_unselected_nue} unselected nue CC view(s)")
 
 
-def _draw_panels(fig_title, point_sets, output_path, legend_lines):
-    """One figure, three panels (XZ / YZ / XY), each with the same point sets."""
+def _draw_panels(fig_title, point_sets, output_path, legend_lines, footer_note=None):
+    """
+    One figure, three panels (XZ / YZ / XY), each with the same point sets.
+
+    footer_note, when given, is (label, url) printed below the panels -- same
+    meaning and same reasoning as in _draw_row_panels, which see.
+    """
     fig, axes = plt.subplots(1, 3, figsize=(19, 6))
+    fiducial_visible = False
     for ax, (ix, iy, xlabel, ylabel, name) in zip(axes, _VIEWS):
         all_x, all_y = [], []
         for points, style in point_sets:
@@ -394,6 +380,10 @@ def _draw_panels(fig_title, point_sets, output_path, legend_lines):
                                    (y.min(), y.max(), ax.set_ylim)):
                 pad = max((hi - lo) * _ZOOM_MARGIN, 5.0)
                 setter(lo - pad, hi + pad)
+        # AFTER the limits: the boundary is decoration and must not drag the
+        # zoom, and whether an edge is visible can only be asked of a set frame.
+        if _draw_fiducial_boundary(ax, ix, iy):
+            fiducial_visible = True
         ax.set_xlabel(xlabel, fontsize=_LABEL_FONTSIZE, fontweight='bold')
         ax.set_ylabel(ylabel, fontsize=_LABEL_FONTSIZE, fontweight='bold')
         ax.set_title(name, fontsize=_LABEL_FONTSIZE, fontweight='bold')
@@ -401,10 +391,20 @@ def _draw_panels(fig_title, point_sets, output_path, legend_lines):
     # The legend carries the numbers that make the picture interpretable, so it
     # goes on the first panel where it is read before the eye moves right.
     handles, labels = axes[0].get_legend_handles_labels()
+    if fiducial_visible:
+        handles.append(Line2D([], [], **_FIDUCIAL_LEGEND_HANDLE_KWARGS))
+        labels.append('fiducial boundary')
     axes[0].legend(handles, labels, fontsize=_LEGEND_FONTSIZE, loc='upper left', framealpha=0.9)
     fig.suptitle(fig_title + "\n" + "   |   ".join(legend_lines),
                  fontsize=_TITLE_FONTSIZE, fontweight='bold')
-    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    fig.tight_layout(rect=(0, 0.05 if footer_note else 0, 1, 0.90))
+    if footer_note:
+        label, url = footer_note
+        note = label if not url else f"{label}:  {url}"
+        fig.text(0.5, 0.012, note, ha='center', va='bottom',
+                 fontsize=_LABEL_FONTSIZE, fontweight='bold',
+                 bbox=dict(boxstyle='round,pad=0.4', facecolor='white',
+                           edgecolor='gray', alpha=0.9))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=110, bbox_inches='tight', pad_inches=0.3)
     plt.close(fig)
@@ -427,36 +427,64 @@ def _draw_row_panels(fig_title, rows, output_path, legend_lines, footer_note=Non
     in one row and not another is a real difference and not a change of zoom.
     That is the whole reason for splitting true and reco onto separate rows: the
     eye compares position, and it can only do that on a common frame.
+
+    A row may be given as (row title, sets) or as (row title, sets, vertex),
+    where vertex is an (x, y, z) drawn on that row's three panels as a black star
+    -- the true interaction vertex, so a true cluster can be read against the
+    point the interaction started from. The vertex is folded into the SHARED
+    limits: a marker outside the frame would be no marker at all, and for an
+    out-of-volume interaction the distance from the vertex to the deposits is the
+    very thing the picture is being looked at for. That does mean an interaction
+    whose vertex is far from its deposits draws a wider frame than the points
+    alone would need.
     """
     n = len(rows)
+    # (title, sets) and (title, sets, vertex) are both accepted, so the callers
+    # that have no vertex to give stay as they are.
+    rows = [(row[0], row[1], row[2] if len(row) > 2 else None) for row in rows]
     fig, axes = plt.subplots(n, 3, figsize=(19, 5.6 * n), squeeze=False)
-    everything = [np.asarray(p) for _, sets in rows for p, _ in sets
+    everything = [np.asarray(p) for _, sets, _ in rows for p, _ in sets
                   if p is not None and len(p)]
+    vertices = [np.asarray(v, dtype=float).reshape(1, 3) for _, _, v in rows
+                if v is not None]
     for col, (ix, iy, xlabel, ylabel, name) in enumerate(_VIEWS):
+        framed = everything + vertices
         lims = []
         for axis in (ix, iy):
-            values = np.concatenate([p[:, axis] for p in everything]) if everything else None
+            values = np.concatenate([p[:, axis] for p in framed]) if framed else None
             if values is None or not len(values):
                 lims.append(None)
                 continue
             lo, hi = values.min(), values.max()
             pad = max((hi - lo) * _ZOOM_MARGIN, 5.0)
             lims.append((lo - pad, hi + pad))
-        for row, (row_title, sets) in enumerate(rows):
+        for row, (row_title, sets, vertex) in enumerate(rows):
             ax = axes[row][col]
             for points, style in sets:
                 if points is not None and len(points):
                     points = np.asarray(points)
                     ax.scatter(points[:, ix], points[:, iy], **style)
+            if vertex is not None:
+                ax.scatter([vertex[ix]], [vertex[iy]], **_VERTEX_STYLE)
             if lims[0]:
                 ax.set_xlim(*lims[0])
             if lims[1]:
                 ax.set_ylim(*lims[1])
+            # AFTER the limits, for the same two reasons as in _draw_panels.
+            fiducial_visible = _draw_fiducial_boundary(ax, ix, iy)
             ax.set_xlabel(xlabel, fontsize=_LABEL_FONTSIZE, fontweight='bold')
             ax.set_ylabel(ylabel, fontsize=_LABEL_FONTSIZE, fontweight='bold')
             ax.set_title(f"{name} -- {row_title}", fontsize=_LABEL_FONTSIZE, fontweight='bold')
             ax.grid(True, linestyle='--', alpha=0.3)
             handles, labels = ax.get_legend_handles_labels()
+            if vertex is not None:
+                handles.append(Line2D([], [], linestyle='none', color='black',
+                                      marker='*', markeredgecolor='white',
+                                      markersize=_VERTEX_LEGEND_MARKERSIZE))
+                labels.append('true vertex')
+            if fiducial_visible:
+                handles.append(Line2D([], [], **_FIDUCIAL_LEGEND_HANDLE_KWARGS))
+                labels.append('fiducial boundary')
             if col == 0 and handles:
                 ax.legend(handles, labels, fontsize=_LEGEND_FONTSIZE,
                           loc='upper left', framealpha=0.9, markerscale=3)
@@ -490,7 +518,7 @@ def draw_pair_views(record, clusters_true, clusters_reco, output_root, event_lab
     - record: a categorize_reco_clusters record (carries the pair's purity,
         completeness, channel, category and both cluster ids)
     - clusters_true / clusters_reco: this event's point dicts
-    - output_root: the Saved_Clusters directory
+    - output_root: the Saved_Clusters directory (the grid cells)
     - event_label: e.g. 'chunk1_37'; the per-event subdirectory is named from it
     """
     true_points = clusters_true.get(record['pair_true_cluster_id'])
@@ -520,31 +548,6 @@ def draw_pair_views(record, clusters_true, clusters_reco, output_root, event_lab
         [("TRUE cluster", [(true_points, _TRUE_STYLE)]),
          ("RECO cluster", [(reco_points, _RECO_STYLE)])],
         Path(output_root) / directory / f"pair_{record['channel']}_{event_label}.png",
-        legend_lines)
-
-
-def draw_cosmic_views(record, clusters_reco, output_root, event_label,
-                      true_energy=None):
-    """
-    One cosmic candidate in XZ, YZ and XY. Reco points only -- a cosmic candidate
-    is by definition a reco cluster that matched no true neutrino, so there is no
-    true NEUTRINO cluster to draw beside it. true_energy, if given, is that of the
-    true cluster it overlaps most (see MIN_COSMIC_VIEW_ENERGY_MEV).
-    """
-    reco_points = clusters_reco.get(record['reco_cluster_id'])
-    if reco_points is None:
-        return None
-    legend_lines = [
-        f"event {event_label}",
-        "cosmic candidate (no true neutrino match)",
-        f"reco id {record['reco_cluster_id']:.3f}",
-        f"true E {true_energy:.0f} MeV" if true_energy is not None else "true E n/a",
-    ]
-    name = f"cosmic_reco{record['reco_cluster_id']:.0f}_{event_label}.png"
-    return _draw_panels(
-        "Cosmic candidate reco cluster",
-        [(reco_points, _RECO_STYLE)],
-        Path(output_root) / COSMIC_DIR_NAME / name,
         legend_lines)
 
 
@@ -608,108 +611,34 @@ def draw_two_neutrino_views(by_true, clusters_true, clusters_reco, output_root, 
         lines)
 
 
-def cosmic_true_energy_mev(record, purity_results, clusters_true):
-    """
-    The deposited energy of the true cluster this reco cluster overlaps most, or
-    None if it overlaps none.
-
-    Chosen by purity because that is the overlap measured from the RECO side --
-    "how much of this reco cluster is that true cluster" -- which is the right
-    question for a fragment. Completeness would favour whichever true cluster is
-    smallest. The sentinel true id 8888 marks a reco cluster that matched nothing
-    and is skipped.
-    """
-    best = None
-    for entry in purity_results or []:
-        if entry.get('reco_cluster_id') != record['reco_cluster_id']:
-            continue
-        if entry.get('true_cluster_id') == 8888 or (entry.get('purity') or 0) <= 0:
-            continue
-        if best is None or entry['purity'] > best['purity']:
-            best = entry
-    if best is None:
-        return None
-    true_points = clusters_true.get(best['true_cluster_id'])
-    if true_points is None:
-        return None
-    return float(np.asarray(true_points)[:, 5].sum())
-
-
-def draw_low_completeness_views(record, clusters_true, clusters_reco, output_root, event_label):
-    """One badly-reconstructed in-volume pair, true above and reco below."""
-    true_points = clusters_true.get(record['pair_true_cluster_id'])
-    reco_points = clusters_reco.get(record['reco_cluster_id'])
-    if true_points is None or reco_points is None:
-        return None
-    true_energy = float(np.asarray(true_points)[:, 5].sum())
-    legend_lines = [
-        f"event {event_label}",
-        f"{record['channel']}",
-        f"completeness {record['pair_completeness']:.3f}",
-        f"purity {record['pair_purity']:.3f}",
-        f"true E {true_energy:.0f} MeV",
-        f"reco E {record['reco_energy_mev']:.0f} MeV",
-        f"true id {record['pair_true_cluster_id']:.0f}",
-        f"reco id {record['reco_cluster_id']:.3f}",
-    ]
-    name = (f"lowcompl_{record['channel']}_c{record['pair_completeness'] * 100:02.0f}"
-            f"_{event_label}.png")
-    return _draw_row_panels(
-        f"Below {LOW_COMPLETENESS_MAX:.0%} completeness -- {record['channel']}",
-        [("TRUE cluster", [(true_points, _TRUE_STYLE)]),
-         ("RECO cluster", [(reco_points, _RECO_STYLE)])],
-        Path(output_root) / LOW_COMPLETENESS_DIR_NAME / name,
-        legend_lines)
-
-
-def draw_unselected_nue_views(vertex, clusters_true, clusters_reco, selected_records,
-                              output_root, event_label):
-    """
-    A nue CC interaction that produced no selected reco cluster.
-
-    Top row: the true cluster that was missed. Bottom row: every reco cluster the
-    event DID select, so it is visible whether the charge went somewhere else or
-    was not reconstructed at all.
-    """
-    true_points = clusters_true.get(vertex.get('cluster_id'))
-    if true_points is None or not len(true_points):
-        return None
-    true_energy = float(np.asarray(true_points)[:, 5].sum())
-    other = [(clusters_reco[r['reco_cluster_id']], _RECO_STYLE)
-             for r in selected_records if r['reco_cluster_id'] in clusters_reco]
-    legend_lines = [
-        f"event {event_label}",
-        "nue CC, in volume, NOT selected",
-        f"true id {vertex.get('cluster_id'):.0f}" if vertex.get('cluster_id') else "true id n/a",
-        f"true E {true_energy:.0f} MeV",
-        f"pre-cut E {(vertex.get('precut_energy_MeV') or 0):.0f} MeV",
-        f"{len(other)} selected reco cluster(s) in the event",
-    ]
-    return _draw_row_panels(
-        "Unselected nue CC interaction",
-        [("TRUE cluster (missed)", [(true_points, _TRUE_STYLE)]),
-         ("RECO clusters selected in this event", other)],
-        Path(output_root) / UNSELECTED_NUE_DIR_NAME / f"unselected_nue_{event_label}.png",
-        legend_lines)
-
-
 def save_event_cluster_views(categorized_records, clusters_true, clusters_reco,
                              sampler, output_root, event_label,
                              first_neutrino_only=True,
-                             min_cosmic_energy=MIN_COSMIC_VIEW_ENERGY_MEV,
-                             purity_results=None, vertex_records=None):
+                             vertex_records=None, job_root=None,
+                             draw_pair_cells=True, draw_two_neutrino=True):
     """
     Draw whatever this event contributes to the sample: pairs for cells not yet
-    filled, and cosmics offered to the reservoir. Returns the number of figures
-    drawn (which counts a cosmic that is later evicted and deleted).
+    filled, two-neutrino events offered to the reservoir, and any unselected nue
+    CC interaction. Returns the number of figures drawn (which counts a
+    two-neutrino view that is later evicted and deleted).
 
     first_neutrino_only restricts pair views to the event's FIRST neutrino -- see
-    FIRST_NEUTRINO_CLUSTER_ID. Cosmic views are unaffected by that, but are taken
-    only above min_cosmic_energy of TRUE deposited energy, which needs
-    purity_results for this event to identify the overlapping true cluster; without
-    it no cosmic can be drawn.
+    FIRST_NEUTRINO_CLUSTER_ID.
+
+    output_root takes the grid cells and nothing else; job_root takes
+    TWO_NEUTRINO_DIR_NAME and UNSELECTED_NUE_DIR_NAME -- see DIRECTORY LAYOUT. It
+    defaults to output_root, so a caller that does not care still gets one
+    self-contained tree.
+
+    draw_pair_cells=False suppresses the grid cells, so output_root is never
+    created; draw_two_neutrino=False does the same for TWO_NEUTRINO_DIR_NAME. Both
+    exist because these views describe the INPUT SAMPLE rather than the code under
+    study, so a job re-run on the same sample would only redraw what an earlier one
+    already has. The unselected nue CC views are covered by neither flag and are
+    always drawn.
     """
     drawn = 0
+    job_root = Path(job_root) if job_root is not None else Path(output_root)
 
     # Unselected nue CC: decided per INTERACTION, so it needs the vertex records
     # rather than the reco-side categorisation.
@@ -722,7 +651,7 @@ def save_event_cluster_views(categorized_records, clusters_true, clusters_reco,
                 or vertex.get('cluster_id') in paired_true):
             continue
         path = draw_unselected_nue_views(vertex, clusters_true, clusters_reco, selected,
-                                         output_root, event_label)
+                                         job_root, event_label)
         if path:
             true_points = clusters_true.get(vertex.get('cluster_id'))
             sampler.take_unselected_nue(
@@ -734,12 +663,12 @@ def save_event_cluster_views(categorized_records, clusters_true, clusters_reco,
 
     # Two-neutrino events first: the decision is per EVENT, not per cluster, so it
     # does not belong in the per-record loop below.
-    by_true = two_neutrino_groups(categorized_records)
+    by_true = two_neutrino_groups(categorized_records) if draw_two_neutrino else {}
     if by_true:
         slot = sampler.offer_two_neutrino()
         if slot is not None:
             path = draw_two_neutrino_views(by_true, clusters_true, clusters_reco,
-                                           output_root, event_label)
+                                           job_root, event_label)
             if path:
                 sampler.take_two_neutrino(
                     slot, path=path, event_label=event_label,
@@ -750,46 +679,17 @@ def save_event_cluster_views(categorized_records, clusters_true, clusters_reco,
                 drawn += 1
 
     for record in categorized_records or []:
+        # Cosmic candidates are drawn by Draw_Selection_Cosmics.ipynb
+        # (draw_selection_cosmics.py), not here.
         if record['category'] == 'cosmic':
-            # Energy first, then existence of the points, and only then offer it to
-            # the reservoir: offering a candidate that cannot be drawn would still
-            # count towards the sampling denominator and bias the draw.
-            true_energy = cosmic_true_energy_mev(record, purity_results, clusters_true)
-            if true_energy is None or true_energy <= min_cosmic_energy:
-                continue
-            if clusters_reco.get(record['reco_cluster_id']) is None:
-                continue
-            slot = sampler.offer_cosmic()
-            if slot is None:
-                continue
-            path = draw_cosmic_views(record, clusters_reco, output_root, event_label,
-                                     true_energy=true_energy)
-            if path:
-                sampler.take_cosmic(slot, record=record, path=path,
-                                    event_label=event_label, true_energy=true_energy)
-                drawn += 1
             continue
         # Only in-volume pairs are sampled across the grid: out-of-volume pairs are
         # a rejection category, and their completeness/purity are not what the grid
         # is about.
         if record['category'] == 'out_of_volume' or record['pair_true_cluster_id'] is None:
             continue
-        # EVERY badly reconstructed in-volume pair, before the first-neutrino
-        # restriction: this set is about what the selection loses, and a second
-        # neutrino's pair is lost just as thoroughly as a first one's.
-        if (record.get('pair_completeness') or 0) < LOW_COMPLETENESS_MAX:
-            sampler.n_low_completeness_candidates += 1
-        if ((record.get('pair_completeness') or 0) < LOW_COMPLETENESS_MAX
-                and (record.get('reco_energy_mev') or 0) > LOW_COMPLETENESS_MIN_RECO_ENERGY_MEV):
-            true_points = clusters_true.get(record['pair_true_cluster_id'])
-            true_energy = (float(np.asarray(true_points)[:, 5].sum())
-                           if true_points is not None else 0.0)
-            path = draw_low_completeness_views(record, clusters_true, clusters_reco,
-                                               output_root, event_label)
-            if path:
-                sampler.take_low_completeness(record, path, event_label, true_energy)
-                drawn += 1
-
+        if not draw_pair_cells:
+            continue
         if first_neutrino_only and record['pair_true_cluster_id'] != FIRST_NEUTRINO_CLUSTER_ID:
             continue
         channel = record['channel']
@@ -807,7 +707,26 @@ def save_event_cluster_views(categorized_records, clusters_true, clusters_reco,
     return drawn
 
 
-def write_cluster_view_index(sampler, output_root, filename='completeness_purity.txt'):
+def _relative_dir(root, base, dir_name):
+    """
+    'dir_name/' as a path the reader can follow from the index file itself.
+
+    The per-event sets are written outside the index's own directory
+    (see DIRECTORY LAYOUT), so naming them bare would point at directories that do
+    not exist beside the index. os.path.relpath rather than Path.relative_to
+    because the target is normally a sibling, needing a '../' the latter refuses
+    to produce; an unrelated root (a different drive on Windows) falls back to the
+    absolute path.
+    """
+    target = Path(root) / dir_name
+    try:
+        return os.path.relpath(target, base) + '/'
+    except ValueError:
+        return str(target) + '/'
+
+
+def write_cluster_view_index(sampler, output_root, filename='completeness_purity.txt',
+                             job_root=None, index_root=None):
     """
     An index of every view drawn, so a plot can be chosen from the text rather
     than by opening files one at a time.
@@ -817,75 +736,75 @@ def write_cluster_view_index(sampler, output_root, filename='completeness_purity
     completeness, which is the comparison the sample exists to make. Cells with no
     entry are shown empty, because knowing that a corner of the plane never
     occurs is as useful as seeing one that does.
+
+    job_root must be the one save_event_cluster_views drew with, so the directories
+    the index names are the ones the files are in; it defaults to output_root,
+    matching that function's own default.
+
+    index_root is where the file itself goes, which is NOT output_root: the index
+    explains the completeness-purity scatter, so it belongs beside that plot, and
+    keeping it out of Saved_Clusters means a job that draws no grid cells leaves no
+    Saved_Clusters directory at all. Every path in the text is written relative to
+    it, so the whole index stays followable from wherever it lands.
     """
     output_root = Path(output_root)
-    output_root.mkdir(parents=True, exist_ok=True)
-    path = output_root / filename
+    index_root = Path(index_root) if index_root is not None else output_root
+    index_root.mkdir(parents=True, exist_ok=True)
+    path = index_root / filename
+    two_nu_dir = _relative_dir(job_root if job_root is not None else output_root,
+                               index_root, TWO_NEUTRINO_DIR_NAME)
+    nue_dir = _relative_dir(job_root if job_root is not None else output_root,
+                            index_root, UNSELECTED_NUE_DIR_NAME)
+    # The grid cells are named relative to the index too, so a pair row can be
+    # followed from wherever the index sits. Empty when the index is inside
+    # output_root, which is what the cell names alone already mean.
+    cell_prefix = _relative_dir(output_root, index_root, '')
+    cell_prefix = '' if cell_prefix == './' else cell_prefix
 
     pairs   = [s for s in sampler.saved if s['kind'] == 'pair']
-    cosmics = [s for s in sampler.saved if s['kind'] == 'cosmic']
     two_nu  = [s for s in sampler.saved if s['kind'] == 'two_neutrino']
-    low_c   = [s for s in sampler.saved if s['kind'] == 'low_completeness']
     lost_nue = [s for s in sampler.saved if s['kind'] == 'unselected_nue']
 
     lines = []
     lines.append("=" * 108)
     lines.append("SAVED CLUSTER VIEWS -- index")
     lines.append("=" * 108)
-    lines.append("One reco-true pair per 10% x 10% cell of the completeness-purity plane, per")
-    lines.append("interaction channel, drawn in XZ, YZ and XY. The pair shown for a cell is the")
-    lines.append("FIRST one the event loop met there, not a uniform draw from it.")
+    # The grid sections are written only when pair views were actually drawn --
+    # with save_event_cluster_views(draw_pair_cells=False) there are none, and
+    # describing a layout that is not on disc would send the reader looking for
+    # directories that do not exist.
+    if pairs:
+        lines.append("One reco-true pair per 10% x 10% cell of the completeness-purity plane, per")
+        lines.append("interaction channel, drawn in XZ, YZ and XY. The pair shown for a cell is the")
+        lines.append("FIRST one the event loop met there, not a uniform draw from it.")
+        lines.append("")
+        lines.append(f"LAYOUT. One directory per CELL, up to {sampler.per_cell} example(s) in each:")
+        lines.append("")
+        lines.append(f"    {cell_prefix}completeness_100_90_purity_80_70/pair_<channel>_<event>.png")
+        lines.append("")
+        lines.append("Each bin is written high value first, so the directories sort best-first.")
+        lines.append("Every pair view has TWO ROWS -- the true cluster above, the reco cluster")
+        lines.append("below -- sharing one set of axes per column, so positions can be compared.")
+        lines.append("Only the event's FIRST neutrino is drawn.")
+        lines.append("")
     lines.append("")
-    lines.append(f"LAYOUT. One directory per CELL, up to {sampler.per_cell} example(s) in each:")
-    lines.append("")
-    lines.append("    completeness_100_90_purity_80_70/pair_<channel>_<event>.png")
-    lines.append("")
-    lines.append("Each bin is written high value first, so the directories sort best-first.")
-    lines.append("Every pair view has TWO ROWS -- the true cluster above, the reco cluster")
-    lines.append("below -- sharing one set of axes per column, so positions can be compared.")
-    lines.append("Only the event's FIRST neutrino is drawn.")
-    lines.append("")
-    lines.append(f"COSMICS -> {COSMIC_DIR_NAME}/")
-    lines.append("")
-    lines.append(f"Up to {sampler.max_cosmics} cosmic candidates, drawn UNIFORMLY AT RANDOM "
-                 f"(reservoir sampling,")
-    lines.append(f"seed {COSMIC_SAMPLE_SEED}) from the {sampler.n_cosmic_candidates} "
-                 f"candidate(s) the job saw. A candidate qualifies")
-    lines.append(f"when the true cluster it overlaps most deposits more than "
-                 f"{MIN_COSMIC_VIEW_ENERGY_MEV:.0f} MeV -- true")
-    lines.append("energy, not the reco cluster's own charge. E reco can exceed E true, because")
-    lines.append("a reco cosmic cluster may span several true ones and only the largest overlap")
-    lines.append("is reported here.")
-    lines.append("")
-    lines.append("")
-    lines.append(f"TWO-NEUTRINO EVENTS -> {TWO_NEUTRINO_DIR_NAME}/")
-    lines.append("")
-    lines.append(f"{sampler.max_two_neutrino} event(s) drawn at random from the")
-    lines.append(f"{sampler.n_two_neutrino_candidates} in which two or more in-volume true neutrinos each")
-    lines.append("produced a selected reco cluster -- one beam flash covering two interactions,")
-    lines.append("which is the case a flash-based grouping cannot separate.")
-    lines.append("")
-    lines.append("")
-    lines.append(f"BADLY RECONSTRUCTED PAIRS -> {LOW_COMPLETENESS_DIR_NAME}/")
-    lines.append("")
-    lines.append(f"EVERY in-volume pair below {LOW_COMPLETENESS_MAX:.0%} completeness whose RECO cluster")
-    lines.append(f"carries more than {LOW_COMPLETENESS_MIN_RECO_ENERGY_MEV:.0f} MeV -- no sampling, no quota.")
-    lines.append("The energy gate is on the reco side, so it keeps the failures that")
-    lines.append("reconstructed a substantial cluster and still missed most of the true")
-    lines.append("one. It is a hard cut: a pair at low completeness usually has a SMALL")
-    lines.append("reco cluster by construction, so far fewer pairs pass it than sit below")
-    lines.append("the completeness bar (the counts below give both).")
-    lines.append("")
-    lines.append(f"{len(pairs)} pair view(s), {len(cosmics)} cosmic view(s), "
-                 f"{len(two_nu)} two-neutrino view(s), {len(low_c)} below-"
-                 f"{LOW_COMPLETENESS_MAX:.0%}-completeness view(s) from "
-                 f"{sampler.n_low_completeness_candidates} such pair(s), "
+    if two_nu:
+        lines.append(f"TWO-NEUTRINO EVENTS -> {two_nu_dir}")
+        lines.append("")
+        lines.append(f"{sampler.max_two_neutrino} event(s) drawn at random from the")
+        lines.append(f"{sampler.n_two_neutrino_candidates} in which two or more in-volume true neutrinos each")
+        lines.append("produced a selected reco cluster -- one beam flash covering two interactions,")
+        lines.append("which is the case a flash-based grouping cannot separate.")
+        lines.append("")
+        lines.append("")
+    lines.append(f"{len(pairs)} pair view(s), {len(two_nu)} two-neutrino view(s), "
                  f"{len(lost_nue)} unselected nue CC view(s).")
     lines.append("")
-    lines.append("-" * 108)
-    lines.append(f"  {'channel':<9s}{'comp bin':>9s}{'pur bin':>9s}{'completeness':>14s}{'purity':>9s}"
-                 f"{'E true':>9s}{'E reco':>9s}{'true id':>10s}{'reco id':>11s}  file")
-    lines.append("-" * 108)
+    if pairs:
+        lines.append("-" * 108)
+        lines.append(f"  {'channel':<9s}{'comp bin':>9s}{'pur bin':>9s}{'completeness':>14s}{'purity':>9s}"
+                     f"{'E true':>9s}{'E reco':>9s}{'true id':>10s}{'reco id':>11s}  file")
+        lines.append("-" * 108)
     for entry in sorted(pairs, key=lambda s: (s['channel'], -s['completeness_bin'], s['purity_bin'])):
         name = Path(entry['path']).name if entry['path'] else ''
         lines.append(
@@ -894,25 +813,13 @@ def write_cluster_view_index(sampler, output_root, filename='completeness_purity
             f"{entry['completeness']:>14.4f}{entry['purity']:>9.4f}"
             f"{(entry.get('true_energy_mev') or 0):>9.0f}{entry['reco_energy_mev']:>9.0f}"
             f"{entry['true_cluster_id']:>10.0f}{entry['reco_cluster_id']:>11.3f}"
-            f"  {cell_directory_name(entry['completeness'], entry['purity'])}/{name}")
-
-    if cosmics:
-        lines.append("")
-        lines.append("-" * 108)
-        lines.append(f"  {'cosmic candidates':<32s}{'event':>10s}{'reco id':>11s}"
-                     f"{'E true':>9s}{'E reco':>9s}  file")
-        lines.append("-" * 108)
-        for entry in sorted(cosmics, key=lambda s: -(s.get('true_energy_mev') or 0)):
-            name = Path(entry['path']).name if entry['path'] else ''
-            lines.append(f"  {'':<32s}{entry['event']:>10s}{entry['reco_cluster_id']:>11.3f}"
-                         f"{(entry.get('true_energy_mev') or 0):>9.0f}"
-                         f"{entry['reco_energy_mev']:>9.0f}  {COSMIC_DIR_NAME}/{name}")
+            f"  {cell_prefix}{cell_directory_name(entry['completeness'], entry['purity'])}/{name}")
 
     if lost_nue:
         lines.append("")
         lines.append("=" * 108)
         lines.append("UNSELECTED nue CC INTERACTIONS -- every in-volume nue CC that produced NO")
-        lines.append(f"selected reco cluster. Views in {UNSELECTED_NUE_DIR_NAME}/.")
+        lines.append(f"selected reco cluster. Views in {nue_dir}")
         lines.append("=" * 108)
         lines.append(f"  {'event':>12s}{'true id':>10s}{'true E':>9s}{'pre-cut E':>11s}"
                      f"{'selected in event':>19s}  file")
@@ -924,21 +831,7 @@ def write_cluster_view_index(sampler, output_root, filename='completeness_purity
                          f"{(entry.get('true_energy_mev') or 0):>9.0f}"
                          f"{(d.get('precut_energy_MeV') or 0):>11.0f}"
                          f"{d.get('n_selected_in_event', 0):>19d}"
-                         f"  {UNSELECTED_NUE_DIR_NAME}/{name}")
-
-    if low_c:
-        lines.append("")
-        lines.append("-" * 108)
-        heading = (f"below {LOW_COMPLETENESS_MAX:.0%} compl, "
-                   f"reco E > {LOW_COMPLETENESS_MIN_RECO_ENERGY_MEV:.0f} MeV")
-        lines.append(f"  {heading:<34s}{'event':>12s}{'channel':>9s}{'compl':>8s}"
-                     f"{'purity':>8s}{'true E':>9s}{'reco E':>9s}")
-        lines.append("-" * 108)
-        for entry in sorted(low_c, key=lambda e: e['completeness'] or 0):
-            lines.append(f"  {'':<34s}{entry['event']:>12s}{str(entry['channel']):>9s}"
-                         f"{(entry['completeness'] or 0):>8.3f}{(entry['purity'] or 0):>8.3f}"
-                         f"{(entry.get('true_energy_mev') or 0):>9.0f}"
-                         f"{(entry['reco_energy_mev'] or 0):>9.0f}")
+                         f"  {nue_dir}{name}")
 
     if two_nu:
         lines.append("")

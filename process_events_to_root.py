@@ -133,8 +133,7 @@ def process_true_clusters(x, y, z, cid, q, e, t, apa, view):
     if len(points) == 0:
         return {}, {}
     if APPLY_WIRE_READOUT_SENSITIVE_XZ_PLANE_CUT:
-        points = apply_wire_readout_sensitive_yz_plane_cut_true(
-            points, X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX)
+        points = apply_wire_readout_sensitive_yz_plane_cut_true(points)
     if len(points) == 0:
         return {}, {}
     deadarea_info = {}
@@ -166,8 +165,7 @@ def process_reco_clusters(x, y, z, cid, q):
     if len(points) == 0:
         return {}
     if APPLY_WIRE_READOUT_SENSITIVE_XZ_PLANE_CUT:
-        points = apply_wire_readout_sensitive_yz_plane_cut_reco(
-            points, X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX)
+        points = apply_wire_readout_sensitive_yz_plane_cut_reco(points)
     if len(points) == 0:
         return {}
     points = reassign_cluster_ID_reco(points)

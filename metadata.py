@@ -361,6 +361,22 @@ def _beam_window_offset_us(flash_time):
     return 0.0
 
 
+# A "would have matched" verdict claims a specific reco cluster WAS the neutrino
+# and a selection took it away. That claim needs the pair to be a real pair.
+#
+# Measured case that forced these: chunk0 event 39, a full-detector cosmic track
+# whose flash sat 502 us outside the beam window, clipping the neutrino at
+# completeness 0.0004 and purity 0.007. It cleared the old "strict overlap > 0"
+# bar and was reported as reco_outside_beam_window -- i.e. as signal the timing
+# cut had cost us -- when nothing of the sort had happened.
+#
+# Below either threshold the reco cluster is not that neutrino's reconstruction,
+# so the neutrino is recorded as no_reco_overlap (or its x_shift variant): there
+# was no reco of it to lose.
+MIN_WOULD_HAVE_MATCHED_COMPLETENESS = 0.10
+MIN_WOULD_HAVE_MATCHED_PURITY       = 0.10
+
+
 def _true_reco_overlap_metrics(true_points, reco_points, radius_completeness, min_recopoints_threshold):
     """
     Energy-weighted overlap of one true cluster with one reco cluster, at two
@@ -460,7 +476,9 @@ YZ_ALIGNED_MIN_OVERLAP = 0.1
 def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, clusters_reco_all,
                                          reco_provenance, beam_window_real_ids, flash_times_by_real_id,
                                          matched_pairs, file_name, event, apa="Combined", event_key=None,
-                                         radius_completeness=2, min_recopoints_threshold=5):
+                                         radius_completeness=2, min_recopoints_threshold=5,
+                                         tagger_removed_ids=None,
+                                         radius_purity_xz=2, radius_purity_yz=5, radius_purity_xy=5):
     """
     Categorize every TRUE NEUTRINO cluster in one event by whether it found a
     1-to-1 reco match and, if not, why not.
@@ -477,6 +495,21 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
       - matched: this true neutrino IS in a MatchTrueToReco1to1 pair. Not a
         failure -- carried in the returned rows so one list describes all of
         them, same as categorize_extra_reco_clusters' 'matched_winner'.
+    EVERY "would have matched" category below (removed_by_cosmic_tagger,
+    reco_outside_beam_window, reco_no_flash_match) additionally requires the
+    winning cluster to clear MIN_WOULD_HAVE_MATCHED_COMPLETENESS and
+    MIN_WOULD_HAVE_MATCHED_PURITY. A cluster that merely clips the neutrino is
+    not its reconstruction, so nothing was lost when a cut removed it; those
+    neutrinos fall through to no_reco_overlap instead. See the constants.
+
+      - removed_by_cosmic_tagger: a reco cluster in the FULL set reaches
+        completeness > 0 against this true neutrino AND its flash is inside the
+        beam window, but selections.apply_cosmic_tagger_cut removed it. Tested
+        BEFORE the two flash categories below, because such a cluster is missing
+        from the selected set while having a perfectly in-window flash -- without
+        this category it would be reported as reco_outside_beam_window, which is
+        the opposite of what happened. Only populated when the caller passes
+        tagger_removed_ids; None means the tagger was not applied.
       - reco_outside_beam_window: a reco cluster in the FULL set reaches
         completeness > 0 against this true neutrino, but it was removed by the
         beam-window cut because its charge-light-matched flash sits outside
@@ -574,6 +607,7 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
             # Best overlap found anywhere in the PRE-cut reco set, at both strictnesses.
             'best_strict_reco_cluster_id': None,
             'best_strict_overlap': 0.0,
+            'best_strict_purity': None,
             'best_relaxed_reco_cluster_id': None,
             'best_relaxed_overlap': 0.0,
             'n_overlapping_reco_clusters': 0,
@@ -617,7 +651,27 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
                 row['best_relaxed_overlap'] = relaxed
                 row['best_relaxed_reco_cluster_id'] = reco_cid
 
-        if row['best_strict_overlap'] > 0:
+        # PURITY of the best-overlapping cluster, with the pipeline's own
+        # EvaluatePurity so the number means what purity means everywhere else.
+        # Needed here and not only for display: it is half the test below.
+        if row['best_strict_overlap'] > 0 and row['best_strict_reco_cluster_id'] in clusters_reco_all:
+            from completeness_purity_estimate import EvaluatePurity
+            winner_cid = row['best_strict_reco_cluster_id']
+            for rec in EvaluatePurity({true_cid: true_points},
+                                      {winner_cid: clusters_reco_all[winner_cid]}, event_key,
+                                      radius_purity_xz, radius_purity_yz, radius_purity_xy):
+                if rec.get('purity') is not None:
+                    row['best_strict_purity'] = float(rec['purity'])
+                    break
+
+        # Does the winner actually look like this neutrino's reconstruction? See
+        # MIN_WOULD_HAVE_MATCHED_* for why a bare overlap > 0 is not enough.
+        would_have_matched = (
+            row['best_strict_overlap'] >= MIN_WOULD_HAVE_MATCHED_COMPLETENESS
+            and row.get('best_strict_purity') is not None
+            and row['best_strict_purity'] >= MIN_WOULD_HAVE_MATCHED_PURITY)
+
+        if row['best_strict_overlap'] > 0 and would_have_matched:
             winner_cid    = row['best_strict_reco_cluster_id']
             winner_reals  = reco_provenance.get(winner_cid, [])
             winner_flashes = [t for rid in winner_reals for t in flash_times_by_real_id.get(rid, [])]
@@ -625,6 +679,16 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
 
             if row['winner_in_beam_window']:
                 row['category'] = 'unexplained'
+            elif winner_cid in (tagger_removed_ids or ()):
+                # In the window, but the cosmic tagger cut took it. Must be tested
+                # before the flash tests: this cluster HAS an in-window flash, so
+                # they would blame the beam window for the tagger's removal.
+                row['category'] = 'removed_by_cosmic_tagger'
+                if winner_flashes:
+                    offsets = [_beam_window_offset_us(t) for t in winner_flashes]
+                    best_i = int(np.argmin(np.abs(offsets)))
+                    row['winner_flash_time']      = winner_flashes[best_i]
+                    row['winner_flash_offset_us'] = offsets[best_i]
             elif not winner_flashes:
                 row['category'] = 'reco_no_flash_match'
             else:
@@ -637,10 +701,16 @@ def categorize_unmatched_true_neutrinos(clusters_true, clusters_reco_selected, c
                 row['winner_flash_time']      = winner_flashes[best_i]
                 row['winner_flash_offset_us'] = offsets[best_i]
 
-        elif row['best_relaxed_overlap'] > 0:
+        elif row['best_relaxed_overlap'] > 0 and row['best_strict_overlap'] == 0:
             row['category'] = 'broken_or_sparse_reco'
 
         else:
+            # Reached either with no overlap at all, or with an overlap too thin
+            # to be this neutrino's reconstruction (the gate above). Both mean the
+            # same thing for the reader: there was no reco of this neutrino to
+            # lose. Deliberately NOT broken_or_sparse_reco -- that category says
+            # the reconstruction is present but fragmented, which is a different
+            # claim from a passing cosmic clipping the edge of the cluster.
             row['category'] = 'no_reco_overlap'
             if clusters_reco_all:
                 true_xyz = true_points[:, :3]
@@ -1184,9 +1254,12 @@ def classify_neutrino_interaction(daughter_particles, flavor=None):
     }
 
 
+_UNSET = object()   # so an explicit None can still mean "do not set the flag"
+
+
 def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, event_key=None,
-                                  x_min=None, x_max=None, y_min=None, y_max=None,
-                                  z_min=None, z_max=None,
+                                  x_min=_UNSET, x_max=_UNSET, y_min=_UNSET, y_max=_UNSET,
+                                  z_min=_UNSET, z_max=_UNSET,
                                   clusters_true_precut=None, min_cluster_energy=None):
     """
     One record per TRUE NEUTRINO INTERACTION in an event, built from mc.json's
@@ -1256,8 +1329,17 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
     - clusters_true: Dict {cluster_id: points}, points columns
         [x, y, z, cluster_id, q_true, energy, time]
     - file_name, event, event_key: identification, as elsewhere
-    - x_min..z_max: volume bounds for the vertex_in_volume flag; if any is None
-        the flag is left None rather than guessed
+    - x_min..z_max: volume bounds for the vertex_in_volume flag. DEFAULTS to the
+        FIDUCIAL volume (selections.Fiducial_*), which is the signal definition:
+        in-volume vs out-of-volume everywhere downstream means "the VERTEX is
+        inside the fiducial volume of EITHER TPC". The test is
+        selections.in_fiducial_volume, which is TPC-aware -- these bounds give
+        the outer edges, and the cathode region in the middle (|x| < 4 cm) is
+        excluded on top of them, belonging to neither drift volume. Those bounds apply to the vertex only -- the
+        true points are cut by the wire-readout sensitive volume, not by this.
+        Pass them explicitly only to ask a different question; passing an explicit
+        None for any one of them disables the flag (it is left None) rather than
+        guessing.
 
     Returns:
         List of dicts, one per neutrino interaction found in mc.json
@@ -1267,7 +1349,19 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
     if not mc_records:
         return []
 
-    bounds = (x_min, x_max, y_min, y_max, z_min, z_max)
+    # Unspecified bounds fall back to the FIDUCIAL volume -- the signal
+    # definition, kept in selections.py so every caller flags vertices against
+    # the same surface. Imported here rather than at module scope to keep
+    # metadata.py importable without the selections module.
+    from selections import (Fiducial_X_MIN, Fiducial_X_MAX,
+                            Fiducial_Y_MIN, Fiducial_Y_MAX,
+                            Fiducial_Z_MIN, Fiducial_Z_MAX)
+    defaults = (Fiducial_X_MIN, Fiducial_X_MAX, Fiducial_Y_MIN,
+                Fiducial_Y_MAX, Fiducial_Z_MIN, Fiducial_Z_MAX)
+    bounds = tuple(default if given is _UNSET else given
+                   for given, default in
+                   zip((x_min, x_max, y_min, y_max, z_min, z_max), defaults))
+    x_min, x_max, y_min, y_max, z_min, z_max = bounds
     have_bounds = all(b is not None for b in bounds)
 
     # First list of daughters, per interaction: the DIRECT children of each
@@ -1293,7 +1387,15 @@ def build_neutrino_vertex_records(mc_records, clusters_true, file_name, event, e
 
         if vertex is not None and have_bounds:
             vx, vy, vz = vertex
-            in_volume = bool(x_min <= vx <= x_max and y_min <= vy <= y_max and z_min <= vz <= z_max)
+            # TPC-AWARE, not a single box. SBND is two drift volumes either side
+            # of a cathode at x = 0, so a vertex is in volume when it is fiducial
+            # in EITHER of them, and the cathode region |x| < 4 cm belongs to
+            # neither -- see selections.in_fiducial_volume.
+            from selections import in_fiducial_volume
+            in_volume = bool(in_fiducial_volume(vx, vy, vz,
+                                                x_min=x_min, x_max=x_max,
+                                                y_min=y_min, y_max=y_max,
+                                                z_min=z_min, z_max=z_max))
         else:
             in_volume = None
 

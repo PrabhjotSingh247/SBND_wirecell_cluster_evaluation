@@ -59,15 +59,19 @@ no volume and no channel of its own.
 Run directly: python investigate_unmatched_true_neutrinos.py
 Output: multi_file_plots_charge_light_matching/unmatched_true_neutrino_investigation_{timestamp}/
 """
+import re
 import numpy as np
 from datetime import datetime
 from pathlib import Path
 
 from readfiles import read_charge_light_files_for_event, flatten_mc_tree
 from selections import (
+    tag_reco_clusters,
     GroupClustersByID, build_true_points_charge_light,
     reassign_cluster_ID_true_charge_light, reassign_cluster_ID_reco,
     apply_energy_cutoff, apply_true_pointwise_energy_cutoff, apply_wire_readout_sensitive_yz_plane_cut_true,
+    Fiducial_X_MIN, Fiducial_X_MAX, Fiducial_Y_MIN,
+    Fiducial_Y_MAX, Fiducial_Z_MIN, Fiducial_Z_MAX,
     apply_wire_readout_sensitive_yz_plane_cut_reco,
     apply_deadarea_cut_true_charge_light,
 )
@@ -85,7 +89,9 @@ from metadata import (
     filter_records_by_label, restrict_label_map,
 )
 from writeinformation import write_unmatched_true_neutrino_info
-from DrawRecoTrueClusters import DrawUnmatchedTrueNeutrinos, DrawUnmatchedTrueNeutrinoBreakdown
+from DrawRecoTrueClusters import (DrawUnmatchedTrueNeutrinos, DrawUnmatchedTrueNeutrinoBreakdown,
+                                  DrawUnmatchedTrueNeutrinoPies,
+                                  DrawUnmatchedSelectionEfficiency)
 from DrawRecoTrueFlashes import (BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US,
                                   draw_unmatched_neutrino_flash_times)
 
@@ -95,7 +101,7 @@ from DrawRecoTrueFlashes import (BEAM_WINDOW_MIN_US, BEAM_WINDOW_MAX_US,
 # investigate_extra_reco_clusters.py, so counts here are directly comparable to
 # both that notebook's job summary and the extra-reco investigation.
 # ============================================================================
-PARENT_DIR  = Path("Haiwang_files_charge_light_matching_MCP2025C_Fall_production_after_deadareacut")
+PARENT_DIR  = Path("Haiwang_files_charge_light_matching_Tagger_Included_MCP2025C_FallProd_100files")
 TARGET_FILE = "all"   # "all" for every file subdirectory with a data/ folder, or "file0"/"file1"/...
 EVENT_LOW   = None    # None = auto-detect from each file's data/ (all events present)
 EVENT_HIGH  = None    # exclusive; None = auto-detect
@@ -109,9 +115,15 @@ radius_purity_xy         = 5
 min_recopoints_threshold = 5
 min_cluster_energy       = 100
 min_true_point_energy    = 0.02   # MeV per true POINT -- see selections.py
-x_min, x_max = -250.0, 250.0
-y_min, y_max = -200.0, 200.0
-z_min, z_max = 0.15, 500.85
+x_min, x_max = Fiducial_X_MIN, Fiducial_X_MAX
+y_min, y_max = Fiducial_Y_MIN, Fiducial_Y_MAX
+z_min, z_max = Fiducial_Z_MIN, Fiducial_Z_MAX
+
+# Apply the cosmic tagger cut to the beam-window reco set, so a neutrino the
+# tagger removed is attributed to the TAGGER rather than counted as reconstructed.
+# Without this the script measures the pipeline as it was before the tagger
+# existed. Set False to get that older picture back.
+APPLY_COSMIC_TAGGER_CUT = True
 
 b_draw_event_level_plots = True   # per-event XZ/YZ/XY plots for events with >=1 unmatched true neutrino
 
@@ -130,12 +142,16 @@ b_draw_event_level_plots = True   # per-event XZ/YZ/XY plots for events with >=1
 # 'volume'/'channel' are the labels a row must carry to belong; None means that
 # axis is not applied.
 POPULATIONS = [
-    {'key': 'all',        'volume': None, 'channel': None,
-     'subdir': None,                                                        'label': None},
+    # IN-VOLUME ONLY. The 'all' and out-of-volume populations are deliberately
+    # absent: this run is about SIGNAL, and an out-of-volume interaction only ever
+    # deposits the part of itself that leaked into the active volume, so its
+    # failure modes mean something different and mixing them in blurs the answer.
+    # Restore the two commented-out entries to get the full split back.
+    # {'key': 'all',      'volume': None, 'channel': None, 'subdir': None, 'label': None},
+    # {'key': 'out',      'volume': 'out','channel': None,
+    #  'subdir': Path("by_vertex_volume/out_volume"), 'label': 'vertex out of volume'},
     {'key': 'in',         'volume': 'in',  'channel': None,
      'subdir': Path("by_vertex_volume/in_volume"),                          'label': 'vertex in volume'},
-    {'key': 'out',        'volume': 'out', 'channel': None,
-     'subdir': Path("by_vertex_volume/out_volume"),                         'label': 'vertex out of volume'},
     {'key': 'in_numu_CC', 'volume': 'in',  'channel': 'numu_CC',
      'subdir': Path("by_vertex_volume/in_volume/by_interaction_channel/numu_CC"),
      'label': 'vertex in volume, numu CC'},
@@ -277,6 +293,17 @@ def render_level_outputs(neutrino_rows, volume_map, channel_map, n_selected_reco
         if draw and (always_write_breakdown or unmatched_by_population[pop_key] > 0):
             DrawUnmatchedTrueNeutrinoBreakdown(pop_rows, n_selected_reco, pop_dir, APA_LABEL,
                                                 pop_level_name, filename_prefix, file_name=file_name)
+            # The same two splits as the bar chart's lower panels, as pies, in
+            # their own files -- see DrawUnmatchedTrueNeutrinoPies.
+            DrawUnmatchedTrueNeutrinoPies(pop_rows, pop_dir, APA_LABEL,
+                                          pop_level_name, filename_prefix, file_name=file_name)
+            # Efficiency curves at JOB level only: a 200 MeV bin holds one or two
+            # interactions in a single event, so per-event and per-file copies
+            # would be noise with error bands wider than the axis.
+            if level_name.lower().startswith('job'):
+                DrawUnmatchedSelectionEfficiency(pop_rows, pop_dir, APA_LABEL,
+                                                 pop_level_name, filename_prefix,
+                                                 file_name=file_name)
 
         if unmatched_by_population[pop_key] > 0:
             write_unmatched_true_neutrino_info(pop_rows, pop_dir)
@@ -290,6 +317,127 @@ def render_level_outputs(neutrino_rows, volume_map, channel_map, n_selected_reco
                                                 file_name=file_name, clusters_reco_all=clusters_reco_all)
 
     return unmatched_by_population
+
+
+BUILD_BEE_SET = True   # build + upload one BEE set of the unmatched events at job level
+
+
+def write_unmatched_bee_set(job_rows, volume_map, job_summary_dir):
+    """
+    ONE BEE set holding every event that contributed an unmatched in-volume true
+    neutrino -- the events behind the reasons pie -- so the whole failing
+    population can be opened from a single link instead of hunting per chunk.
+
+    Writes, into job_summary/:
+      unmatched_true_neutrino_bee_events.txt  the selection, one line per
+          neutrino, in the chunk<N>_event<M> form build_bee_set_from_links.py
+          parses. Written ALWAYS -- it is the input the set is built from, and it
+          is useful on its own as the list of events to look at.
+      unmatched_true_neutrino_bee_link.txt    the uploaded set's url and the
+          event map, written only when the upload succeeds.
+
+    The build shells out to build_bee_set_from_links.py and upload-to-bee.sh
+    rather than reimplementing them: those are the same two steps every other
+    population in this repository uses, already handle the renumbering that BEE
+    forces on a combined set, and already refuse to upload an oversized zip.
+
+    Set BUILD_BEE_SET = False to write only the selection file -- the upload is a
+    network round trip of a few hundred MB and is the slow part of this step.
+    """
+    import subprocess
+
+    job_summary_dir = Path(job_summary_dir)
+    job_summary_dir.mkdir(parents=True, exist_ok=True)
+    selection = job_summary_dir / 'unmatched_true_neutrino_bee_events.txt'
+
+    rows = [r for r in job_rows
+            if r['category'] != 'matched'
+            and volume_map.get((r['event'], r['true_cluster_id'])) == 'in']
+    if not rows:
+        selection.write_text("# no unmatched in-volume true neutrinos\n")
+        return None
+
+    lines = ["# Events behind the unmatched-reasons pie: every event with at least",
+             "# one UNMATCHED in-volume true neutrino. One line per neutrino; the",
+             "# leading token is what build_bee_set_from_links.py parses.",
+             ""]
+    for r in sorted(rows, key=lambda r: (r['event'], r['true_cluster_id'])):
+        chunk, _, evt = r['event'].rpartition('_')
+        lines.append(f"{chunk}_event{evt}_true{r['true_cluster_id']:.0f}.png"
+                     f"   {r['category']}")
+    selection.write_text("\n".join(lines) + "\n")
+    n_events = len({r['event'] for r in rows})
+    print(f"\nUnmatched BEE selection: {len(rows)} neutrino(s) over {n_events} event(s)")
+    print(f"  {selection}")
+    if not BUILD_BEE_SET:
+        return None
+
+    repo = Path(__file__).resolve().parent
+    out  = job_summary_dir / 'bee_set_unmatched'
+    try:
+        build = subprocess.run(
+            ['python3', str(repo / 'build_bee_set_from_links.py'), str(selection),
+             '--out', str(out)],
+            cwd=str(repo), capture_output=True, text=True, timeout=3600)
+        print(build.stdout.rstrip())
+        zip_path = out.with_suffix('.zip')
+        if build.returncode != 0 or not zip_path.exists():
+            print("  BEE set build failed -- selection file kept, no upload")
+            return None
+        up = subprocess.run(['bash', str(repo / 'upload-to-bee.sh'), str(zip_path)],
+                            cwd=str(repo), capture_output=True, text=True, timeout=7200)
+        url = next((tok for tok in up.stdout.split()
+                    if tok.startswith('https://') and 'event/list' in tok), None)
+        if not url:
+            print("  BEE upload returned no url -- see the zip and upload by hand")
+            return None
+    except Exception as exc:
+        print(f"  BEE step skipped: {exc}")
+        return None
+
+    # The url also goes INTO the set's own event_map.txt, at the top and on every
+    # row. That file is the only thing mapping a BEE event number back to a chunk
+    # and event -- BEE renumbers on upload -- so it is exactly the file a reader
+    # has open while looking at the set, and the least useful place for the link
+    # to be missing. A row's own url means jumping straight to that event instead
+    # of counting down the set listing.
+    map_path = out / 'event_map.txt'
+    if map_path.exists():
+        base = url[:-len('/event/list/')] if url.endswith('/event/list/') else url.rstrip('/')
+        lines = map_path.read_text().splitlines()
+        if not any(l.startswith('BEE SET URL:') for l in lines):
+            for i, l in enumerate(lines):
+                if l.startswith('Built from:'):
+                    lines[i:i] = [f"BEE SET URL: {url}", "",
+                                  "Every row carries the direct url for that event -- open it to go",
+                                  "straight to the event rather than hunting through the set listing.",
+                                  ""]
+                    break
+        out_lines, n_urls = [], 0
+        for l in lines:
+            out_lines.append(l)
+            m = re.match(r'^(\s+)(\d+)(\s+chunk\d+\s+\d+\s+)(\S+)$', l)
+            if m and 'https://' not in l:
+                out_lines.append(f"{' ' * (len(m.group(1)) + len(m.group(2)))}     "
+                                 f"{base}/event/{m.group(2)}/")
+                n_urls += 1
+        map_path.write_text("\n".join(out_lines) + "\n")
+        print(f"  event_map.txt: {n_urls} per-event url(s) added")
+
+    link = job_summary_dir / 'unmatched_true_neutrino_bee_link.txt'
+    body = [f"BEE SET URL: {url}", "",
+            f"{len(rows)} unmatched in-volume true neutrino(s) over {n_events} event(s),",
+            "the population behind unmatched_true_neutrino_pie_reasons_*.png.",
+            "",
+            "Events are RENUMBERED on upload -- see event_map.txt beside the set for",
+            "the mapping back to chunk and original event number.", ""]
+    map_path = out / 'event_map.txt'
+    if map_path.exists():
+        body.append(map_path.read_text())
+    link.write_text("\n".join(body))
+    print(f"  BEE: {url}")
+    print(f"  {link}")
+    return url
 
 
 def process_event(input_dir, file_name, evt):
@@ -317,7 +465,7 @@ def process_event(input_dir, file_name, evt):
     # total of the points that survive. 0.01 MeV -- see selections.py.
     true_points = apply_true_pointwise_energy_cutoff(true_points, min_true_point_energy)
     true_points = apply_energy_cutoff(true_points, min_cluster_energy)
-    true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points, x_min, x_max, y_min, y_max, z_min, z_max)
+    true_points = apply_wire_readout_sensitive_yz_plane_cut_true(true_points)
     true_points = apply_deadarea_cut_true_charge_light(true_points, output_dir=None, event=evt, file_name=file_name)
     clusters_true = GroupClustersByID(true_points) if len(true_points) else {}
 
@@ -331,12 +479,14 @@ def process_event(input_dir, file_name, evt):
     clu_beam_window_ids = {float(r['clustering_cluster_id']) for r in img_cluster_flash_records
                             if BEAM_WINDOW_MIN_US <= r['flash_time'] <= BEAM_WINDOW_MAX_US}
     flash_times_by_real_id = {}
+    flash_indices_by_real = {}
     for r in img_cluster_flash_records:
         flash_times_by_real_id.setdefault(float(r['clustering_cluster_id']), []).append(r['flash_time'])
+        flash_indices_by_real.setdefault(float(r['clustering_cluster_id']), set()).add(r['flash_index'])
 
     x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu = result['clustering']
     predicted_points = np.column_stack((x_clu, y_clu, z_clu, real_id_clu, q_clu))
-    predicted_points = apply_wire_readout_sensitive_yz_plane_cut_reco(predicted_points, x_min, x_max, y_min, y_max, z_min, z_max)
+    predicted_points = apply_wire_readout_sensitive_yz_plane_cut_reco(predicted_points)
 
     if len(predicted_points) == 0:
         clusters_reco_all, reco_provenance, clusters_reco = {}, {}, {}
@@ -344,6 +494,62 @@ def process_event(input_dir, file_name, evt):
         clusters_reco_all, reco_provenance = group_reco_with_provenance(predicted_points)
         clusters_reco = {cid: points for cid, points in clusters_reco_all.items()
                           if any(rid in clu_beam_window_ids for rid in reco_provenance[cid])}
+
+    # --- COSMIC TAGGER CUT, on the beam-window survivors ---
+    # The reco ids here are group_reco_with_provenance's, one per avg-X group,
+    # NOT clustering-global's coarse cluster_id -- so flash-mates are separate
+    # clusters and the per-flash tag has to be told which of them share a flash,
+    # or it would only ever remove the directly-tagged one. The group key is the
+    # set of IN-WINDOW flash indices a cluster's real ids carry; clusters with no
+    # in-window flash are left out of the map entirely, so each is its own group
+    # rather than all of them sharing a "no flash" bucket.
+    # Both initialised here: an event with no in-beam clusters skips the branch
+    # below entirely, and the row loop reads them unconditionally.
+    tagger_removed_ids = set()
+    tagger_names_by_cluster = {}
+    if APPLY_COSMIC_TAGGER_CUT and clusters_reco:
+        in_window_index_by_real = {}
+        for r in img_cluster_flash_records:
+            if BEAM_WINDOW_MIN_US <= r['flash_time'] <= BEAM_WINDOW_MAX_US:
+                in_window_index_by_real.setdefault(
+                    float(r['clustering_cluster_id']), set()).add(r['flash_index'])
+        flash_group_by_cluster = {}
+        for cid in clusters_reco:
+            indices = set()
+            for rid in reco_provenance.get(cid, []):
+                indices |= in_window_index_by_real.get(rid, set())
+            if indices:
+                flash_group_by_cluster[cid] = frozenset(indices)
+        tagged = tag_reco_clusters(result.get('taggers'), clusters_reco,
+                                   flash_group_by_cluster=flash_group_by_cluster)
+        tagger_removed_ids = set(tagged)
+        # WHICH tagger, per cluster -- the figures name it, and "stm" vs "tgm"
+        # is the difference between a stopping muon and a through-going one.
+        # Propagated entries carry the names of whatever was tagged in their
+        # flash group, flagged so the plot can say it was not tagged directly.
+        tagger_names_by_cluster = {cid: (e.get('taggers') or [], e.get('tagged_directly', False))
+                                   for cid, e in tagged.items()}
+        clusters_reco = {cid: pts for cid, pts in clusters_reco.items()
+                         if cid not in tagger_removed_ids}
+
+    # FLASH MATES. All reco activity on one flash is one bundle -- that is the
+    # premise the whole beam-window selection rests on -- so a cluster's
+    # flash-mates are part of the same activity and belong in the same picture.
+    # Built over the PRE-cut set, since the clusters of interest here are exactly
+    # the ones a cut removed.
+    flash_indices_by_reco = {}
+    for cid, reals in reco_provenance.items():
+        idx = set()
+        for rid in reals:
+            idx |= flash_indices_by_real.get(float(rid), set())
+        if idx:
+            flash_indices_by_reco[cid] = idx
+    flash_mates_by_reco = {}
+    for cid, idx in flash_indices_by_reco.items():
+        mates = sorted(other for other, other_idx in flash_indices_by_reco.items()
+                       if other != cid and (idx & other_idx))
+        if mates:
+            flash_mates_by_reco[cid] = mates
 
     completeness_results = EvaluateCompleteness(clusters_true, clusters_reco, event_key, radius_completeness, min_recopoints_threshold)
     purity_results     = EvaluatePurity(clusters_true, clusters_reco, event_key, radius_purity_xz, radius_purity_yz, radius_purity_xy)
@@ -353,7 +559,10 @@ def process_event(input_dir, file_name, evt):
         clusters_true, clusters_reco, clusters_reco_all, reco_provenance,
         clu_beam_window_ids, flash_times_by_real_id, matched_pairs,
         file_name, evt, apa=APA_LABEL, event_key=event_key,
-        radius_completeness=radius_completeness, min_recopoints_threshold=min_recopoints_threshold)
+        radius_completeness=radius_completeness, min_recopoints_threshold=min_recopoints_threshold,
+        tagger_removed_ids=tagger_removed_ids,
+        radius_purity_xz=radius_purity_xz, radius_purity_yz=radius_purity_yz,
+        radius_purity_xy=radius_purity_xy)
 
     # --- Interaction vertices (mc.json), for the in/out-of-volume split ---
     # Same builder and same bounds as the evaluation notebook, so "in volume"
@@ -365,9 +574,31 @@ def process_event(input_dir, file_name, evt):
         x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, z_min=z_min, z_max=z_max)
     volume_by_cluster  = {r['cluster_id']: r['vertex_in_volume'] for r in vertex_records}
     channel_by_cluster = {r['cluster_id']: r['interaction_channel'] for r in vertex_records}
+    # The interaction VERTEX, for the truth panels. mc.json's root start_xyz, in
+    # the same cm frame as the true points.
+    vertex_xyz_by_cluster = {}
+    for r in vertex_records:
+        vx, vy, vz = r.get('vertex_x'), r.get('vertex_y'), r.get('vertex_z')
+        if None not in (vx, vy, vz):
+            vertex_xyz_by_cluster[r['cluster_id']] = (vx, vy, vz)
     for row in neutrino_rows:
         row['vertex_in_volume']    = volume_by_cluster.get(row['true_cluster_id'])
         row['interaction_channel'] = channel_by_cluster.get(row['true_cluster_id'])
+        row['vertex_xyz']          = vertex_xyz_by_cluster.get(row['true_cluster_id'])
+
+        # WHICH tagger removed this neutrino's cluster, and whether it was tagged
+        # on its own points or inherited the tag from a flash-mate. Only set for
+        # the tagger category, where it is the answer to "why".
+        evidence_cid = row.get('best_strict_reco_cluster_id')
+        names, direct = tagger_names_by_cluster.get(evidence_cid, ([], None))
+        row['tagger_names']    = list(names)
+        row['tagger_direct']   = direct
+        # Other reco clusters on the SAME FLASH as the evidence cluster: the rest
+        # of the bundled in-beam activity, typically a coincident cosmic.
+        row['flash_mate_reco_ids'] = list(flash_mates_by_reco.get(evidence_cid, []))
+        if row.get('category') == 'no_reco_overlap_x_shift':
+            yz_cid = row.get('yz_best_reco_cluster_id')
+            row['flash_mate_reco_ids'] = list(flash_mates_by_reco.get(yz_cid, []))
 
     return clusters_true, clusters_reco, clusters_reco_all, neutrino_rows, vertex_records
 
@@ -441,9 +672,12 @@ def main():
         job_volume_map = build_neutrino_volume_map(job_vertex_records)
         render_level_outputs(job_rows, job_volume_map, build_neutrino_channel_map(job_vertex_records),
                              job_selected_reco, output_dir / "job_summary", "Job Level", "alljobs")
+        write_unmatched_bee_set(job_rows, job_volume_map, output_dir / "job_summary")
 
     categories = ['matched', 'reco_outside_beam_window', 'reco_no_flash_match', 'broken_or_sparse_reco',
                   'no_reco_overlap_x_shift', 'no_reco_overlap', 'unexplained']
+    if APPLY_COSMIC_TAGGER_CUT:
+        categories.insert(1, 'removed_by_cosmic_tagger')
     job_volume_map  = build_neutrino_volume_map(job_vertex_records)
     job_channel_map = build_neutrino_channel_map(job_vertex_records)
     rows_by_population = {p['key']: population_rows(job_rows, p, job_volume_map, job_channel_map)
@@ -465,6 +699,28 @@ def main():
         print(f"  {cat + ':':<24}"
               + "".join(f"{sum(1 for r in rows_by_population[key] if r['category'] == cat):>30}"
                         for key, _ in columns))
+    # Every categorised true neutrino as one CSV row, so the population can be
+    # re-cut afterwards without re-running the job -- by energy band, by channel,
+    # by whatever the question turns out to need. The printed tables above are a
+    # fixed set of splits; this is the data behind them.
+    import csv
+    csv_path = Path(output_dir) / 'true_neutrino_categories.csv'
+    fields = ['event', 'event_num', 'true_cluster_id', 'category', 'volume', 'channel',
+              'total_true_energy', 'n_true_points', 'completeness',
+              'matched_reco_cluster_id', 'best_relaxed_overlap',
+              'n_overlapping_reco_clusters', 'n_overlapping_in_beam_window',
+              'winner_flash_time', 'winner_flash_offset_us',
+              'min_dist', 'dx', 'dy', 'dz', 'linearity']
+    with open(csv_path, 'w', newline='') as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields, extrasaction='ignore')
+        writer.writeheader()
+        for row in job_rows:
+            key = (row.get('event'), row.get('true_cluster_id'))
+            writer.writerow({**row,
+                             'volume': job_volume_map.get(key),
+                             'channel': job_channel_map.get(key)})
+    print(f"\nPer-neutrino rows: {csv_path}  ({len(job_rows)} row(s))")
+
     print(f"\nOutput written to: {output_dir}")
     for population in POPULATIONS:
         where = "<level>/" if population['subdir'] is None else f"<level>/{population['subdir']}/"

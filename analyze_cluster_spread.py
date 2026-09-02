@@ -139,8 +139,7 @@ def process_true_clusters(x, y, z, cid, q, e, t):
     points = apply_min_true_points_cutoff(points, MIN_TRUE_POINTS_CUTOFF)
     if len(points) == 0:
         return {}
-    points = apply_wire_readout_sensitive_yz_plane_cut_true(
-        points, X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX)
+    points = apply_wire_readout_sensitive_yz_plane_cut_true(points)
     if len(points) == 0:
         return {}
     with contextlib.redirect_stdout(io.StringIO()):
@@ -155,8 +154,7 @@ def process_reco_clusters(x, y, z, cid, q):
     points = apply_min_reco_points_cutoff(points, MIN_RECO_POINTS_CUTOFF)
     if len(points) == 0:
         return {}
-    points = apply_wire_readout_sensitive_yz_plane_cut_reco(
-        points, X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX)
+    points = apply_wire_readout_sensitive_yz_plane_cut_reco(points)
     if len(points) == 0:
         return {}
     points = reassign_cluster_ID_reco(points)

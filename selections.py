@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial import cKDTree
 import json
 from pathlib import Path
 from matplotlib.path import Path as MplPath
@@ -65,7 +66,34 @@ def apply_min_reco_points_cutoff(reco_points, min_points):
 
 # Remove true points outside the fiducial volume boundaries.
 # Keeps only points within x, y, z limits.
-def apply_wire_readout_sensitive_yz_plane_cut_true(true_points, x_min, x_max, y_min, y_max, z_min, z_max):
+# ============================================================================
+# WIRE-READOUT SENSITIVE VOLUME
+# ============================================================================
+# The fiducial bounds, in cm, in ONE place. Every notebook used to carry its own
+# copy of these six numbers and pass them to the cut by hand; they are here so a
+# change reaches every script at once.
+#
+# They define two things that must agree: which true POINTS survive the fiducial
+# cut, and what vertex_in_volume means for the signal definition
+# (metadata.build_neutrino_vertex_records). A notebook that took the cut from
+# here but kept its own numbers for the vertex flag would cut points at one
+# boundary and call an interaction "in volume" at another.
+WIRE_READOUT_X_MIN = -201.45
+WIRE_READOUT_X_MAX = 201.45
+WIRE_READOUT_Y_MIN = -200.0
+WIRE_READOUT_Y_MAX = 200.0
+WIRE_READOUT_Z_MIN = 0.15
+WIRE_READOUT_Z_MAX = 500.85
+
+
+def apply_wire_readout_sensitive_yz_plane_cut_true(true_points):
+    x_min = WIRE_READOUT_X_MIN
+    x_max = WIRE_READOUT_X_MAX
+    y_min = WIRE_READOUT_Y_MIN
+    y_max = WIRE_READOUT_Y_MAX
+    z_min = WIRE_READOUT_Z_MIN
+    z_max = WIRE_READOUT_Z_MAX
+    
     filtered_points = []
     for point in true_points:
         x, y, z = point[0], point[1], point[2]
@@ -75,13 +103,349 @@ def apply_wire_readout_sensitive_yz_plane_cut_true(true_points, x_min, x_max, y_
 
 # Remove reconstructed points outside the fiducial volume boundaries.
 # Keeps only points within x, y, z limits.
-def apply_wire_readout_sensitive_yz_plane_cut_reco(reco_points, x_min, x_max, y_min, y_max, z_min, z_max):
+def apply_wire_readout_sensitive_yz_plane_cut_reco(reco_points):
+    x_min = WIRE_READOUT_X_MIN
+    x_max = WIRE_READOUT_X_MAX
+    y_min = WIRE_READOUT_Y_MIN
+    y_max = WIRE_READOUT_Y_MAX
+    z_min = WIRE_READOUT_Z_MIN
+    z_max = WIRE_READOUT_Z_MAX
     filtered_points = []
     for point in reco_points:
         x, y, z = point[0], point[1], point[2]
         if x_min <= x <= x_max and y_min <= y <= y_max and z_min <= z <= z_max:
             filtered_points.append(point)
     return np.array(filtered_points) if filtered_points else np.array([]).reshape(0, 5)
+
+# ============================================================================
+# FIDUCIAL VOLUME CUT
+# ============================================================================
+
+# Fiducial volume cuts
+Fiducial_X_MIN = -198.0
+Fiducial_X_MAX = 198.0
+Fiducial_Y_MIN = -198.0
+Fiducial_Y_MAX = 198.0
+Fiducial_Z_MIN = 2.0
+Fiducial_Z_MAX = 498.0
+
+# ----------------------------------------------------------------------------
+# TWO TPCs, AND THE CATHODE BETWEEN THEM
+# ----------------------------------------------------------------------------
+# SBND is two drift volumes either side of a cathode centred on x = 0. The
+# fiducial volume is therefore NOT one box: it is one box per TPC, and a vertex
+# counts as in-volume when it is fiducial in EITHER of them.
+#
+# The cathode is 2 cm thick, so it occupies |x| <= 2. Applying the same 2 cm
+# fiducial margin used elsewhere pushes the exclusion out to |x| <= 4, and a
+# vertex anywhere in x = [-4, 4] is OUT of volume. That region is not a fiducial
+# choice so much as an admission: charge either side of the cathode drifts away
+# from it, so a vertex sitting in it has no well-defined TPC and its drift
+# coordinate is the least trustworthy in the detector.
+CATHODE_HALF_THICKNESS_CM = 2.0
+FIDUCIAL_CATHODE_MARGIN_CM = 2.0
+# |x| below this is excluded: the cathode itself plus the margin.
+FIDUCIAL_CATHODE_EXCLUSION_CM = CATHODE_HALF_THICKNESS_CM + FIDUCIAL_CATHODE_MARGIN_CM
+
+# The two TPC fiducial x ranges, as (low, high). TPC0 drifts one way and TPC1
+# the other; a point is fiducial in x when it falls in either.
+FIDUCIAL_X_INTERVALS = ((Fiducial_X_MIN, -FIDUCIAL_CATHODE_EXCLUSION_CM),
+                        (FIDUCIAL_CATHODE_EXCLUSION_CM, Fiducial_X_MAX))
+
+
+def in_fiducial_volume(x, y, z,
+                       x_min=None, x_max=None, y_min=None, y_max=None,
+                       z_min=None, z_max=None,
+                       cathode_exclusion=None):
+    """
+    Is this position inside the fiducial volume of EITHER TPC?
+
+    y and z are a plain range test. x is the TPC-aware part: the position has to
+    sit in one of the two drift volumes, which means |x| at least
+    cathode_exclusion (clear of the cathode) and at most x_max (clear of the
+    anode). A position in x = [-4, 4] fails both TPCs and is OUT.
+
+    The bounds default to the module constants; pass them to ask the same
+    question of a different volume. Scalar or array x/y/z both work -- the array
+    form is what apply_fiducial_volume_cut uses.
+    """
+    x_min = Fiducial_X_MIN if x_min is None else x_min
+    x_max = Fiducial_X_MAX if x_max is None else x_max
+    y_min = Fiducial_Y_MIN if y_min is None else y_min
+    y_max = Fiducial_Y_MAX if y_max is None else y_max
+    z_min = Fiducial_Z_MIN if z_min is None else z_min
+    z_max = Fiducial_Z_MAX if z_max is None else z_max
+    gap   = FIDUCIAL_CATHODE_EXCLUSION_CM if cathode_exclusion is None else cathode_exclusion
+
+    x = np.asarray(x); y = np.asarray(y); z = np.asarray(z)
+    in_tpc0 = (x >= x_min) & (x <= -gap)
+    in_tpc1 = (x >= gap)   & (x <= x_max)
+    inside = (in_tpc0 | in_tpc1) & (y >= y_min) & (y <= y_max) & (z >= z_min) & (z <= z_max)
+    return bool(inside) if inside.ndim == 0 else inside
+
+
+# remove points outside the fiducial volume
+def apply_fiducial_volume_cut(points):
+    points = np.asarray(points)
+    if not len(points):
+        return points
+    keep = in_fiducial_volume(points[:, 0], points[:, 1], points[:, 2])
+    kept = points[keep]
+    return kept if len(kept) else np.array([]).reshape(0, points.shape[1])
+
+
+# THE FIDUCIAL VOLUME IS THE SIGNAL DEFINITION, AND ONLY THAT. The six numbers
+# above decide one thing: whether a neutrino INTERACTION VERTEX counts as in
+# volume -- vertex_in_volume in metadata.build_neutrino_vertex_records, which is
+# what separates signal from out-of-volume background everywhere downstream.
+# build_neutrino_vertex_records DEFAULTS to these bounds for that reason.
+#
+# IT IS NOT A CUT ON THE TRUE POINTS. The points are cut by the wire-readout
+# sensitive volume above (the detector geometry) and nothing else. A neutrino
+# whose vertex is inside this volume is signal however far its tracks reach, and
+# all of its energy belongs to it -- applying these bounds to the points would
+# shrink the true energy of exactly the interactions nearest the boundary while
+# still counting them as signal.
+#
+# The volume sits strictly inside the wire-readout sensitive volume above
+# (198 < 201.45, 198 < 200, [2, 498] inside [0.15, 500.85]), so a vertex that
+# passes it has passed that one too.
+#
+# Keyed by COLUMN INDEX of the standard point arrays (0=x, 1=y, 2=z) so the
+# drawing code can look up a boundary straight from a view's axis index.
+FIDUCIAL_BOUNDS_BY_AXIS = {
+    0: (Fiducial_X_MIN, Fiducial_X_MAX),
+    1: (Fiducial_Y_MIN, Fiducial_Y_MAX),
+    2: (Fiducial_Z_MIN, Fiducial_Z_MAX),
+}
+
+# The gap in the middle of an axis, for drawing. Only x has one -- the cathode
+# exclusion -- and a boundary drawn from FIDUCIAL_BOUNDS_BY_AXIS alone would
+# show a single accepted band from -198 to 198 and hide it.
+FIDUCIAL_EXCLUDED_BY_AXIS = {
+    0: (-FIDUCIAL_CATHODE_EXCLUSION_CM, FIDUCIAL_CATHODE_EXCLUSION_CM),
+}
+
+
+# ============================================================================
+# COSMIC TAGGER CUT
+# ============================================================================
+# WireCell's cosmic taggers (tagger_stm, tagger_tgm, ...) write one file per
+# event holding a point cloud with a per-point flag -- see
+# readfiles.read_tagger_from_json, which explains why the column named
+# 'cluster_id' in those files is a FLAG and not an id.
+#
+# HOW A TAGGED POINT IS TIED TO A RECO CLUSTER: by POSITION, nearest neighbour
+# within COSMIC_TAG_MATCH_RADIUS_CM. NOT by charge -- the tagger files carry a
+# 'q' on a different scale from clustering-global's, and of 3698 exactly
+# coincident points on chunk0 event 73 only 3 had matching q. Position is exact
+# or near enough: 3698 of 4418 coincide to 1e-4 cm, worst offset 0.71 cm.
+COSMIC_TAG_MATCH_RADIUS_CM = 1.0
+
+# How many flagged points a cluster needs before it counts as tagged. A
+# nearest-neighbour match across two point clouds always finds a few stragglers,
+# and one stray point is not a tagged cosmic.
+COSMIC_TAG_MIN_POINTS = 10
+
+# ----------------------------------------------------------------------------
+# HOW FAR DOES ONE TAG SPREAD?
+# ----------------------------------------------------------------------------
+# A tagger flags points; those points sit in some cluster; the question is what
+# else goes with that cluster.
+#
+#   'flash' (current)  the tag removes every cluster sharing the tagged
+#                      cluster's FLASH, and nothing else. All activity at one
+#                      flash time is one interaction and the reconstruction
+#                      cannot separate it, so it goes together -- but activity at
+#                      a DIFFERENT flash time in the same event is separable, is
+#                      demonstrably a different interaction, and is kept.
+#   'event'            the original all-or-nothing: one tagged cluster removes
+#                      every in-beam cluster in the event, whatever its flash.
+#                      This is what wrongly removed the neutrino in chunk4
+#                      event 70 -- a tagged cosmic on flash 14 (t = 0.578 us)
+#                      took a numu CC on flash 15 (t = 1.596 us) with it.
+#   'none'             only the clusters a tagger flagged directly.
+#
+# WHICH CLUSTERS SHARE A FLASH is supplied by the caller as
+# flash_group_by_cluster = {cluster id: flash key}. When it is NOT supplied,
+# every cluster is treated as its own flash group, so 'flash' behaves like
+# 'none'. That default is correct wherever the reco id is clustering-global's
+# COARSE cluster_id, because that grouping is already flash-based -- one coarse
+# cluster IS one flash's activity (verified on chunk4 event 70: reals 23 and 28
+# share flash 15 and one coarse id, while real 6 on flash 14 stays separate).
+# Pass the mapping when working in the real_cluster_id namespace, where
+# flash-mates are separate clusters and the tag does need to reach them.
+COSMIC_TAG_PROPAGATE_SCOPE = 'flash'
+
+
+def tagged_tagger_points(tagger_arrays):
+    """
+    (N, 3) positions of the points one tagger FLAGGED, from an entry of
+    read_charge_light_files_for_event()['taggers'].
+
+    Empty when that tagger flagged nothing, which is the normal case for most
+    taggers on most events.
+    """
+    if not tagger_arrays:
+        return np.empty((0, 3))
+    x, y, z, tagged = (np.asarray(a, dtype=float) for a in tagger_arrays[:4])
+    if not len(x):
+        return np.empty((0, 3))
+    flagged = tagged == 1
+    return np.column_stack((x[flagged], y[flagged], z[flagged]))
+
+
+def tag_reco_clusters(taggers, clusters_reco,
+                      match_radius=COSMIC_TAG_MATCH_RADIUS_CM,
+                      min_tagged_points=COSMIC_TAG_MIN_POINTS,
+                      propagate_scope=None,
+                      flash_group_by_cluster=None):
+    """
+    Which reco clusters the taggers flagged, in ONE event.
+
+    clusters_reco is {cluster id: points}, and should be the BEAM-WINDOW
+    survivors -- that is the set a propagated tag would spread across.
+
+    Returns {cluster id: {'taggers', 'n_tagged', 'n_points', 'tagged_directly'}}.
+
+    A cluster is tagged DIRECTLY when min_tagged_points of its own points are
+    flagged. That is the whole result when propagate_scope is 'none'.
+
+    propagate_scope defaults to COSMIC_TAG_PROPAGATE_SCOPE -- see there for what
+    'flash', 'event' and 'none' mean and why the flash one is the default.
+    flash_group_by_cluster = {cluster id: flash key} says which clusters share a
+    flash; without it each cluster is its own group.
+
+    Propagated entries carry tagged_directly=False, an empty n_tagged and a
+    'propagated_from' listing the clusters actually flagged, so a caller can
+    always tell a real tag from an inherited one.
+    """
+    if propagate_scope is None:
+        propagate_scope = COSMIC_TAG_PROPAGATE_SCOPE
+    if propagate_scope not in ('none', 'flash', 'event'):
+        raise ValueError(f"propagate_scope must be 'none', 'flash' or 'event', "
+                         f"got {propagate_scope!r}")
+    direct = {}
+    for cluster_id, points in (clusters_reco or {}).items():
+        points = np.asarray(points, dtype=float)
+        if not len(points):
+            continue
+        tree = cKDTree(points[:, :3])
+        per_tagger = {}
+        for name, arrays in (taggers or {}).items():
+            flagged = tagged_tagger_points(arrays)
+            if not len(flagged):
+                continue
+            distances, _ = tree.query(flagged, k=1)
+            n_hit = int((distances <= match_radius).sum())
+            if n_hit >= min_tagged_points:
+                per_tagger[name] = n_hit
+        if per_tagger:
+            direct[cluster_id] = {
+                'taggers':         sorted(per_tagger),
+                'n_tagged':        per_tagger,
+                'n_points':        len(points),
+                'tagged_directly': True,
+            }
+
+    if not direct or propagate_scope == 'none':
+        return direct
+
+    # Which clusters a tag is allowed to reach. 'event' is one group holding
+    # everything; 'flash' groups by the caller's flash key, and a cluster with no
+    # key is its own group -- never lumped in with the others, because "we do not
+    # know its flash" is not evidence that it shares one.
+    flash_group_by_cluster = flash_group_by_cluster or {}
+    def group_of(cluster_id):
+        if propagate_scope == 'event':
+            return '__event__'
+        return flash_group_by_cluster.get(cluster_id, ('__ungrouped__', cluster_id))
+
+    tagged_groups = {group_of(cluster_id) for cluster_id in direct}
+    result = dict(direct)
+    every_tagger = sorted({name for entry in direct.values() for name in entry['taggers']})
+    for cluster_id, points in clusters_reco.items():
+        if cluster_id in result or group_of(cluster_id) not in tagged_groups:
+            continue
+        points = np.asarray(points, dtype=float)
+        if not len(points):
+            continue
+        result[cluster_id] = {
+            'taggers':         every_tagger,
+            'n_tagged':        {},
+            'n_points':        len(points),
+            'tagged_directly': False,
+            'propagated_from': sorted(cid for cid in direct
+                                      if group_of(cid) == group_of(cluster_id)),
+        }
+    return result
+
+
+def apply_cosmic_tagger_cut(reco_points, taggers,
+                            match_radius=COSMIC_TAG_MATCH_RADIUS_CM,
+                            min_tagged_points=COSMIC_TAG_MIN_POINTS,
+                            propagate_scope=None,
+                            flash_group_by_cluster=None):
+    """
+    Remove in-beam reco activity the cosmic taggers flagged.
+
+    reco_points is the BEAM-WINDOW point array (N x 5: x, y, z, cluster_id, q) --
+    the output of the beam-window selection, before it is grouped. taggers is the
+    event's 'taggers' dict from read_charge_light_files_for_event.
+
+    Returns (kept_points, info) where info is
+    {'n_tagged_clusters', 'n_direct', 'tagged_cluster_ids', 'tagged_by',
+     'n_points_removed'}.
+
+    WHAT GETS REMOVED is a WHOLE CLUSTER, and how far the tag spreads beyond the
+    directly-flagged one is set by COSMIC_TAG_PROPAGATE_SCOPE (overridable per
+    call). Read that constant before using any number this produces:
+
+      'flash' (current)  the tagged cluster and anything sharing its flash.
+                         Activity at a different flash time in the same event is
+                         KEPT -- it is separable, so it is a different
+                         interaction.
+      'event'            the original all-or-nothing; the returned array is
+                         empty. Removes neutrinos that merely shared the window.
+      'none'             only the directly-flagged clusters.
+
+    flash_group_by_cluster = {cluster id: flash key} tells 'flash' which clusters
+    go together. Omit it when the ids are clustering-global's COARSE cluster_id,
+    which is already one-cluster-per-flash; pass it in the real_cluster_id
+    namespace, where flash-mates are separate clusters.
+
+    An event with no tagger files, or with nothing flagged, is returned
+    unchanged.
+
+    info carries 'n_tagged_clusters', 'n_direct' (flagged on their own points),
+    'tagged_cluster_ids', 'tagged_by' and 'n_points_removed'. The gap between
+    n_tagged_clusters and n_direct is exactly what propagation added.
+    """
+    empty_info = {'n_tagged_clusters': 0, 'n_direct': 0, 'tagged_cluster_ids': [],
+                  'tagged_by': [], 'n_points_removed': 0}
+    reco_points = np.asarray(reco_points)
+    if not len(reco_points) or not taggers:
+        return reco_points, empty_info
+
+    clusters_reco = GroupClustersByID(reco_points)
+    tagged = tag_reco_clusters(taggers, clusters_reco, match_radius=match_radius,
+                               min_tagged_points=min_tagged_points,
+                               propagate_scope=propagate_scope,
+                               flash_group_by_cluster=flash_group_by_cluster)
+    if not tagged:
+        return reco_points, dict(empty_info)
+
+    keep = ~np.isin(reco_points[:, 3],
+                    np.fromiter(tagged, dtype=float, count=len(tagged)))
+    info = {
+        'n_tagged_clusters':  len(tagged),
+        'n_direct':           sum(1 for e in tagged.values() if e['tagged_directly']),
+        'tagged_cluster_ids': sorted(tagged),
+        'tagged_by':          sorted({name for e in tagged.values() for name in e['taggers']}),
+        'n_points_removed':   int((~keep).sum()),
+    }
+    return reco_points[keep], info
+
 
 # Reassign cluster IDs to true clusters sequentially.
 # Ensures IDs start from 0 and are contiguous.

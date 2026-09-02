@@ -14,6 +14,11 @@ Haiwang_files_charge_light_matching_MCP2025C_Fall_production/
 Haiwang_files_charge_light_matching_MCP2025C_Fall_production_after_deadareacut/
 Haiwang_files_charge_light_matching_Tagger_Included_MCP2025C_FallProd_10files
 Haiwang_files_charge_light_matching_Tagger_Included_MCP2025C_FallProd_100files
+Cathode_Gap_FiducialCut_Fix
+
+# nbconvert scratch: executed copies carry stored outputs and are regenerated
+# by every run
+.run_*.ipynb
 
 # Output files
 *.root

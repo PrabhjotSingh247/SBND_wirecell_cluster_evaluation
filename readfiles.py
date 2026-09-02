@@ -186,6 +186,41 @@ def read_cluster_global_from_json(json_file):
     return _x, _y, _z, _id, _q, _real_id
 
 
+# The cosmic taggers whose per-event files are read alongside the clustering
+# output. Each is a <evt>-tagger_<name>.json holding ONE point cloud with a
+# per-point flag; see read_tagger_from_json.
+TAGGER_NAMES = ('stm', 'tgm')
+
+
+def read_tagger_from_json(json_file):
+    """
+    Reads one cosmic-tagger file (tagger_stm / tagger_tgm / ...).
+
+    Returns (x, y, z, tagged, q, real_cluster_id), where `tagged` is the file's
+    'cluster_id' column.
+
+    THAT COLUMN IS A FLAG, NOT A CLUSTER ID. Every tagger file of an event holds
+    the SAME point cloud -- x, y, z, q and real_cluster_id are identical between
+    tagger_stm and tagger_tgm -- and only this column differs: 1 where that
+    tagger tagged the point, 0 where it did not. Measured on chunk0 event 73,
+    where tgm flags 4409 of 4418 points and stm flags none of them.
+
+    It is named 'cluster_id' in the file to match the schema of the clustering
+    output, which is why it is renamed here: calling it a cluster id in the code
+    would invite it being grouped on.
+    """
+    with open(json_file, 'r') as f:
+        data = json.load(f)
+
+    _x = np.array(data.get('x', []))
+    _y = np.array(data.get('y', []))
+    _z = np.array(data.get('z', []))
+    _tagged = np.array(data.get('cluster_id', []))
+    _q = np.array(data.get('q', []))
+    _real_id = np.array(data.get('real_cluster_id', []))
+    return _x, _y, _z, _tagged, _q, _real_id
+
+
 def read_sed_sce_from_json(json_file):
     """
     Reads combined-APA true cluster points (sed-sce_drift_smear_readout) from JSON file.
@@ -455,6 +490,11 @@ def read_charge_light_files_for_event(input_dir, evt):
     OPTIONAL: it comes back None when the file is absent rather than skipping the
     event, so callers that do not ask for it keep working on productions that
     predate the file.
+
+    'taggers' is {name: (x, y, z, tagged, q, real_cluster_id)} for each of
+    TAGGER_NAMES whose file is present -- see read_tagger_from_json. Also
+    OPTIONAL, and for the same reason: only the Tagger-included productions carry
+    these files, and an event without them is still a perfectly good event.
     """
     input_dir = Path(input_dir)
     event_dir = input_dir / "data" / str(evt)
@@ -487,6 +527,14 @@ def read_charge_light_files_for_event(input_dir, evt):
         op_data = read_op_json(op_json)
         x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu = read_cluster_global_from_json(clustering_json)
 
+        # Optional, like true_clustering_sce above: absent in productions that
+        # predate the taggers, and their loss must not cost the event.
+        taggers = {}
+        for tagger_name in TAGGER_NAMES:
+            tagger_json = event_dir / f"{evt}-tagger_{tagger_name}.json"
+            if tagger_json.exists():
+                taggers[tagger_name] = read_tagger_from_json(tagger_json)
+
         x_reco, y_reco, z_reco = x_reco.astype(np.float64), y_reco.astype(np.float64), z_reco.astype(np.float64)
         id_reco, q_reco, real_id_reco = id_reco.astype(np.float64), q_reco.astype(np.float64), real_id_reco.astype(np.float64)
 
@@ -510,6 +558,7 @@ def read_charge_light_files_for_event(input_dir, evt):
             'mc': mc_tree,
             'op': op_data,
             'clustering': (x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu),
+            'taggers': taggers,
         }
 
     except Exception as e:

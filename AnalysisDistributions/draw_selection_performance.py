@@ -118,7 +118,11 @@ CHANNELS = ('numu_CC', 'nue_CC', 'NC')
 # (completeness, purity) pair. Every stack and efficiency figure is produced at
 # each of them from ONE categorisation -- see category_at_threshold -- so adding a
 # definition costs figure-drawing time and no re-analysis.
-EFFICIENCY_THRESHOLDS = (0.8, 0.7, 0.5, (0.6, 0.8), (0.6, 0.6))
+#
+# A purity bar of 0.0 means "irrespective of purity": completeness alone decides,
+# subject only to the MIN_MATCH_PURITY floor that has to be cleared for a pair to
+# exist at all. (0.6, 0.0) is "anything above 60% completeness is signal".
+EFFICIENCY_THRESHOLDS = (0.8, 0.7, 0.5, (0.6, 0.8), (0.6, 0.6), (0.6, 0.0))
 
 
 # ============================================================================
@@ -367,10 +371,13 @@ def threshold_pair(threshold):
 
 
 def threshold_tag(threshold):
-    """Filename fragment: '_thr80' when symmetric, '_c60p80' when not."""
+    """Filename fragment: '_thr80' when symmetric, '_c60p80' when not,
+    '_c60pany' when purity is unconstrained."""
     completeness, purity = threshold_pair(threshold)
     if completeness == purity:
         return f"_thr{completeness:.0%}".replace('%', '')
+    if purity == 0.0:
+        return f"_c{completeness:.0%}pany".replace('%', '')
     return f"_c{completeness:.0%}p{purity:.0%}".replace('%', '')
 
 
@@ -379,7 +386,26 @@ def threshold_label(threshold):
     completeness, purity = threshold_pair(threshold)
     if completeness == purity:
         return f"completeness & purity > {completeness:.0%}"
+    if purity == 0.0:
+        # Purity unconstrained -- the absence of a purity clause says so, and the
+        # signal-definition subdirectory the figure lands in spells it out.
+        return f"completeness > {completeness:.0%}"
     return f"completeness > {completeness:.0%}, purity > {purity:.0%}"
+
+
+def threshold_dirname(threshold):
+    """
+    Subdirectory name for one signal definition, so the efficiency figures are
+    grouped by the threshold they were drawn at rather than all in one flat
+    directory. Filenames still carry threshold_tag; this is the folder above them.
+    """
+    completeness, purity = threshold_pair(threshold)
+    if completeness == purity:
+        return f"completeness_and_purity_gt_{completeness * 100:.0f}pc"
+    if purity == 0.0:
+        return f"completeness_gt_{completeness * 100:.0f}pc"
+    return (f"completeness_gt_{completeness * 100:.0f}pc"
+            f"_purity_gt_{purity * 100:.0f}pc")
 
 
 def category_at_threshold(record, threshold=HIGH_SIGNAL_THRESHOLD):
@@ -1438,7 +1464,10 @@ def draw_selection_efficiency(efficiency, output_dir, level_name, filename_prefi
     intervals are correlated, and drawing both invites the reader to compare them
     as if they were independent.
     """
-    output_dir = Path(output_dir)
+    # One subdirectory per signal definition, so a reader after a particular
+    # threshold opens one folder instead of filtering a flat directory by tag.
+    output_dir = Path(output_dir) / threshold_dirname(
+        efficiency.get('threshold', HIGH_SIGNAL_THRESHOLD))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     edges = efficiency['edges']
@@ -1593,14 +1622,18 @@ def draw_efficiency_by_multiplicity(efficiencies_by_class, output_dir, level_nam
     place: the multi-neutrino class has an order of magnitude fewer interactions
     than the single, and without them the two curves look equally well measured.
     """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     present = {k: e for k, e in efficiencies_by_class.items()
                if k in classes and k in _MULTIPLICITY_STYLE and e['n_denominator']}
     if not present:
         return None
     channel = next(iter(present.values()))['channel']
+
+    # Same signal-definition subdirectory as draw_selection_efficiency, so the
+    # multiplicity split for a threshold sits beside that threshold's other
+    # figures. All classes on one figure share the threshold (one build call).
+    output_dir = Path(output_dir) / threshold_dirname(
+        next(iter(present.values())).get('threshold', HIGH_SIGNAL_THRESHOLD))
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     fig, ax = plt.subplots(figsize=(10, 7))
     for class_name, efficiency in present.items():
@@ -1648,7 +1681,7 @@ def draw_efficiency_by_multiplicity(efficiencies_by_class, output_dir, level_nam
     curve_tag = 'high' if numerator_key == 'numerator_high' else 'goodbad'
     # Only the signal curve depends on the threshold -- All Selected counts any
     # matched pair -- so only it carries the tag. Tagging both would write the
-    # same good+bad figure once per threshold under five different names.
+    # same good+bad figure once per threshold under several different names.
     if numerator_key == 'numerator_high':
         curve_tag = f"{threshold_tag(threshold).lstrip('_')}_{curve_tag}"
     path = output_dir / (f"{filename}_{channel}_{reco_cuts_label}_{bin_width:.0f}MeV"
@@ -1661,7 +1694,10 @@ def draw_efficiency_by_multiplicity(efficiencies_by_class, output_dir, level_nam
     return path
 
 
-_THRESHOLD_COLORS = ['tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+# One per entry in EFFICIENCY_THRESHOLDS -- zip() against the sorted thresholds
+# silently drops any curve past the end of this list, so keep it at least as long.
+_THRESHOLD_COLORS = ['tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown',
+                     'tab:olive']
 
 
 def draw_efficiency_threshold_comparison(efficiencies_by_threshold, output_dir, level_name,

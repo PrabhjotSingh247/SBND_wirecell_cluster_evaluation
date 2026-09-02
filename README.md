@@ -124,32 +124,6 @@ The cut is reco-side only by design. "In beam window" is not a truth quantity â€
 
 ---
 
-## Single-Event Notebooks
-
-### single_cluster_eval.ipynb
-**Description:** Evaluates efficiency and purity for a single event by matching true and reconstructed clusters. The fastest way to iterate on a change before running it over many files.
-
-**How to run:**
-1. Open the notebook: `jupyter notebook single_cluster_eval.ipynb`
-2. Configure the event number, APA, and radius thresholds
-3. Run all cells
-
-**Output:** Efficiency and purity heatmaps for true-reco cluster pairs, energy-weighted efficiency plots, and side-by-side cluster visualisations.
-
----
-
-### single_cluster_eval_optimization.ipynb
-**Description:** Sweeps thresholds and radius settings across an event range to find the parameter values that give the best reconstruction quality.
-
-**How to run:**
-1. Open the notebook: `jupyter notebook single_cluster_eval_optimization.ipynb`
-2. Set the event range and the parameter ranges to test
-3. Run all cells
-
-**Output:** Summary tables and plots showing how efficiency and purity vary with each parameter choice.
-
----
-
 ## Detector Geometry Notebooks
 
 ### ReadDrawWirecellBoundary.ipynb
@@ -192,12 +166,11 @@ Install with: `pip install numpy matplotlib pandas seaborn scipy uproot`
 
 ## Quick Start Workflow
 
-1. **Single event first:** use `single_cluster_eval.ipynb` to sanity-check one event
-2. **What the cuts keep:** run `SelectionAnalysis.ipynb` to see the selection flow before trusting any performance number
-3. **Full evaluation:** run `Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb` over all files and events
-4. **Neutrinos only:** run `Evaluation_ChargeLightMatching_AfterBeamWindowCut.ipynb` for the in-beam-window population
-5. **Parameter tuning:** use `single_cluster_eval_optimization.ipynb`, `TrueClusterPointSelection.ipynb`, and `RecoClusterPointSelection.ipynb` to understand threshold effects
-6. **Geometry reference:** consult `ReadDrawWirecellBoundary.ipynb` and `deadarea.ipynb` when interpreting fiducial and dead-area effects
+1. **What the cuts keep:** run `SelectionAnalysis.ipynb` to see the selection flow before trusting any performance number
+2. **Full evaluation:** run `Evaluation_ChargeLightMatching_BeforeBeamWindowCut.ipynb` over all files and events
+3. **Neutrinos only:** run `Evaluation_ChargeLightMatching_AfterBeamWindowCut.ipynb` for the in-beam-window population
+4. **Parameter tuning:** use `TrueClusterPointSelection.ipynb` and `RecoClusterPointSelection.ipynb` to understand threshold effects
+5. **Geometry reference:** consult `ReadDrawWirecellBoundary.ipynb` and `deadarea.ipynb` when interpreting fiducial and dead-area effects
 
 ---
 

@@ -2121,11 +2121,16 @@ def DrawExtraRecoCategoryBreakdown(categorized_rows, n_true_neutrinos, output_di
 # suggesting a relationship that isn't there -- except 'matched', which reuses
 # the same green as 'matched_winner' because it is the same set of pairs seen
 # from the other side.
-_UNMATCHED_TRUE_NU_CATEGORY_ORDER = ['matched', 'reco_outside_beam_window', 'reco_no_flash_match',
+_UNMATCHED_TRUE_NU_CATEGORY_ORDER = ['matched', 'removed_by_cosmic_tagger',
+                                      'reco_outside_beam_window', 'reco_no_flash_match',
                                       'broken_or_sparse_reco', 'no_reco_overlap_x_shift',
                                       'no_reco_overlap', 'unexplained']
 _UNMATCHED_TRUE_NU_CATEGORY_COLORS = {
     'matched':                  'green',
+    # The cosmic tagger removal is a SELECTION decision, not a reconstruction
+    # failure like the rest -- brown keeps it visually apart from the red/purple
+    # beam-window family it sits next to in the order.
+    'removed_by_cosmic_tagger': '#8c564b',
     'reco_outside_beam_window': '#d62728',
     'reco_no_flash_match':      '#9467bd',
     'broken_or_sparse_reco':    '#ff7f0e',
@@ -2138,6 +2143,7 @@ _UNMATCHED_TRUE_NU_CATEGORY_COLORS = {
 }
 _UNMATCHED_TRUE_NU_CATEGORY_LABELS = {
     'matched':                  'Matched',
+    'removed_by_cosmic_tagger': 'Removed by\ncosmic tagger',
     'reco_outside_beam_window': 'Reco outside\nbeam window',
     'reco_no_flash_match':      'Reco has\nno flash',
     'broken_or_sparse_reco':    'Broken /\nsparse reco',
@@ -2161,15 +2167,98 @@ _UNMATCHED_TRUE_NU_CATEGORY_LABELS = {
 # The rest have no such cluster: broken_or_sparse_reco has no single cluster that
 # would have matched, and plain no_reco_overlap has nothing nearby in any view.
 _EVIDENCE_RECO_ID_FIELD = {
+    'removed_by_cosmic_tagger': 'best_strict_reco_cluster_id',
     'reco_outside_beam_window': 'best_strict_reco_cluster_id',
     'reco_no_flash_match':      'best_strict_reco_cluster_id',
     'no_reco_overlap_x_shift':  'yz_best_reco_cluster_id',
 }
 _EVIDENCE_RECO_LABEL = {
+    'removed_by_cosmic_tagger': 'tagger removed',
     'reco_outside_beam_window': 'would have matched',
     'reco_no_flash_match':      'would have matched',
     'no_reco_overlap_x_shift':  'YZ-aligned with',
 }
+
+
+# TRUE is red and RECO is blue in the point plots, always -- the same pairing
+# every other true/reco drawer in this codebase uses, so a reader moving between
+# populations never has to re-learn which colour is which. The CATEGORY is not
+# carried by colour here; it is spelled out in each legend entry instead, which
+# is unambiguous where a colour key is not. The category colours still drive the
+# bar and pie charts, where the category IS the variable being shown.
+_UNMATCHED_TRUE_POINT_COLOR = 'tab:red'
+_UNMATCHED_RECO_POINT_COLOR = 'tab:blue'
+# Other reco clusters sharing the evidence cluster's FLASH. All activity on one
+# flash is one bundle, so these are part of the same in-beam activity -- usually
+# the coincident cosmic that got the neutrino's cluster tagged. Orange keeps them
+# distinct from both the red truth and the blue reco under study.
+_UNMATCHED_FLASHMATE_COLOR = 'tab:orange'
+# The true interaction vertex, on the truth panels.
+_UNMATCHED_VERTEX_STYLE = dict(color='black', marker='*', s=200, zorder=6,
+                               edgecolors='white', linewidths=0.8)
+_FIDUCIAL_LINE_STYLE = dict(color='0.30', linestyle=':', linewidth=1.4, alpha=0.9, zorder=1)
+
+
+def _draw_fiducial_with_arrows(ax, x_col, y_col):
+    """
+    The fiducial boundary on one panel: a dotted line at each bound of the two
+    plotted coordinates, each with a short arrow pointing at the ACCEPTED side.
+
+    The arrows exist because a bare dotted line is ambiguous -- at x = -198 the
+    accepted region is to the right, at x = +198 to the left, and a reader should
+    not have to remember which bound they are looking at. Drawn as axis-spanning
+    lines rather than a rectangle so each edge is visible independently.
+    """
+    from selections import FIDUCIAL_BOUNDS_BY_AXIS, FIDUCIAL_EXCLUDED_BY_AXIS
+
+    for axis, is_vertical in ((x_col, True), (y_col, False)):
+        bounds = FIDUCIAL_BOUNDS_BY_AXIS.get(axis)
+        if bounds is None:
+            continue
+        # The cathode gap in the middle of x: two more edges, with their arrows
+        # pointing AWAY from the centre, since the accepted side of each is the
+        # TPC outside it. Without these the boundary would show one accepted band
+        # spanning the cathode and quietly contradict the vertex test.
+        excluded = FIDUCIAL_EXCLUDED_BY_AXIS.get(axis)
+        if excluded is not None:
+            ex_lo, ex_hi = excluded
+            lo_lim_e, hi_lim_e = ax.get_xlim() if is_vertical else ax.get_ylim()
+            span_e = hi_lim_e - lo_lim_e
+            other_lo_e, other_hi_e = ax.get_ylim() if is_vertical else ax.get_xlim()
+            anchor_e = other_lo_e + 0.32 * (other_hi_e - other_lo_e)
+            for value, inward in ((ex_lo, -1), (ex_hi, +1)):
+                if not (lo_lim_e <= value <= hi_lim_e):
+                    continue
+                if is_vertical:
+                    ax.axvline(value, **_FIDUCIAL_LINE_STYLE)
+                    ax.annotate('', xy=(value + inward * 0.05 * span_e, anchor_e),
+                                xytext=(value, anchor_e),
+                                arrowprops=dict(arrowstyle='-|>', color='0.30', lw=1.4))
+                else:
+                    ax.axhline(value, **_FIDUCIAL_LINE_STYLE)
+                    ax.annotate('', xy=(anchor_e, value + inward * 0.05 * span_e),
+                                xytext=(anchor_e, value),
+                                arrowprops=dict(arrowstyle='-|>', color='0.30', lw=1.4))
+        lo_b, hi_b = bounds
+        lo_lim, hi_lim = ax.get_xlim() if is_vertical else ax.get_ylim()
+        span = hi_lim - lo_lim
+        other_lo, other_hi = ax.get_ylim() if is_vertical else ax.get_xlim()
+        # Arrow tails sit a third of the way up the perpendicular axis, clear of
+        # the legend in the upper right and of most of the data.
+        anchor = other_lo + 0.32 * (other_hi - other_lo)
+        for value, inward in ((lo_b, +1), (hi_b, -1)):
+            if not (lo_lim <= value <= hi_lim):
+                continue
+            if is_vertical:
+                ax.axvline(value, **_FIDUCIAL_LINE_STYLE)
+                ax.annotate('', xy=(value + inward * 0.05 * span, anchor),
+                            xytext=(value, anchor),
+                            arrowprops=dict(arrowstyle='-|>', color='0.30', lw=1.4))
+            else:
+                ax.axhline(value, **_FIDUCIAL_LINE_STYLE)
+                ax.annotate('', xy=(anchor, value + inward * 0.05 * span),
+                            xytext=(anchor, value),
+                            arrowprops=dict(arrowstyle='-|>', color='0.30', lw=1.4))
 
 
 def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_dir, file_name=None,
@@ -2186,13 +2275,33 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
     rest of the event. Same view/axis conventions as the other drawers here (Z
     on the x-axis for XZ/YZ).
 
-    The ONE exception is the reco cluster that would have matched: for the
-    _WOULD_HAVE_MATCHED_CATEGORIES rows, whose whole diagnosis is that reco
-    charge WAS sitting on the neutrino and the beam-window cut (or a missing
-    flash) removed it, that single cluster is drawn in gray underneath. Without
-    it the plot cannot distinguish "cut on timing" from "never reconstructed",
-    which is the entire question for those categories. No other reco cluster is
-    drawn.
+    COLOURS: true points are always RED and reco points always BLUE, as in every
+    other true/reco drawer here. The category is named in each legend entry rather
+    than encoded in the point colour.
+
+    LAYOUT: the flagged TRUE neutrinos on the TOP row of three panels, and the
+    reco clusters the selection removed on the BOTTOM row -- same order as every
+    other pair population here. Both rows use the same fixed detector-wide limits,
+    so position is directly comparable between them.
+
+    The reco row exists only for the categories whose diagnosis is that reco
+    charge WAS sitting on the neutrino and a selection removed it (see
+    _EVIDENCE_RECO_ID_FIELD). Those clusters used to be drawn in gray UNDER the
+    true points in one shared row, which hid the very thing they demonstrate:
+    where reco and truth coincide -- which for these categories is the whole
+    point -- the true cluster paints straight over the reco. Separate rows make
+    "the reco is there and the cut took it" legible. Categories with no such
+    cluster get a single row, since there is nothing to put underneath.
+
+    On the reco panels each removed cluster prints the COMPLETENESS and PURITY the
+    pair would have had -- how much of the neutrino that cluster held, and how
+    much of the cluster was actually the neutrino -- so a reader can see at once
+    whether the selection lost a whole interaction or a contaminated fragment.
+    A beam-window failure additionally prints its FLASH TIME and how far outside
+    the window it fell. That is a property of the reco cluster, so it
+    belongs there rather than on the truth row; a tagger removal deliberately gets
+    no such note, because its flash was inside the window and quoting a time would
+    invite the reader to blame the timing for a decision the tagger made.
 
     Every legend entry carries a cluster ID -- the true cluster's, and the gray
     reco cluster's -- so anything flagged here can be found again in the other
@@ -2215,8 +2324,14 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
     if not unmatched_category:
         return
 
-    # reco_cluster_id -> (true cluster it relates to, how). Keyed by reco ID so one
-    # cluster implicated by two flagged neutrinos is drawn (and labelled) once.
+    # reco_cluster_id -> (true cluster it relates to, how, flash note). Keyed by
+    # reco ID so one cluster implicated by two flagged neutrinos is drawn once.
+    #
+    # The flash note is the answer to "why is this cluster not in the selection",
+    # and it belongs on the RECO panel because it is a property of the reco
+    # cluster, not of the neutrino. Only the beam-window failures get one: a
+    # tagger removal happened despite an in-window flash, so quoting a time there
+    # would invite the reader to blame the timing.
     evidence_reco = {}
     if clusters_reco_all:
         for r in neutrino_rows:
@@ -2224,9 +2339,57 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
             if id_field is None:
                 continue
             reco_cid = r.get(id_field)
-            if reco_cid in clusters_reco_all:
-                evidence_reco.setdefault(reco_cid,
-                                          (r['true_cluster_id'], _EVIDENCE_RECO_LABEL[r['category']]))
+            if reco_cid not in clusters_reco_all:
+                continue
+            # How good the pairing WOULD have been. completeness is the row's
+            # best_strict_overlap (identical to EvaluateCompleteness's
+            # completeness_energy_weighted); purity is attached by the caller,
+            # computed with the pipeline's EvaluatePurity on the same pair. Both
+            # printed because they answer different halves of "what was lost":
+            # completeness how much of the neutrino that cluster held, purity how
+            # much of the cluster was actually the neutrino.
+            bits = []
+            if r['category'] == 'removed_by_cosmic_tagger':
+                names = r.get('tagger_names') or []
+                if names:
+                    how = ("tagged directly" if r.get('tagger_direct')
+                           else "tag inherited from a flash-mate")
+                    bits.append(f"REMOVED by tagger: {', '.join(names)} ({how})")
+                else:
+                    bits.append("REMOVED by the cosmic tagger cut")
+            compl = r.get('best_strict_overlap')
+            purity = r.get('best_strict_purity')
+            if compl is not None:
+                bits.append(f"completeness {compl:.3f}")
+            if purity is not None:
+                bits.append(f"purity {purity:.3f}")
+            if r['category'] == 'reco_outside_beam_window':
+                t = r.get('winner_flash_time')
+                off = r.get('winner_flash_offset_us')
+                if t is not None:
+                    line = f"flash t = {t:.2f} us"
+                    if off is not None:
+                        line += f" ({abs(off):.2f} us outside window)"
+                    bits.append(line)
+            elif r['category'] == 'reco_no_flash_match':
+                bits.append("no flash bridged onto this cluster")
+            note = "\n    ".join(bits) if bits else None
+            evidence_reco.setdefault(reco_cid, (r['true_cluster_id'],
+                                                _EVIDENCE_RECO_LABEL[r['category']], note))
+
+    # The interaction vertex per flagged neutrino, for the truth panels.
+    vertices = {r['true_cluster_id']: r['vertex_xyz'] for r in neutrino_rows
+                if r['category'] != 'matched' and r.get('vertex_xyz')}
+
+    # Reco clusters sharing a flash with an evidence cluster -- the rest of the
+    # bundled in-beam activity. The evidence clusters themselves are removed so
+    # nothing is drawn twice in two colours.
+    flash_mates = set()
+    for r in neutrino_rows:
+        for cid in (r.get('flash_mate_reco_ids') or []):
+            if clusters_reco_all and cid in clusters_reco_all:
+                flash_mates.add(cid)
+    flash_mates -= set(evidence_reco)
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -2238,53 +2401,87 @@ def DrawUnmatchedTrueNeutrinos(clusters_true, neutrino_rows, event, apa, output_
         ("XY", 0, 1, (-250, 250), (-250, 250), "x [cm]", "y [cm]"),
     ]
 
-    fig, axes = plt.subplots(1, 3, figsize=(20, 6.5))
+    # TRUE on top, RECO below, whenever there is a reco cluster to show -- the
+    # same order every other pair population in this codebase uses. Overlaying
+    # them in one row hid the thing these categories exist to show: the reco
+    # charge sits exactly on the neutrino, so on a shared panel the true points
+    # simply paint over it. On separate rows with identical (fixed, detector-wide)
+    # limits, "the reco is there and was cut" reads directly off the two rows.
+    # With no evidence cluster there is nothing to put underneath, so it stays a
+    # single row.
+    n_rows = 2 if (evidence_reco or flash_mates) else 1
+    fig, axes = plt.subplots(n_rows, 3, figsize=(20, 6.5 * n_rows), squeeze=False)
 
-    # What each flagged neutrino IS -- interaction channel and vertex volume, keyed
-    # by the same cluster ids the legends use. With two neutrinos on one canvas
-    # that is what tells them apart. Built from the rows themselves, which carry
-    # the fields when the caller annotated them (investigate_unmatched_true_neutrinos
-    # does); absent fields print as n/a. Drawn inside each panel below its legend,
-    # once the panels are populated.
     banner = format_true_neutrino_banner(neutrino_rows, cluster_ids=unmatched_category.keys(),
                                           id_key='true_cluster_id')
 
     for col_idx, (view_label, x_col, y_col, xlim, ylim, xlabel, ylabel) in enumerate(views):
-        ax = axes[col_idx]
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        title = f"Unmatched true neutrinos: Event {event}, {apa}, {view_label}"
+        # ---- top row: the flagged TRUE neutrinos ----
+        ax = axes[0][col_idx]
+        ax.set_xlim(xlim); ax.set_ylim(ylim)
+        ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
+        title = f"TRUE -- unmatched neutrinos: Event {event}, {apa}, {view_label}"
         if file_name:
             title += f" ({file_name})"
         ax.set_title(title, fontsize=11, wrap=True)
-
-        # Gray reco first, so the true cluster it failed to match sits on top of it.
-        # Drawn with a LARGER marker than the true points (s=6 vs s=1): where the
-        # two coincide -- which for these categories is the whole point -- an
-        # equal-sized gray layer is completely hidden by the true cluster painted
-        # over it, so the overlap has to read as a gray halo around the true points.
-        for reco_cid, (true_cid, relation) in sorted(evidence_reco.items()):
-            reco_points = np.array(clusters_reco_all[reco_cid])
-            ax.scatter(reco_points[:, x_col], reco_points[:, y_col], s=6, alpha=0.5, color='gray')
-            ax.plot([], [], color='gray',
-                    label=f"Reco cluster {reco_cid:.3f} ({relation} {true_cid:.0f})")
-
         for true_cid, category in sorted(unmatched_category.items()):
             points = np.array(clusters_true[true_cid])
-            color = _UNMATCHED_TRUE_NU_CATEGORY_COLORS[category]
-            ax.scatter(points[:, x_col], points[:, y_col], s=1, alpha=0.8, color=color)
+            ax.scatter(points[:, x_col], points[:, y_col], s=1, alpha=0.8,
+                       color=_UNMATCHED_TRUE_POINT_COLOR)
             # Invisible zero-length line to carry the legend entry -- same trick
-            # used by DrawTrueRecoClustersXZ/YZ/XY and DrawExtraRecoClusters
-            # above -- so each cluster's ID is readable directly off the plot,
-            # not just its category color.
+            # used by DrawTrueRecoClustersXZ/YZ/XY and DrawExtraRecoClusters above.
+            # The category rides in the TEXT, not the colour.
             label = _UNMATCHED_TRUE_NU_CATEGORY_LABELS[category].replace('\n', ' ')
-            ax.plot([], [], color=color, label=f"True cluster {true_cid:.0f} ({label})")
+            ax.plot([], [], color=_UNMATCHED_TRUE_POINT_COLOR,
+                    label=f"True cluster {true_cid:.0f} ({label})")
+        for _tcid, vertex in sorted(vertices.items()):
+            ax.scatter([vertex[x_col]], [vertex[y_col]], **_UNMATCHED_VERTEX_STYLE)
+        if vertices:
+            ax.plot([], [], linestyle='none', color='black', marker='*',
+                    markeredgecolor='white', markersize=8, label='true interaction vertex')
+        _draw_fiducial_with_arrows(ax, x_col, y_col)
+        ax.plot([], [], label='fiducial boundary (arrow = accepted)', **_FIDUCIAL_LINE_STYLE)
         ax.legend(fontsize=8, loc='upper right')
-
-    for ax in axes:
         _draw_true_neutrino_note(ax, banner, fontsize=10)
+
+        # ---- bottom row: the reco clusters the selection removed ----
+        if not (evidence_reco or flash_mates):
+            continue
+        ax = axes[1][col_idx]
+        ax.set_xlim(xlim); ax.set_ylim(ylim)
+        ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
+        title = f"RECO -- removed by the selection: Event {event}, {apa}, {view_label}"
+        if file_name:
+            title += f" ({file_name})"
+        ax.set_title(title, fontsize=11, wrap=True)
+        notes = []
+        for reco_cid, (true_cid, relation, note) in sorted(evidence_reco.items()):
+            reco_points = np.array(clusters_reco_all[reco_cid])
+            ax.scatter(reco_points[:, x_col], reco_points[:, y_col], s=6, alpha=0.6,
+                       color=_UNMATCHED_RECO_POINT_COLOR)
+            ax.plot([], [], color=_UNMATCHED_RECO_POINT_COLOR,
+                    label=f"Reco cluster {reco_cid:.3f} ({relation} {true_cid:.0f})")
+            if note:
+                notes.append(f"{reco_cid:.3f}: {note}")
+        # Same-flash companions: one flash is one bundle of activity, so a
+        # coincident cosmic sharing it belongs in this picture -- for a
+        # propagated tagger removal it IS the reason the neutrino was cut.
+        for mate_cid in sorted(flash_mates):
+            mate_points = np.array(clusters_reco_all[mate_cid])
+            ax.scatter(mate_points[:, x_col], mate_points[:, y_col], s=4, alpha=0.45,
+                       color=_UNMATCHED_FLASHMATE_COLOR)
+            ax.plot([], [], color=_UNMATCHED_FLASHMATE_COLOR,
+                    label=f"Reco cluster {mate_cid:.3f} (same flash)")
+        _draw_fiducial_with_arrows(ax, x_col, y_col)
+        ax.plot([], [], label='fiducial boundary (arrow = accepted)', **_FIDUCIAL_LINE_STYLE)
+        ax.legend(fontsize=8, loc='upper right')
+        if notes:
+            # Directly under the legend, right-aligned to it, so the flash time
+            # reads as a property of the cluster named just above it.
+            ax.text(0.98, 0.80, "\n".join(notes), transform=ax.transAxes,
+                    ha='right', va='top', fontsize=9, fontweight='bold',
+                    bbox=dict(boxstyle='round,pad=0.4', facecolor='white',
+                              edgecolor='gray', alpha=0.9))
 
     plt.tight_layout()
     plt.savefig(output_dir / f"unmatched_true_neutrinos_event{event}_{apa}.png", dpi=100, bbox_inches='tight')
@@ -2391,5 +2588,237 @@ def DrawUnmatchedTrueNeutrinoBreakdown(neutrino_rows, n_selected_reco, output_di
 
     plt.tight_layout()
     plt.savefig(output_dir / f"unmatched_true_neutrino_breakdown_{filename_prefix}_{num_events}events_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+
+# The categories that mean "a real reco cluster WAS this neutrino, and something
+# other than the reconstruction lost it". Counted as recoverable signal in the
+# second efficiency curve.
+#
+# no_reco_overlap_x_shift is in the list even though its 3D completeness and
+# purity are ~0. That is the point of the category: the cluster lines up with the
+# neutrino in YZ and misses in 3D, which can only happen along the drift
+# direction, which charge-light matching sets from the flash time. So the charge
+# WAS reconstructed and was merely placed at the wrong X -- give it the right
+# flash and it would match. Excluding it would blame the reconstruction for a
+# flash-assignment failure.
+WOULD_HAVE_MATCHED_CATEGORIES = ('removed_by_cosmic_tagger',
+                                 'reco_outside_beam_window',
+                                 'reco_no_flash_match',
+                                 'no_reco_overlap_x_shift')
+
+_EFFICIENCY_BIN_WIDTH_MEV = 200
+_EFFICIENCY_MAX_MEV       = 3000
+_EFFICIENCY_CURVE_COLOR   = '#1f77b4'
+# Everything above this goes in ONE bin. Above ~1000 MeV the in-volume sample
+# thins to a handful of interactions per 200 MeV, and separate bins there are
+# single-entry ratios sitting at exactly 0 or 1 with error bands spanning most of
+# the axis -- noise drawn at the same weight as the measured region. One tail bin
+# pools them into a number that means something. Matches the
+# tail_1bin_above_1000MeV convention in draw_selection_performance.
+_EFFICIENCY_TAIL_FROM_MEV = 1000
+
+
+def _efficiency_bin_edges():
+    """200 MeV bins up to the tail threshold, then a single bin holding the rest."""
+    edges = list(np.arange(0, _EFFICIENCY_TAIL_FROM_MEV + _EFFICIENCY_BIN_WIDTH_MEV,
+                           _EFFICIENCY_BIN_WIDTH_MEV, dtype=float))
+    edges.append(float(_EFFICIENCY_MAX_MEV))
+    return np.array(edges)
+
+
+def DrawUnmatchedSelectionEfficiency(neutrino_rows, output_dir, apa, level_name,
+                                     filename_prefix, file_name=None):
+    """
+    Selection efficiency vs TRUE DEPOSITED ENERGY for the population it is given,
+    written as TWO files:
+
+      selection_efficiency_matched_*.png       numerator = matched only
+      selection_efficiency_recoverable_*.png   numerator = matched PLUS the
+                                               would-have-matched categories
+
+    ONE CURVE, for whatever rows arrive. The caller draws this once per
+    population, so the copy in by_vertex_volume/in_volume/ is every in-volume
+    neutrino combined and the copy in by_interaction_channel/numu_CC/ is numu CC
+    alone -- the same split every other output in this investigation uses. Drawing
+    the channels as separate curves here would duplicate the directory structure
+    inside a single figure.
+
+    The pair of files is the point. The first is what the selection delivers
+    today; the second is what it would deliver if the things that discarded a
+    genuine reconstruction did not. The gap between them is the recoverable
+    inefficiency, and either one alone misleads about where the loss is.
+
+    DENOMINATOR is every true neutrino in these rows, whatever its fate, which is
+    what makes the ratio an efficiency rather than a purity.
+
+    UNCERTAINTY is the Clopper-Pearson binomial interval from
+    draw_selection_performance -- the same function and confidence level the
+    Signal_Background efficiency plots use, so the bands mean the same thing in
+    both places. Binomial and not sqrt(N): the numerator is a SUBSET of the
+    denominator, so what fluctuates is successes in a fixed number of trials.
+
+    The OVERALL efficiency is printed under the legend, integrated over every
+    bin -- not the eye-average of the curve, and the number to quote.
+    """
+    import sys as _sys
+    _here = str(Path(__file__).resolve().parent / 'AnalysisDistributions')
+    if _here not in _sys.path:
+        _sys.path.insert(0, _here)
+    from draw_selection_performance import clopper_pearson, draw_efficiency_band
+
+    rows = [r for r in neutrino_rows if r.get('total_true_energy') is not None]
+    if not rows:
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    num_events = len(set(r['event'] for r in neutrino_rows)) if neutrino_rows else 1
+    edges   = _efficiency_bin_edges()
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    # Anything past the last edge belongs in the tail bin, not outside the plot.
+    energies = np.clip(np.array([r['total_true_energy'] for r in rows], dtype=float),
+                       None, edges[-1] - 1e-6)
+
+    for recoverable, tag, title_bit in (
+            (False, 'matched',     'matched only'),
+            (True,  'recoverable', 'matched + would-have-matched')):
+        hits = np.array([r['category'] == 'matched'
+                         or (recoverable and r['category'] in WOULD_HAVE_MATCHED_CATEGORIES)
+                         for r in rows], dtype=bool)
+        denom, _ = np.histogram(energies, bins=edges)
+        numer, _ = np.histogram(energies[hits], bins=edges)
+        if denom.sum() == 0:
+            continue
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratio = np.where(denom > 0, numer / np.maximum(denom, 1), np.nan)
+
+        fig, ax = plt.subplots(figsize=(11, 8))
+        draw_efficiency_band(ax, centers, *clopper_pearson(numer, denom),
+                             _EFFICIENCY_CURVE_COLOR)
+        ax.plot(centers, ratio, marker='s', markersize=5, linewidth=1.8,
+                color=_EFFICIENCY_CURVE_COLOR,
+                label=f"{title_bit}  ({int(denom.sum())} true neutrinos)")
+        # Mark where the pooled tail begins, so the wide last point is not read
+        # as a 200 MeV bin like the others.
+        ax.axvline(_EFFICIENCY_TAIL_FROM_MEV, color='0.55', linestyle='--', linewidth=1)
+        ax.text(_EFFICIENCY_TAIL_FROM_MEV + 30, 0.04,
+                f'single bin above {_EFFICIENCY_TAIL_FROM_MEV:.0f} MeV',
+                fontsize=9, color='0.35', rotation=90, va='bottom')
+        ax.axhline(1.0, color='black', linestyle=':', linewidth=1)
+        ax.set_ylim(0, 1.25)
+        ax.set_xlim(0, _EFFICIENCY_MAX_MEV)
+        ax.set_xlabel('True Deposited Energy (MeV)', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Selection Efficiency', fontsize=12, fontweight='bold')
+        title = (f'Selection efficiency ({title_bit}) - {level_name}, '
+                 f'{num_events} events, {apa}')
+        if file_name:
+            title += f' ({file_name})'
+        ax.set_title(title, fontsize=13, fontweight='bold', wrap=True)
+        ax.grid(True, alpha=0.3)
+        legend = ax.legend(fontsize=10, loc='upper right', framealpha=0.9)
+
+        total_n, total_d = int(numer.sum()), int(denom.sum())
+        fig.canvas.draw()
+        bbox = legend.get_window_extent().transformed(ax.transAxes.inverted())
+        ax.text(bbox.x1, bbox.y0 - 0.02,
+                f"overall efficiency\n{total_n}/{total_d} = {total_n / total_d:.3f}",
+                transform=ax.transAxes, ha='right', va='top',
+                fontsize=11, fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.4', facecolor='white',
+                          edgecolor='gray', alpha=0.9))
+        plt.tight_layout()
+        plt.savefig(output_dir / f"selection_efficiency_{tag}_{filename_prefix}_"
+                                 f"{num_events}events_{apa}.png",
+                    dpi=100, bbox_inches='tight')
+        plt.close(fig)
+
+
+def DrawUnmatchedTrueNeutrinoPies(neutrino_rows, output_dir, apa, level_name, filename_prefix,
+                                  file_name=None):
+    """
+    The middle and bottom panels of DrawUnmatchedTrueNeutrinoBreakdown again, as
+    two pie charts in TWO SEPARATE FILES:
+
+      unmatched_true_neutrino_pie_matched_*.png  matched vs not matched
+      unmatched_true_neutrino_pie_reasons_*.png  the not-matched bucket by reason
+
+    Same counts and the same colours as the bars, deliberately -- a pie answers
+    "what fraction" at a glance where the bars answer "how many", and giving the
+    two different colours for the same category would break the link between them.
+
+    Separate files rather than one two-panel figure because the two get used
+    differently: the matched/not-matched split is the headline number to put in a
+    talk, the reason breakdown is the diagnostic that goes beside it.
+
+    A reason with zero entries is dropped rather than drawn as a zero-width
+    wedge, and the reason pie is skipped entirely when nothing is unmatched --
+    an empty pie is not a statement, it is a broken plot.
+    """
+    if not neutrino_rows:
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    num_events   = len(set(r['event'] for r in neutrino_rows))
+    n_total      = len(neutrino_rows)
+    n_matched    = sum(1 for r in neutrino_rows if r['category'] == 'matched')
+    n_unmatched  = n_total - n_matched
+
+    def _suffix(title):
+        out = f'{title} - {level_name}, {num_events} events, {apa}'
+        return out + (f' ({file_name})' if file_name else '')
+
+    def _autopct(counts):
+        # Both the percentage and the count: a pie slice alone cannot be read
+        # back to a number, and these samples are small enough that the raw
+        # count is what a reader actually wants.
+        total = sum(counts)
+        def fmt(pct):
+            return f'{pct:.1f}%\n({int(round(pct * total / 100.0))})'
+        return fmt
+
+    # ---- 1. matched vs not matched ----
+    counts = [n_matched, n_unmatched]
+    labels = ['Matched', 'Not matched']
+    colors = [_UNMATCHED_TRUE_NU_CATEGORY_COLORS['matched'], '#898781']
+    keep   = [i for i, c in enumerate(counts) if c > 0]
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.pie([counts[i] for i in keep], labels=[labels[i] for i in keep],
+           colors=[colors[i] for i in keep], autopct=_autopct([counts[i] for i in keep]),
+           startangle=90, counterclock=False,
+           wedgeprops=dict(edgecolor='black', linewidth=1.5),
+           textprops=dict(fontsize=12, fontweight='bold'))
+    ax.set_title(_suffix('True Neutrinos: Matched vs Not Matched')
+                 + f'\n{n_total} true neutrino cluster(s)',
+                 fontsize=13, fontweight='bold', wrap=True)
+    ax.axis('equal')
+    plt.tight_layout()
+    plt.savefig(output_dir / f"unmatched_true_neutrino_pie_matched_{filename_prefix}_{num_events}events_{apa}.png",
+                dpi=100, bbox_inches='tight')
+    plt.close()
+
+    # ---- 2. the not-matched bucket, by reason ----
+    if n_unmatched == 0:
+        return
+    reasons = [cat for cat in _UNMATCHED_TRUE_NU_CATEGORY_ORDER if cat != 'matched']
+    counts  = [sum(1 for r in neutrino_rows if r['category'] == cat) for cat in reasons]
+    keep    = [i for i, c in enumerate(counts) if c > 0]
+    fig, ax = plt.subplots(figsize=(9, 9))
+    ax.pie([counts[i] for i in keep],
+           labels=[_UNMATCHED_TRUE_NU_CATEGORY_LABELS[reasons[i]].replace('\n', ' ') for i in keep],
+           colors=[_UNMATCHED_TRUE_NU_CATEGORY_COLORS[reasons[i]] for i in keep],
+           autopct=_autopct([counts[i] for i in keep]),
+           startangle=90, counterclock=False,
+           wedgeprops=dict(edgecolor='black', linewidth=1.5, alpha=0.85),
+           textprops=dict(fontsize=11, fontweight='bold'))
+    ax.set_title(_suffix('Unmatched True Neutrinos by Reason')
+                 + f'\n{n_unmatched} of {n_total} unmatched',
+                 fontsize=13, fontweight='bold', wrap=True)
+    ax.axis('equal')
+    plt.tight_layout()
+    plt.savefig(output_dir / f"unmatched_true_neutrino_pie_reasons_{filename_prefix}_{num_events}events_{apa}.png",
                 dpi=100, bbox_inches='tight')
     plt.close()

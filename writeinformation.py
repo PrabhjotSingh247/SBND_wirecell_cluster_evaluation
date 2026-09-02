@@ -588,7 +588,8 @@ def write_extra_reco_info(categorized_rows, output_dir, filename="extra_reco_inf
     return out_path
 
 
-_UNMATCHED_TRUE_NU_CATEGORY_ORDER = ['reco_outside_beam_window', 'reco_no_flash_match',
+_UNMATCHED_TRUE_NU_CATEGORY_ORDER = ['removed_by_cosmic_tagger',
+                                      'reco_outside_beam_window', 'reco_no_flash_match',
                                       'broken_or_sparse_reco', 'no_reco_overlap_x_shift',
                                       'no_reco_overlap', 'unexplained']
 
@@ -641,6 +642,14 @@ def write_unmatched_true_neutrino_info(neutrino_rows, output_dir, filename="unma
         f.write(f"{'='*205}\n")
         f.write("TRUE NEUTRINO CLUSTERS WITH NO RECO MATCH\n")
         f.write(f"{'='*205}\n")
+        f.write("NOTE: the three 'would have matched' reasons below require the overlapping cluster to reach\n")
+        f.write("      completeness > 10% AND purity > 10% of this neutrino. A cluster that merely clips it is\n")
+        f.write("      not its reconstruction, so nothing was lost when a cut removed it -- those land in\n")
+        f.write("      no_reco_overlap instead (metadata.MIN_WOULD_HAVE_MATCHED_*)\n")
+        f.write("removed_by_cosmic_tagger : a reco cluster overlaps this neutrino well enough to have matched it AND\n")
+        f.write("                           its flash is INSIDE the beam window, but the cosmic tagger cut removed\n")
+        f.write("                           it. A selection decision, not a reconstruction failure -- the cluster\n")
+        f.write("                           was reconstructed and in time, and the tagger judged it cosmic\n")
         f.write("reco_outside_beam_window : a reco cluster in the PRE-cut set overlaps this neutrino well enough to\n")
         f.write("                           have matched it, but the beam-window cut removed it -- its charge-light\n")
         f.write("                           flash is outside the window. flash_off_us is the signed distance to the\n")

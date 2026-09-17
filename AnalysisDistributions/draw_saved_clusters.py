@@ -1,6 +1,6 @@
 """
 SAVED CLUSTER VIEWS -- driven by
-AnalysisDistributions/SignalBackground_Distributions.ipynb.
+AnalysisDistributions/SignalBackground_Distributions_AfterCosmic.ipynb.
 
 XZ, YZ and XY pictures of individual reco-true pairs, sampled across the
 completeness-purity plane so that every corner of it has a concrete example
@@ -330,6 +330,20 @@ class ClusterViewSampler:
                 f"from {self.n_two_neutrino_candidates} candidate(s)")
 
 
+def _as_vertex_array(vertex):
+    """
+    None, one (x, y, z), or a list of (x, y, z) triples -> an (n, 3) array (n
+    may be 0). Lets _draw_row_panels accept either shape for its per-row vertex
+    argument without the caller having to know which one it is giving.
+    """
+    if vertex is None:
+        return np.empty((0, 3))
+    arr = np.asarray(vertex, dtype=float)
+    if arr.ndim == 1:
+        arr = arr.reshape(1, 3)
+    return arr
+
+
 def _draw_panels(fig_title, point_sets, output_path, legend_lines, footer_note=None):
     """
     One figure, three panels (XZ / YZ / XY), each with the same point sets.
@@ -406,24 +420,27 @@ def _draw_row_panels(fig_title, rows, output_path, legend_lines, footer_note=Non
     eye compares position, and it can only do that on a common frame.
 
     A row may be given as (row title, sets) or as (row title, sets, vertex),
-    where vertex is an (x, y, z) drawn on that row's three panels as a black star
-    -- the true interaction vertex, so a true cluster can be read against the
-    point the interaction started from. The vertex is folded into the SHARED
-    limits: a marker outside the frame would be no marker at all, and for an
-    out-of-volume interaction the distance from the vertex to the deposits is the
-    very thing the picture is being looked at for. That does mean an interaction
-    whose vertex is far from its deposits draws a wider frame than the points
-    alone would need.
+    where vertex is an (x, y, z) -- OR a list of them, for a row overlaying
+    several interactions that each have their own -- drawn on that row's three
+    panels as black stars: the true interaction vertex/vertices, so a true
+    cluster can be read against the point(s) the interaction(s) started from.
+    Vertices are folded into the SHARED limits: a marker outside the frame would
+    be no marker at all, and for an out-of-volume interaction the distance from
+    the vertex to the deposits is the very thing the picture is being looked at
+    for. That does mean an interaction whose vertex is far from its deposits
+    draws a wider frame than the points alone would need.
     """
     n = len(rows)
     # (title, sets) and (title, sets, vertex) are both accepted, so the callers
-    # that have no vertex to give stay as they are.
-    rows = [(row[0], row[1], row[2] if len(row) > 2 else None) for row in rows]
+    # that have no vertex to give stay as they are. vertex is normalised to an
+    # (n, 3) array (n may be 0) so one-vertex and multi-vertex rows share the
+    # same drawing code below.
+    rows = [(row[0], row[1], _as_vertex_array(row[2] if len(row) > 2 else None))
+            for row in rows]
     fig, axes = plt.subplots(n, 3, figsize=(19, 5.6 * n), squeeze=False)
     everything = [np.asarray(p) for _, sets, _ in rows for p, _ in sets
                   if p is not None and len(p)]
-    vertices = [np.asarray(v, dtype=float).reshape(1, 3) for _, _, v in rows
-                if v is not None]
+    vertices = [v for _, _, v in rows if len(v)]
     for col, (ix, iy, xlabel, ylabel, name) in enumerate(_VIEWS):
         framed = everything + vertices
         lims = []
@@ -441,8 +458,8 @@ def _draw_row_panels(fig_title, rows, output_path, legend_lines, footer_note=Non
                 if points is not None and len(points):
                     points = np.asarray(points)
                     ax.scatter(points[:, ix], points[:, iy], **style)
-            if vertex is not None:
-                ax.scatter([vertex[ix]], [vertex[iy]], **_VERTEX_STYLE)
+            if len(vertex):
+                ax.scatter(vertex[:, ix], vertex[:, iy], **_VERTEX_STYLE)
             if lims[0]:
                 ax.set_xlim(*lims[0])
             if lims[1]:
@@ -454,7 +471,7 @@ def _draw_row_panels(fig_title, rows, output_path, legend_lines, footer_note=Non
             ax.set_title(f"{name} -- {row_title}", fontsize=_LABEL_FONTSIZE, fontweight='bold')
             ax.grid(True, linestyle='--', alpha=0.3)
             handles, labels = ax.get_legend_handles_labels()
-            if vertex is not None:
+            if len(vertex):
                 handles.append(Line2D([], [], linestyle='none', color='black',
                                       marker='*', markeredgecolor='white',
                                       markersize=_VERTEX_LEGEND_MARKERSIZE))
@@ -526,6 +543,63 @@ def draw_pair_views(record, clusters_true, clusters_reco, output_root, event_lab
          ("RECO cluster", [(reco_points, _RECO_STYLE)])],
         Path(output_root) / directory / f"pair_{record['channel']}_{event_label}.png",
         legend_lines)
+
+
+def draw_selected_reco_cluster_view(cluster_points, output_path, fig_title, legend_lines):
+    """
+    One SELECTED reco cluster, no truth to draw beside it -- real data has no
+    true cluster to pair against (see draw_pair_views for the truth-bearing
+    counterpart). Single row, XZ/YZ/XY, styled like the reco half of a pair
+    view (_RECO_STYLE) so a reco cluster reads the same whether or not this
+    event happens to have truth.
+    """
+    return _draw_panels(fig_title, [(cluster_points, _RECO_STYLE)], Path(output_path), legend_lines)
+
+
+def write_selected_reco_cluster_index(entries, output_root, filename='selected_reco_clusters.txt',
+                                      bee_set_url=None, preamble=None):
+    """
+    Index + bee_links.txt for a population of draw_selected_reco_cluster_view
+    figures. entries: dicts with 'event_key', 'reco_cluster_id',
+    'reco_energy_mev', 'n_points', 'path', and (once
+    build_bee_set_from_links.build_population_bee_set has run) 'bee_url'.
+
+    Same two-file convention as write_cosmic_index (draw_selection_cosmics.py):
+    a human-readable table plus a separate bee_links.txt, because a PNG cannot
+    carry a clickable link but a text file can.
+    """
+    output_root = Path(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+    entries = sorted(entries or [], key=lambda e: -(e['reco_energy_mev'] or 0))
+
+    lines = ["=" * 104, "SELECTED RECO CLUSTERS (DATA, no truth) -- index", "=" * 104, ""]
+    if preamble:
+        lines.extend(preamble)
+        lines.append("")
+    lines.append(f"{len(entries)} figure(s).")
+    lines.append("")
+    lines.append("-" * 104)
+    lines.append(f"  {'event':<22s}{'reco E':>10s}{'n pts':>8s}{'reco id':>10s}  file")
+    lines.append("-" * 104)
+    for entry in entries:
+        rel = Path(entry['path']).relative_to(output_root)
+        lines.append(
+            f"  {str(entry['event_key']):<22s}{(entry['reco_energy_mev'] or 0):>10.0f}"
+            f"{(entry.get('n_points') or 0):>8d}{int(entry['reco_cluster_id']):>10d}  {rel}")
+    index_path = output_root / filename
+    index_path.write_text("\n".join(lines) + "\n")
+
+    link_lines = ["# BEE event display, one per figure. The same URL is printed on the",
+                  "# figure itself, where it cannot be clicked -- PNG has no hyperlinks."]
+    if bee_set_url:
+        link_lines.append(f"# BEE SET (whole population, one upload): {bee_set_url}")
+    link_lines.append("")
+    for entry in entries:
+        if entry.get('bee_url'):
+            rel = Path(entry['path']).relative_to(output_root)
+            link_lines.append(f"{rel}  {entry['bee_url']}")
+    (output_root / 'bee_links.txt').write_text("\n".join(link_lines) + "\n")
+    return index_path
 
 
 _TWO_NU_TRUE_STYLES = [dict(color='tab:red', marker='.', s=8, alpha=0.55),

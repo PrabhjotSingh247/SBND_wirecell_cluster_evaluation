@@ -725,3 +725,74 @@ def read_charge_light_files_for_event(input_dir, evt):
     except Exception as e:
         print(f"Error reading charge-light-matching JSON files for event {evt}: {e}")
         return None
+
+
+def read_data_files_for_event(input_dir, evt):
+    """
+    Read combined-APA charge-light-matching event data for REAL DETECTOR DATA
+    (e.g. the beam-off / off-beam sample) -- the truth-free counterpart of
+    read_charge_light_files_for_event above.
+
+    Expected structure:
+      input_dir/data/{evt}/{evt}-img-global.json
+      input_dir/data/{evt}/{evt}-op.json
+      input_dir/data/{evt}/{evt}-clustering-global.json
+
+    Real data carries no sed-smear/sed-sce truth and no mc.json -- there was no
+    simulated interaction to record -- so none of the three REQUIRED files of
+    read_charge_light_files_for_event are read or expected here. Only the
+    reco/optical side exists.
+
+    Returns a dict with keys 'reco', 'op', 'clustering', 'taggers', or None if
+    the event directory or any of the three REQUIRED files is missing.
+
+    'taggers' is {name: (x, y, z, tagged, q, real_cluster_id)} for each of
+    TAGGER_NAMES whose file is present -- see read_tagger_from_json. OPTIONAL,
+    like in read_charge_light_files_for_event: kept only in case a caller wants
+    to look at the tagger flags directly. It is NOT used to cut anything here --
+    real data has no cosmic-tagger cut applied by this reader; that choice
+    belongs to the caller.
+    """
+    input_dir = Path(input_dir)
+    event_dir = input_dir / "data" / str(evt)
+
+    if not event_dir.exists():
+        print(f"Warning: Event directory {event_dir} not found. Skipping event {evt}.")
+        return None
+
+    img_json = event_dir / f"{evt}-img-global.json"
+    op_json  = event_dir / f"{evt}-op.json"
+    clustering_json = event_dir / f"{evt}-clustering-global.json"
+
+    for required_file in (img_json, op_json, clustering_json):
+        if not required_file.exists():
+            print(f"Warning: {required_file} not found. Skipping event {evt}.")
+            return None
+
+    try:
+        x_reco, y_reco, z_reco, id_reco, q_reco, real_id_reco = read_img_global_from_json(img_json)
+        op_data = read_op_json(op_json)
+        x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu = read_cluster_global_from_json(clustering_json)
+
+        taggers = {}
+        for tagger_name in TAGGER_NAMES:
+            tagger_json = event_dir / f"{evt}-tagger_{tagger_name}.json"
+            if tagger_json.exists():
+                taggers[tagger_name] = read_tagger_from_json(tagger_json)
+
+        x_reco, y_reco, z_reco = x_reco.astype(np.float64), y_reco.astype(np.float64), z_reco.astype(np.float64)
+        id_reco, q_reco, real_id_reco = id_reco.astype(np.float64), q_reco.astype(np.float64), real_id_reco.astype(np.float64)
+
+        x_clu, y_clu, z_clu = x_clu.astype(np.float64), y_clu.astype(np.float64), z_clu.astype(np.float64)
+        id_clu, q_clu, real_id_clu = id_clu.astype(np.float64), q_clu.astype(np.float64), real_id_clu.astype(np.float64)
+
+        return {
+            'reco': (x_reco, y_reco, z_reco, id_reco, q_reco, real_id_reco),
+            'op': op_data,
+            'clustering': (x_clu, y_clu, z_clu, id_clu, q_clu, real_id_clu),
+            'taggers': taggers,
+        }
+
+    except Exception as e:
+        print(f"Error reading data JSON files for event {evt}: {e}")
+        return None

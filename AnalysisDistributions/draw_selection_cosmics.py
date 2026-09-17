@@ -39,11 +39,11 @@ to look at whole. Every one is now drawn, as for the contaminated pairs.
 NO DISTRIBUTIONS. Only the per-cluster views. The charge and reco-energy
 histograms of the selected cosmics (draw_selection_performance.
 draw_cosmic_distributions) are not drawn here and, since they also left
-SignalBackground_Distributions.ipynb, are not drawn anywhere -- restore the call
+SignalBackground_Distributions_AfterCosmic.ipynb, are not drawn anywhere -- restore the call
 in either notebook if they are wanted again.
 
 WHY A SEPARATE MODULE. These outputs used to come from
-SignalBackground_Distributions.ipynb, split across two files. That notebook draws
+SignalBackground_Distributions_AfterCosmic.ipynb, split across two files. That notebook draws
 DISTRIBUTIONS; a picture of one cosmic cluster is not one, and the pictures cost
 event-loop time there for output nobody reads in that context. They now sit with
 the other per-cluster views, in the layout Contamination_Clusters established.

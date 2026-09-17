@@ -218,6 +218,15 @@ def build_and_upload_set(selections, parent_dir, out_dir, source_label,
     On a successful upload the URL is also written into event_map.txt as a
     'BEE SET URL:' line under the header (see feedback_bee_sets_per_run). Returns
     (None, None, []) if the selection assembled no events.
+
+    The raw out_dir/data/ tree -- link_or_copy()'d together by build(), and a
+    genuine COPY rather than a free hard link whenever parent_dir sits on a
+    different filesystem than out_dir (an external drive feeding a local run
+    directory, for instance) -- is DELETED once make_zip() has verified the zip
+    holds every file. From that point the zip is self-contained and strictly
+    redundant with the raw copy; leaving both in place roughly doubles the
+    on-disk cost of every BEE set this builds for as long as the run directory
+    exists. event_map.txt is kept (it is tiny and is the human-readable index).
     """
     out_dir = Path(out_dir)
     rows = build(selections, parent_dir, out_dir)
@@ -226,6 +235,7 @@ def build_and_upload_set(selections, parent_dir, out_dir, source_label,
     map_path = write_event_map(rows, out_dir, [source_label])
     zip_path = out_dir.with_suffix('.zip')
     make_zip(out_dir, zip_path)
+    shutil.rmtree(out_dir / 'data', ignore_errors=True)
     url = upload_bee_zip(zip_path, upload_script) if upload else None
     if url:
         header = "BEE SET -- what each event in this upload actually is"

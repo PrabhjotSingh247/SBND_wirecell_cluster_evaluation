@@ -27,6 +27,9 @@ Cathode_Gap_FiducialCut_Fix
 *.log
 bee_links_final.txt
 bee_links_output.txt
+STATUS.txt
+executed.ipynb
+*.executed.ipynb
 
 # Jupyter checkpoint files
 .ipynb_checkpoints/

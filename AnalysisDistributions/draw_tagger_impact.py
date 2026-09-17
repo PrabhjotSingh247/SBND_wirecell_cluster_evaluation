@@ -1,16 +1,20 @@
 """
 WHAT THE COSMIC TAGGER CUT DID TO THE NEUTRINOS -- driven by
 
+    AnalysisDistributions/Draw_InVolumeSignal_Survived_Before_CosmicTagger.ipynb
     AnalysisDistributions/Draw_InVolumeSignal_Removed_Before_CosmicTagger.ipynb
     AnalysisDistributions/Draw_InVolumeSignal_Removed_After_CosmicTagger.ipynb
     AnalysisDistributions/Draw_InVolumeSignal_Survived_After_CosmicTagger.ipynb
     AnalysisDistributions/Draw_OutOfVolumeNeutrinos_Survived_After_CosmicTagger.ipynb
     AnalysisDistributions/Draw_OutOfVolumeNeutrinos_Removed_After_CosmicTagger.ipynb
 
-FIVE populations. Four of them are about reco clusters that SURVIVED the
-beam-window cut; the fifth asks what that cut itself already threw away, and so
-is matched against the PRE-cut reco set:
+SIX populations. Four of them are about reco clusters that SURVIVED the
+beam-window cut; the other two ask what that cut itself did, one stage earlier,
+and so are matched against the PRE-cut reco set:
 
+    BEAM-WINDOW SURVIVED matched an IN-volume neutrino, and the BEAM-WINDOW cut
+                         left it alone -- signal that reaches the tagger stage,
+                         one stage earlier than the other four
     BEAM-WINDOW REMOVED  matched an IN-volume neutrino, and the BEAM-WINDOW cut
                          removed it before the tagger ever ran -- signal lost one
                          stage earlier, and invisible to the other four
@@ -24,11 +28,13 @@ is matched against the PRE-cut reco set:
     OUT-OF-VOL REMOVED   matched an OUT-of-volume neutrino, and the tagger cut
                          REMOVED it -- background the tagger correctly rejected
 
-They are the four corners of the (in volume?, removed?) grid, and they are meant
-to be read together: (in, removed) is the cost and (out, kept) the leftover,
-while (out, removed) and (in, kept) are the tagger working as intended. The four
-counts together give the rejection and retention rates -- no one of them means
-much on its own.
+The BEAM-WINDOW pair partitions one set (every in-volume-matched, PRE-cut
+pairing) into what reaches the tagger and what does not; the four tagger-stage
+populations are the four corners of the (in volume?, removed?) grid on what is
+left, and are meant to be read together: (in, removed) is the cost and (out,
+kept) the leftover, while (out, removed) and (in, kept) are the tagger working
+as intended. The four counts together give the rejection and retention rates --
+no one of them means much on its own.
 
 THE FIGURES put the TRUE cluster on the TOP row and the RECO cluster BELOW it,
 the same order Contamination_Clusters and the completeness/purity populations
@@ -62,8 +68,9 @@ from draw_contamination_clusters import _id_text, bee_event_url, split_event_key
 
 IN_VOLUME_SIGNAL_REMOVED_DIR_NAME = 'InVolumeSignalRemoved'
 IN_VOLUME_SIGNAL_SURVIVED_DIR_NAME = 'InVolumeSignalSurvived'
-# The stage BEFORE the tagger: signal the BEAM-WINDOW cut itself removed.
+# The stage BEFORE the tagger: signal the BEAM-WINDOW cut itself removed, or left alone.
 IN_VOLUME_SIGNAL_REMOVED_BEFORE_TAGGER_DIR_NAME = 'InVolumeSignalRemovedBeforeCosmicTagger'
+IN_VOLUME_SIGNAL_SURVIVED_BEFORE_TAGGER_DIR_NAME = 'InVolumeSignalSurvivedBeforeCosmicTagger'
 OUT_OF_VOLUME_SURVIVED_DIR_NAME = 'OutOfVolumeNeutrinosSurvived'
 OUT_OF_VOLUME_REMOVED_DIR_NAME = 'OutOfVolumeNeutrinosRemoved'
 

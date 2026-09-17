@@ -1,6 +1,6 @@
 """
 SELECTION PERFORMANCE -- driven by
-AnalysisDistributions/SignalBackground_Distributions.ipynb.
+AnalysisDistributions/SignalBackground_Distributions_AfterCosmic.ipynb.
 
 Reconstruction performance judged in RECO SPACE: every selected reco cluster gets
 a category, using truth only to assign it. Where draw_signal_background.py stacks
@@ -626,6 +626,146 @@ def draw_reco_selection_stack(categorized_records, output_dir, level_name, filen
     fig.savefig(path, dpi=150, bbox_inches='tight', pad_inches=0.3)
     plt.close(fig)
     return by_key, all_energies
+
+
+# ============================================================================
+# PLOT 1, NO-TRUTH VARIANT -- real data has no true cluster to categorise
+# against, so there is no stack: just the closure outline of
+# draw_reco_selection_stack, drawn as the figure itself rather than as a check
+# over bands that do not exist here.
+# ============================================================================
+
+_SELECTED_RECO_MARKER_COLOR = 'black'
+
+
+def draw_selected_reco_energy(reco_records, output_dir, level_name, filename_prefix, apa,
+                              bin_width=ENERGY_BIN_WIDTH_MEV,
+                              reco_cuts_label='AfterBeamWindowCut',
+                              filename='selected_reco_energy'):
+    """
+    SELECTED RECO clusters as DATA POINTS, x = reco cluster energy from its
+    charge, y = number of reco clusters. For a sample with no truth (real
+    data): nothing categorises a reco cluster, so there is no stack to read a
+    filled area against -- each bin is drawn as a single point at its centre,
+    with a vertical statistical (sqrt(N)) uncertainty bar, the standard
+    convention for a measured count rather than a modelled composition. No
+    fill, no connecting line, no bars: this is the same total the
+    closure-outline curve in draw_reco_selection_stack checks a stack against,
+    drawn here as the figure itself.
+
+    reco_records is build_reco_cluster_variable_records output (carries
+    'total_charge', not yet converted to energy). Returns the list of
+    per-cluster reco energies (MeV), for write_selected_reco_root /
+    write_selected_reco_info to share without recomputing.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    all_energies = [reco_cluster_energy_mev(r.get('total_charge') or 0.0)
+                    for r in (reco_records or [])]
+    n_total = len(all_energies)
+
+    edges = energy_bin_edges(bin_width)
+    n_overflow = count_overflow(all_energies)
+    if n_overflow:
+        print(f"    NOTE: {n_overflow} selected reco cluster(s) above {ENERGY_AXIS_MAX_MEV:.0f} MeV "
+              f"are off the fixed axis and not drawn")
+
+    counts, _ = np.histogram(all_energies, bins=edges)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    errors = np.sqrt(counts)
+
+    # Empty bins carry no measurement -- an empty bin's "zero" is a statement
+    # about the whole axis, not a point on it, so it is left undrawn rather
+    # than plotted at height zero.
+    nonzero = counts > 0
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+    ax.errorbar(centers[nonzero], counts[nonzero], yerr=errors[nonzero], fmt='o',
+               color=_SELECTED_RECO_MARKER_COLOR, ecolor=_SELECTED_RECO_MARKER_COLOR,
+               markersize=5, capsize=3, linestyle='none',
+               label=f"Selected reco ({n_total})")
+
+    ax.set_xlabel('Reco Cluster Energy (MeV)', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    ax.set_ylabel('Number of Reco Clusters', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    set_fitted_title(ax, f'Selected Reco Clusters (Data) -- reco: {reco_cuts_label}',
+                 _TITLE_FONTSIZE, fontweight='bold')
+    ax.tick_params(axis='both', labelsize=_TICK_LABEL_FONTSIZE)
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.set_xlim(edges[0], PLOT_X_MAX_MEV)
+    ax.xaxis.set_major_locator(MultipleLocator(ENERGY_AXIS_TICK_MEV))
+    n_beyond = sum(1 for e in all_energies if e > PLOT_X_MAX_MEV)
+    if n_beyond:
+        print(f"    NOTE: {n_beyond} selected reco cluster(s) above {PLOT_X_MAX_MEV:.0f} MeV are "
+              f"binned and tabulated but beyond the drawn axis")
+
+    visible = edges[:-1] < PLOT_X_MAX_MEV
+    tops = (counts + errors)[visible]
+    tallest = max(float(tops.max()) if len(tops) else 0.0, 1.0)
+    ax.set_ylim(0, tallest * (1 + _Y_HEADROOM_LINEAR))
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    ax.legend(fontsize=_LEGEND_FONTSIZE, loc='upper right', framealpha=0.9)
+
+    path = output_dir / f"{filename}_{reco_cuts_label}_{bin_width:.0f}MeV_{filename_prefix}_{apa}.png"
+    fig.savefig(path, dpi=150, bbox_inches='tight', pad_inches=0.3)
+    plt.close(fig)
+    return all_energies
+
+
+def write_selected_reco_info(all_energies, output_dir, level_name,
+                             bin_width=ENERGY_BIN_WIDTH_MEV,
+                             reco_cuts_label='AfterBeamWindowCut', filename=None):
+    """Total count and the per-bin table behind draw_selected_reco_energy."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / (filename or f"selected_reco_info_{reco_cuts_label}_{bin_width:.0f}MeV.txt")
+
+    edges = energy_bin_edges(bin_width)
+    counts, _ = np.histogram(all_energies or [], bins=edges)
+
+    lines = []
+    lines.append("=" * 88)
+    lines.append(f"SELECTED RECO CLUSTERS -- DATA, no truth available ({level_name}) -- "
+                 f"reco selection: {reco_cuts_label}")
+    lines.append("=" * 88)
+    lines.append(f"Reco energy = {RECO_WORK_FUNCTION_EV} eV * charge / {RECO_RECOMBINATION_FACTOR}")
+    lines.append(f"  selected reco clusters   {len(all_energies or []):6d}")
+    lines.append("")
+    lines.append(f"  {'energy bin [MeV]':<22s}{'count':>8s}")
+    for i in range(len(edges) - 1):
+        n = int(counts[i])
+        if n == 0:
+            continue
+        lines.append(f"  {f'{edges[i]:.0f} - {edges[i+1]:.0f}':<22s}{n:>8d}")
+    n_overflow = count_overflow(all_energies)
+    if n_overflow:
+        lines.append(f"  above {ENERGY_AXIS_MAX_MEV:.0f} MeV (off-axis)   {n_overflow:>8d}")
+    lines.append("=" * 88)
+
+    with open(path, 'w') as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
+def write_selected_reco_root(all_energies, output_dir, bin_width=ENERGY_BIN_WIDTH_MEV,
+                             reco_cuts_label='AfterBeamWindowCut', filename=None):
+    """
+    The histogram behind draw_selected_reco_energy, as a single TH1D, so it can
+    be restyled without re-running the job. Written with uproot, NOT PyROOT --
+    see write_signal_background_root's docstring for why.
+    """
+    import uproot
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / (filename or f"selected_reco_histograms_{bin_width:.0f}MeV.root")
+    edges = energy_bin_edges(bin_width)
+    counts, _ = np.histogram(all_energies or [], bins=edges)
+
+    with uproot.recreate(path) as root_file:
+        root_file[f"selection_{reco_cuts_label}_{bin_width:.0f}MeV/all_selected_reco"] = (counts, edges)
+    return path
 
 
 # ============================================================================

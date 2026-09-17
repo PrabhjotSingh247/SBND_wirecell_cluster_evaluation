@@ -10,7 +10,7 @@ ONE FLASH PER CLUSTER -- one row per cluster, not one per (cluster, flash) match
 
 A cathode-crossing cluster is matched by one flash per APA, so an un-collapsed
 plot counts it once per flash. Collapsing to one row each makes the count the
-number of reco clusters the stacks in SignalBackground_Distributions.ipynb
+number of reco clusters the stacks in SignalBackground_Distributions_AfterCosmic.ipynb
 report; without it the two disagree by however many flash-mates the coarse
 grouping merged (137 vs 104 on chunk0).
 
@@ -27,7 +27,7 @@ disagree with the stacks. Among equally in-window (or equally out-of-window)
 flashes, the best supported wins.
 
 WHY A SEPARATE MODULE. These plots used to come from
-SignalBackground_Distributions.ipynb, where the collapse above sat inline in the
+SignalBackground_Distributions_AfterCosmic.ipynb, where the collapse above sat inline in the
 job-level cell. They describe the RECO INPUT -- what the beam-window cut is
 choosing between -- rather than the signal/background composition that notebook
 measures, and nothing else in it depends on them.

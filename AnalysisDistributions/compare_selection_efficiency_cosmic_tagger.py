@@ -40,7 +40,7 @@ and the single-curve 'relaxed' one need a numerator neither text file has
 
 UNCERTAINTY. Both runs' single-line PNGs already draw a Clopper-Pearson band
 (the only uncertainty style either job drew -- UNCERTAINTY_STYLES_DRAWN =
-('band',) in SignalBackground_Distributions.ipynb), so this script recomputes
+('band',) in SignalBackground_Distributions_AfterCosmic.ipynb), so this script recomputes
 the SAME interval (draw_selection_performance.clopper_pearson, same 68.27% CL)
 from the numerator/denominator counts the text files report per bin -- not a
 new choice, just reusing the one this codebase already draws everywhere else.
@@ -94,7 +94,7 @@ SAMPLE_NAME = "NuMuCC_Sample"
 _PLOTS = Path("/Users/prabhjotsingh/Experiments/SBND/WireCell_Reconstruction/"
               "AnalysisDistributions/multi_file_plots_charge_light_matching")
 
-# AFTER: the SignalBackground_Distributions.ipynb run (cosmic tagger cut applied).
+# AFTER: the SignalBackground_Distributions_AfterCosmic.ipynb run (cosmic tagger cut applied).
 # BEFORE: the SignalBackground_Distributions_BeforeCosmicTagger.ipynb run.
 # Both auto-discover the latest combined_apa_* run under their SAMPLE_NAME
 # subdirectory, so a re-run is picked up without editing these paths. Set

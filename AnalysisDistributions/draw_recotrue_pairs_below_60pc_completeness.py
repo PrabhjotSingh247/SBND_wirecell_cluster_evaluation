@@ -33,7 +33,7 @@ NO SAMPLING. Every qualifying pair is drawn -- the question these figures answer
 example, and on the full sample this is a handful of figures.
 
 WHY A SEPARATE MODULE, AND WHY HERE. These views used to be drawn by
-draw_saved_clusters.py from SignalBackground_Distributions.ipynb, alongside the
+draw_saved_clusters.py from SignalBackground_Distributions_AfterCosmic.ipynb, alongside the
 completeness-purity grid. They never belonged there: that notebook draws
 DISTRIBUTIONS, and a per-pair picture is what DrawRecoTrueClusters.ipynb exists
 for. Moving them puts them beside Contamination_Clusters, whose population they

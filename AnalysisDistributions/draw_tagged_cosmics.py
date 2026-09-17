@@ -1,6 +1,6 @@
 """
 COSMIC-TAGGER RESULTS -- driven by
-AnalysisDistributions/SignalBackground_Distributions.ipynb.
+AnalysisDistributions/SignalBackground_Distributions_AfterCosmic.ipynb.
 
 Which reco clusters the cosmic taggers flagged, drawn in XZ, YZ and XY and listed
 in a text file with enough identity to find each one again.

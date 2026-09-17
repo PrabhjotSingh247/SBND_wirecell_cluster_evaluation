@@ -1,6 +1,6 @@
 """
 SIGNAL AND BACKGROUND DISTRIBUTIONS -- driven by
-AnalysisDistributions/SignalBackground_Distributions.ipynb.
+AnalysisDistributions/SignalBackground_Distributions_AfterCosmic.ipynb.
 
 A STACKED histogram of true cluster energy, one stack component per physics
 category, so signal and the backgrounds it has to be separated from are read off

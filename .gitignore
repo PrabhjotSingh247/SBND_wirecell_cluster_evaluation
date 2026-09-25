@@ -30,6 +30,7 @@ bee_links_output.txt
 STATUS.txt
 executed.ipynb
 *.executed.ipynb
+*.csv
 
 # Jupyter checkpoint files
 .ipynb_checkpoints/

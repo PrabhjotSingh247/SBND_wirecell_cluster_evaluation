@@ -12,6 +12,9 @@ into its own subdirectory of OUT_DIR so the widths don't overwrite each other:
   Data_MC_Overlay_Plots/100MeV/...
   Data_MC_Overlay_Plots/50MeV/...
 
+The ROOT-input version of the same plots is draw_data_mc_overlay_plots_InputRootFiles.py,
+which calls run() below with its own input/output dirs.
+
 Inputs (today's r3-nuecc/r3-mc-cv/data runs), per bin width W:
   MC (NuMuCC)   selection_performance_histograms_{W}MeV.root : selection_AfterBeamWindowCut_{W}MeV/all_selected_reco
   Off-beam data selected_reco_histograms_{W}MeV.root         : selection_AfterBeamWindowCut_{W}MeV/all_selected_reco
@@ -213,7 +216,16 @@ def draw_points_panel(ax, edges, counts, errors, label, title, ymax, xmax=None):
     ax.legend(fontsize=_LEGEND_FONTSIZE, loc='upper right', framealpha=0.9)
 
 
-def run(bin_width, merge_bins, drop_first_bin=False):
+def run(bin_width, merge_bins, drop_first_bin=False,
+        mc_dir=MC_DIR, offbeam_dir=OFFBEAM_DIR, onbeam_dir=ONBEAM_DIR, out_root=OUT_ROOT,
+        stage='AfterBeamWindowCut', title_tag=''):
+    """
+    mc_dir / offbeam_dir / onbeam_dir hold one <W>MeV/ subdir per bin width;
+    stage names the reco selection inside the histogram paths
+    (selection_<stage>_<W>MeV/...); title_tag is appended to the two overlay
+    titles. The defaults are the JSON-input runs -- see
+    draw_data_mc_overlay_plots_InputRootFiles.py for the ROOT-input ones.
+    """
     W = f"{bin_width}MeV"
 
     # drop_first_bin is built ENTIRELY from the finer 50 MeV histograms (paired
@@ -221,15 +233,15 @@ def run(bin_width, merge_bins, drop_first_bin=False):
     # themselves are not read in this mode.
     if drop_first_bin:
         assert bin_width == 100, "drop_first_bin only makes sense against the 100 MeV grid"
-        component_prefix = "selection_AfterBeamWindowCut_50MeV"
-        mc_root      = MC_DIR / "50MeV" / "selection_performance_histograms_50MeV.root"
-        offbeam_root = OFFBEAM_DIR / "50MeV" / "selected_reco_histograms_50MeV.root"
-        onbeam_root  = ONBEAM_DIR / "50MeV" / "selected_reco_histograms_50MeV.root"
+        component_prefix = f"selection_{stage}_50MeV"
+        mc_root      = mc_dir / "50MeV" / "selection_performance_histograms_50MeV.root"
+        offbeam_root = offbeam_dir / "50MeV" / "selected_reco_histograms_50MeV.root"
+        onbeam_root  = onbeam_dir / "50MeV" / "selected_reco_histograms_50MeV.root"
     else:
-        component_prefix = f"selection_AfterBeamWindowCut_{W}"
-        mc_root      = MC_DIR / W / f"selection_performance_histograms_{W}.root"
-        offbeam_root = OFFBEAM_DIR / W / f"selected_reco_histograms_{W}.root"
-        onbeam_root  = ONBEAM_DIR / W / f"selected_reco_histograms_{W}.root"
+        component_prefix = f"selection_{stage}_{W}"
+        mc_root      = mc_dir / W / f"selection_performance_histograms_{W}.root"
+        offbeam_root = offbeam_dir / W / f"selected_reco_histograms_{W}.root"
+        onbeam_root  = onbeam_dir / W / f"selected_reco_histograms_{W}.root"
     hist_path = f"{component_prefix}/all_selected_reco"
 
     # Sibling output sets per bin width: the original per-bin plots directly
@@ -237,11 +249,11 @@ def run(bin_width, merge_bins, drop_first_bin=False):
     # and (100 MeV only) the 0-50 MeV bin zeroed out in W/drop_0-50MeV/ --
     # all wanted side by side, none replacing another.
     if drop_first_bin:
-        out_dir = OUT_ROOT / W / "drop_0-50MeV"
+        out_dir = out_root / W / "drop_0-50MeV"
     elif merge_bins:
-        out_dir = OUT_ROOT / W / "merged_after_1400MeV"
+        out_dir = out_root / W / "merged_after_1400MeV"
     else:
-        out_dir = OUT_ROOT / W
+        out_dir = out_root / W
     out_dir.mkdir(parents=True, exist_ok=True)
 
     mc_counts, raw_edges = load_hist(mc_root, hist_path)
@@ -374,7 +386,8 @@ def run(bin_width, merge_bins, drop_first_bin=False):
     visible_data  = (on_counts + on_errors)[edges[:-1] < PLOT_X_MAX_MEV]
     ymax = max(float(visible_stack.max()) if len(visible_stack) else 0.0,
                float(visible_data.max()) if len(visible_data) else 0.0, 1.0) * (1 + _Y_HEADROOM_LINEAR)
-    style_axes(ax, edges, "Data/MC Overlay -- On-Beam Data vs POT-Normalized (MC + Off-Beam)", ymax)
+    style_axes(ax, edges, "Data/MC Overlay -- On-Beam Data vs POT-Normalized (MC + Off-Beam)"
+               + title_tag, ymax)
     # Data first in the legend, then the stack bands in their drawing order.
     handles3, labels3 = ax.get_legend_handles_labels()
     data_idx = next(i for i, l in enumerate(labels3) if l.startswith("On-beam data"))
@@ -440,7 +453,7 @@ def run(bin_width, merge_bins, drop_first_bin=False):
     # Same y-axis range as DataMC_Overlay_Stack (plot 3, `ymax` above) -- the
     # two are the same population, one solid MC band vs broken into
     # components, and sharing the range makes them directly comparable.
-    style_axes(ax, edges, "Data/MC Overlay by MC Component", ymax)
+    style_axes(ax, edges, "Data/MC Overlay by MC Component" + title_tag, ymax)
     # Data first in the legend, then off-beam, then the MC components ranked
     # in the same order the reference stack plot uses (signal channels, then
     # contamination, out-of-volume, cosmic) -- inside the axes, matching

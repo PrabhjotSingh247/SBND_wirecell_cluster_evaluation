@@ -4,9 +4,11 @@ TPC asymmetry of the reco neutrino vertex through the candidate stages, data vs
 prediction (POT-scaled MC + off-beam), from the three ROOT-input jobs'
 <stage>/nu_x histograms.
 
-  top     A = (N_TPC0 - N_TPC1) / (N_TPC0 + N_TPC1); data points with sqrt(N)
-          errors, prediction as a line with its MC (+ off-beam) stat. band
-  bottom  data / prediction in TPC0 and in TPC1 separately
+Two figures:
+  TPC_asymmetry_...            A = (N_TPC0 - N_TPC1) / (N_TPC0 + N_TPC1); data points with
+                               sqrt(N) errors, prediction as a line with its MC (+ off-beam)
+                               stat. band
+  TPC_data_over_prediction_... data / prediction in TPC0 and in TPC1 separately
 
 The first stage is NuCandidate: before it a cluster has no reco vertex.
 
@@ -56,18 +58,19 @@ def main(mc_run, offbeam_run, onbeam_run, out_dir):
                          ratio=ratio, dratio=dratio, sigma=(a_p - a_d) / np.hypot(da_d, da_p)))
 
     x = np.arange(len(STAGES))
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10), sharex=True,
-                                   gridspec_kw={'height_ratios': [1.3, 1.0]})
-    a_p = np.array([r['a_p'] for r in rows]); da_p = np.array([r['da_p'] for r in rows])
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    name = "TPC_asymmetry_reco_vertex_x_vs_stage"
+    ratio_name = "TPC_data_over_prediction_reco_vertex_x_vs_stage"
+
+    fig, ax1 = plt.subplots(figsize=(11, 6))
+    a_p =np.array([r['a_p'] for r in rows]); da_p = np.array([r['da_p'] for r in rows])
     ax1.fill_between(x, a_p - da_p, a_p + da_p, color=_MC_COLOR, alpha=0.25, linewidth=0,
                      label='Prediction stat. unc.')
     ax1.plot(x, a_p, '-s', color=_MC_COLOR, markersize=7,
              label='Prediction: BNB Light MC (POT norm.) + off-beam')
     ax1.errorbar(x, [r['a_d'] for r in rows], yerr=[r['da_d'] for r in rows], fmt='o',
                  color=_DATA_COLOR, markersize=7, capsize=4, label=f'On-beam data (POT={POT_DATAON:.3e})')
-    for xi, r in zip(x, rows):
-        ax1.annotate(f"{r['sigma']:.1f}$\\sigma$", (xi, max(r['a_p'] + r['da_p'], r['a_d'] + r['da_d'])),
-                     textcoords='offset points', xytext=(0, 8), ha='center', fontsize=12)
     ax1.axhline(0.0, color='gray', linestyle=':', linewidth=1.0)
     ax1.set_ylabel('TPC asymmetry\n$(N_{TPC0} - N_{TPC1}) / (N_{TPC0} + N_{TPC1})$', fontsize=13,
                    fontweight='bold')
@@ -76,27 +79,25 @@ def main(mc_run, offbeam_run, onbeam_run, out_dir):
     ax1.grid(True, linestyle='--', alpha=0.3)
     ax1.set_title('Reco Neutrino Vertex TPC Asymmetry vs Selection Stage (ROOT input)\n'
                   'TPC0: reco vertex x < 0, TPC1: x > 0', fontsize=14, fontweight='bold')
-
-    for k, (name, color, dx) in enumerate((('TPC0 (x < 0)', 'tab:green', -0.08),
+    fig2, ax2 = plt.subplots(figsize=(11, 5.5))
+    for k, (tpc, color, dx) in enumerate((('TPC0 (x < 0)', 'tab:green', -0.08),
                                            ('TPC1 (x > 0)', 'tab:purple', 0.08))):
         ax2.errorbar(x + dx, [r['ratio'][k] for r in rows], yerr=[r['dratio'][k] for r in rows],
-                     fmt='o-', color=color, markersize=7, capsize=4, label=name)
+                     fmt='o-', color=color, markersize=7, capsize=4, label=tpc)
     ax2.axhline(1.0, color='gray', linestyle='--', linewidth=1.0)
     ax2.set_ylabel('Data / Prediction', fontsize=13, fontweight='bold')
     ax2.legend(fontsize=11, loc='upper left', framealpha=0.9)
     ax2.grid(True, linestyle='--', alpha=0.3)
-    ax2.set_xticks(x)
-    ax2.set_xticklabels([label for _, label in STAGES], fontsize=12)
-    ax2.set_xlim(-0.4, len(STAGES) - 0.6)
-    for ax in (ax1, ax2):
+    ax2.set_title('Reco Neutrino Vertex Data / Prediction per TPC vs Selection Stage (ROOT input)\n'
+                  'TPC0: reco vertex x < 0, TPC1: x > 0', fontsize=14, fontweight='bold')
+    for f, ax, n in ((fig, ax1, name), (fig2, ax2, ratio_name)):
+        ax.set_xticks(x)
+        ax.set_xticklabels([label for _, label in STAGES], fontsize=12)
+        ax.set_xlim(-0.4, len(STAGES) - 0.6)
         ax.tick_params(axis='y', labelsize=11)
-    fig.tight_layout()
-
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    name = "TPC_asymmetry_reco_vertex_x_vs_stage"
-    fig.savefig(out_dir / f"{name}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
-    plt.close(fig)
+        f.tight_layout()
+        f.savefig(out_dir / f"{n}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
+        plt.close(f)
     lines = [f"# {name}: A = (N_TPC0 - N_TPC1)/(N_TPC0 + N_TPC1); prediction = MC x {MC_SCALE:.4g} "
              f"+ off-beam x {OFF_SCALE:.4g}",
              "# stage\tdata_TPC0\tdata_TPC1\tpred_TPC0\tpred_TPC1\tA_data\tA_pred\tdiff_sigma\t"
@@ -106,7 +107,7 @@ def main(mc_run, offbeam_run, onbeam_run, out_dir):
                      f"{r['a_d']:+.3f}±{r['da_d']:.3f}\t{r['a_p']:+.3f}±{r['da_p']:.3f}\t{r['sigma']:.1f}\t"
                      f"{r['ratio'][0]:.2f}±{r['dratio'][0]:.2f}\t{r['ratio'][1]:.2f}±{r['dratio'][1]:.2f}")
     (out_dir / f"{name}_info.txt").write_text("\n".join(lines) + "\n")
-    print(f"wrote {out_dir / name}.png and _info.txt")
+    print(f"wrote {out_dir / name}.png, {ratio_name}.png and {name}_info.txt")
 
 
 if __name__ == "__main__":

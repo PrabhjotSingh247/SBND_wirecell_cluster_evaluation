@@ -75,9 +75,13 @@ def link_or_copy(src, dst):
         return 'copied'
 
 
-def build(selections, parent_dir, out_dir):
+def build(selections, parent_dir, out_dir, exclude=()):
     """
     Assemble data/<n>/ for each selected event. Returns the rows for event_map.txt.
+
+    exclude: file-name stems (the part after '<event>-') to leave out, e.g.
+    ('sed-',) drops the raw MC truth depositions, which make an MC set too big
+    to upload (~3.7 MB of sed-*.json per event against ~1 MB of everything else).
     """
     data_dir = Path(out_dir) / 'data'
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +100,8 @@ def build(selections, parent_dir, out_dir):
             # <event>-<rest>.json -> <new event>-<rest>.json; the prefix must
             # match the directory or BEE will not find the file.
             rest = src.name[len(f"{event}-"):] if src.name.startswith(f"{event}-") else src.name
+            if any(rest.startswith(stem) for stem in exclude):
+                continue
             how = link_or_copy(src, target / f"{new_event}-{rest}")
             n_linked += how == 'linked'
             n_copied += how == 'copied'
@@ -207,7 +213,7 @@ def upload_bee_zip(zip_path, upload_script=None, cwd=None):
 
 
 def build_and_upload_set(selections, parent_dir, out_dir, source_label,
-                         upload=True, upload_script=None):
+                         upload=True, upload_script=None, exclude=()):
     """
     build() + write_event_map() + make_zip() for a {(chunk, event): [figures]}
     selection, then (upload=True) upload it as ONE BEE set.
@@ -229,7 +235,7 @@ def build_and_upload_set(selections, parent_dir, out_dir, source_label,
     exists. event_map.txt is kept (it is tiny and is the human-readable index).
     """
     out_dir = Path(out_dir)
-    rows = build(selections, parent_dir, out_dir)
+    rows = build(selections, parent_dir, out_dir, exclude=exclude)
     if not rows:
         return None, None, []
     map_path = write_event_map(rows, out_dir, [source_label])

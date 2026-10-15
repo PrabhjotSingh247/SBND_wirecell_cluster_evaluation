@@ -796,3 +796,105 @@ def read_data_files_for_event(input_dir, evt):
     except Exception as e:
         print(f"Error reading data JSON files for event {evt}: {e}")
         return None
+
+
+# ============================================================================
+# TRACKING-PR ROOT FILES (one event per file: tracking-pr_r<run>_s<subrun>_e<event>.root)
+# ============================================================================
+# Laid out by chunk_r3_rootfiles.py: a ROOT file whose bee zip exists sits in
+# that zip's chunk_NN/subchunk_MM/ folder (bee/, after_1000files/, corrupted/),
+# the rest in tracking-pr/chunk_NN/subchunk_MM/. Read with uproot -- PyROOT is
+# not usable on this machine.
+
+TRACKING_PR_RE = re.compile(r'^tracking-pr_r(\d+)_s(\d+)_e(\d+)\.root$')
+
+# T_tagger has ~1200 branches; only these are read. Missing ones are skipped,
+# so an older or newer file layout does not break the reader.
+TAGGER_BRANCHES = ('cluster_id', 'nu_index', 'matched_flash_gid', 'nu_x', 'nu_y', 'nu_z',
+                   'numu_score', 'nue_score', 'numu_cc_flag', 'cosmict_flag', 'cosmic_flag',
+                   'numu_1_score', 'numu_2_score', 'numu_3_score', 'cosmict_score')
+KINE_BRANCHES = ('cluster_id', 'nu_index', 'kine_reco_Enu', 'kine_pio_flag', 'kine_pio_mass',
+                 'kine_particle_type', 'kine_energy_particle')   # per-particle PDG code and energy (MeV)
+# T_rec_charge: the 3D trajectory points of the candidates' particles. particle_id
+# is the PDG code of the particle a point belongs to (13 muon, 2212 proton, 11
+# shower, -1 vertex points). Large, so only read on request (rec_charge=True).
+REC_CHARGE_BRANCHES = ('x', 'y', 'z', 'q', 'rr', 'particle_id', 'cluster_id', 'sub_cluster_id')   # q: point charge; rr: residual range (cm)
+
+
+def _chunk_number(path):
+    """chunk_NN / subchunk_MM -> NN / MM, so chunk_100 sorts after chunk_99."""
+    m = re.search(r'(\d+)$', Path(path).name)
+    return int(m.group(1)) if m else -1
+
+
+def find_tracking_pr_files(subchunk_dirs):
+    """
+    Sorted tracking-pr ROOT files in each subchunk dir, in the order given.
+    Returns [(subchunk_dir, [root paths sorted by (run, subrun, event)]), ...].
+    """
+    out = []
+    for sub_dir in subchunk_dirs:
+        sub_dir = Path(sub_dir)
+        files = [p for p in sub_dir.iterdir() if TRACKING_PR_RE.match(p.name)]
+        files.sort(key=lambda p: tuple(int(v) for v in TRACKING_PR_RE.match(p.name).groups()))
+        out.append((sub_dir, files))
+    return out
+
+
+def list_subchunk_dirs(chunk_dir):
+    """chunk_NN/subchunk_MM dirs, numerically sorted."""
+    return sorted((d for d in Path(chunk_dir).iterdir()
+                   if d.is_dir() and d.name.startswith("subchunk_")), key=_chunk_number)
+
+
+def read_tracking_pr_root(root_file, rec_charge=False):
+    """
+    One event's tracking-pr ROOT file, as numpy arrays:
+
+      'run', 'subrun', 'event' -- from Trun (falling back to the file name)
+      'cluster'  -- T_cluster: one entry per reco cluster (all branches)
+      'tagger'   -- T_tagger, TAGGER_BRANCHES only; one entry per neutrino
+                    candidate. {} if the event has no candidate (tree absent).
+      'kine'     -- T_kine, KINE_BRANCHES only; {} if absent.
+      'rec_charge' -- T_rec_charge, REC_CHARGE_BRANCHES only, when rec_charge=True
+                    ({} if absent or not requested).
+      'trees'    -- names of every tree in the file
+
+    T_truth_nu / T_truth_pf are not read: the r3 sample predates them, so MC
+    truth still comes from mc.json.
+
+    Returns None if the file cannot be opened.
+    """
+    import uproot
+
+    root_file = Path(root_file)
+    try:
+        f = uproot.open(root_file)
+    except Exception as e:
+        print(f"Error opening {root_file}: {e}")
+        return None
+
+    with f:
+        trees = sorted({k.split(';')[0] for k in f.keys()})
+        m = TRACKING_PR_RE.match(root_file.name)
+        run, subrun, event = (int(v) for v in m.groups()) if m else (-1, -1, -1)
+        if 'Trun' in trees and f['Trun'].num_entries:
+            trun = f['Trun'].arrays(['runNo', 'subRunNo', 'eventNo'], library='np')
+            run, subrun, event = (int(trun[b][0]) for b in ('runNo', 'subRunNo', 'eventNo'))
+
+        def _read(name, branches=None):
+            if name not in trees:
+                return {}
+            tree = f[name]
+            if branches is not None:
+                branches = [b for b in branches if b in tree.keys()]
+            return tree.arrays(branches, library='np')
+
+        return {
+            'run': run, 'subrun': subrun, 'event': event,
+            'cluster': _read('T_cluster'),
+            'tagger': _read('T_tagger', TAGGER_BRANCHES),
+            'kine': _read('T_kine', KINE_BRANCHES),
+            'rec_charge': _read('T_rec_charge', REC_CHARGE_BRANCHES) if rec_charge else {},
+            'trees': trees,
+        }

@@ -31,6 +31,7 @@ STATUS.txt
 executed.ipynb
 *.executed.ipynb
 *.csv
+*.txt
 
 # Jupyter checkpoint files
 .ipynb_checkpoints/

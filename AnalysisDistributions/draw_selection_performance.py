@@ -641,7 +641,7 @@ _SELECTED_RECO_MARKER_COLOR = 'black'
 def draw_selected_reco_energy(reco_records, output_dir, level_name, filename_prefix, apa,
                               bin_width=ENERGY_BIN_WIDTH_MEV,
                               reco_cuts_label='AfterBeamWindowCut',
-                              filename='selected_reco_energy'):
+                              filename='selected_reco_energy', title=None):
     """
     SELECTED RECO clusters as DATA POINTS, x = reco cluster energy from its
     charge, y = number of reco clusters. For a sample with no truth (real
@@ -688,7 +688,7 @@ def draw_selected_reco_energy(reco_records, output_dir, level_name, filename_pre
 
     ax.set_xlabel('Reco Cluster Energy (MeV)', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     ax.set_ylabel('Number of Reco Clusters', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
-    set_fitted_title(ax, f'Selected Reco Clusters (Data) -- reco: {reco_cuts_label}',
+    set_fitted_title(ax, title or f'Selected Reco Clusters (Data) -- reco: {reco_cuts_label}',
                  _TITLE_FONTSIZE, fontweight='bold')
     ax.tick_params(axis='both', labelsize=_TICK_LABEL_FONTSIZE)
     ax.grid(True, linestyle='--', alpha=0.3)
@@ -766,6 +766,228 @@ def write_selected_reco_root(all_energies, output_dir, bin_width=ENERGY_BIN_WIDT
     with uproot.recreate(path) as root_file:
         root_file[f"selection_{reco_cuts_label}_{bin_width:.0f}MeV/all_selected_reco"] = (counts, edges)
     return path
+
+
+# ============================================================================
+# PLOT 1, ANY VARIABLE -- the same data-point style as draw_selected_reco_energy,
+# for an arbitrary per-cluster quantity and arbitrary fixed bin edges. Used by
+# the ROOT-input notebooks, whose inputs carry no per-cluster charge (so no
+# reco energy) but do carry length, point count, flash PE, the candidates'
+# kinematic energy and BDT scores.
+# ============================================================================
+
+def draw_selected_data_points(values, edges, output_dir, filename, xlabel, title,
+                              ylabel='Number of Reco Clusters', label='Selected reco',
+                              x_tick=None, show_errors=True, bands=None):
+    """
+    Black points at bin centres, sqrt(N) bars, empty bins undrawn -- see
+    draw_selected_reco_energy. Values outside [edges[0], edges[-1]] are not
+    drawn; how many is printed and returned, so a fixed axis never silently
+    disagrees with the count in the legend. show_errors=False drops the bars
+    (used for the BDT score plots). bands = [(lo, hi, label), ...] shades x
+    ranges behind the points (e.g. the beam window on a flash-time axis).
+
+    Returns (counts, n_below, n_above).
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    values = np.asarray(values if values is not None else [], dtype=float)
+    edges = np.asarray(edges, dtype=float)
+
+    n_below = int(np.sum(values < edges[0]))
+    n_above = int(np.sum(values > edges[-1]))
+    if n_below or n_above:
+        print(f"    NOTE: {filename}: {n_below} below {edges[0]:g} and {n_above} above "
+              f"{edges[-1]:g} are off the fixed axis and not drawn")
+
+    counts, _ = np.histogram(values, bins=edges)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    errors = np.sqrt(counts) if show_errors else np.zeros(len(counts))
+    nonzero = counts > 0
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+    for lo, hi, band_label in (bands or []):
+        ax.axvspan(lo, hi, color='tab:orange', alpha=0.2, zorder=0, label=band_label)
+    ax.errorbar(centers[nonzero], counts[nonzero],
+                yerr=errors[nonzero] if show_errors else None, fmt='o',
+                color=_SELECTED_RECO_MARKER_COLOR, ecolor=_SELECTED_RECO_MARKER_COLOR,
+                markersize=5, capsize=3, linestyle='none',
+                label=f"{label} ({len(values)})")
+
+    ax.set_xlabel(xlabel, fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    ax.set_ylabel(ylabel, fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    set_fitted_title(ax, title, _TITLE_FONTSIZE, fontweight='bold')
+    ax.tick_params(axis='both', labelsize=_TICK_LABEL_FONTSIZE)
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.set_xlim(edges[0], edges[-1])
+    if x_tick is not None:
+        ax.xaxis.set_major_locator(MultipleLocator(x_tick))
+
+    tallest = max(float((counts + errors).max()) if len(counts) else 0.0, 1.0)
+    ax.set_ylim(0, tallest * (1 + _Y_HEADROOM_LINEAR))
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.legend(fontsize=_LEGEND_FONTSIZE, loc='upper right', framealpha=0.9)
+
+    fig.savefig(output_dir / f"{filename}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
+    plt.close(fig)
+    return counts, n_below, n_above
+
+
+def write_selected_data_points_info(values, edges, path, header, unit=''):
+    """Total count and the per-bin table behind draw_selected_data_points."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    values = np.asarray(values if values is not None else [], dtype=float)
+    edges = np.asarray(edges, dtype=float)
+    counts, _ = np.histogram(values, bins=edges)
+
+    lines = ["=" * 88, header, "=" * 88,
+             f"  entries                  {len(values):6d}"]
+    n_below = int(np.sum(values < edges[0]))
+    n_above = int(np.sum(values > edges[-1]))
+    if n_below:
+        lines.append(f"  below {edges[0]:g} {unit} (off-axis) {n_below:6d}")
+    if n_above:
+        lines.append(f"  above {edges[-1]:g} {unit} (off-axis) {n_above:6d}")
+    lines.append("")
+    lines.append(f"  {'bin ' + (f'[{unit}]' if unit else ''):<26s}{'count':>8s}")
+    for i in range(len(edges) - 1):
+        if counts[i]:
+            lines.append(f"  {f'{edges[i]:g} - {edges[i+1]:g}':<26s}{int(counts[i]):>8d}")
+    lines.append("=" * 88)
+    with open(path, 'w') as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
+def write_selected_data_points_root(histograms, path):
+    """
+    {key: (values, edges)} -> one TH1D per key in a single ROOT file (uproot,
+    not PyROOT -- see write_signal_background_root). A plain string value
+    ({key: 'text'}) is written as a TObjString, e.g. a signal definition; a
+    4-tuple (x values, y values, x edges, y edges) as a TH2D.
+    """
+    import uproot
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with uproot.recreate(path) as root_file:
+        for key, value in histograms.items():
+            if isinstance(value, str):
+                root_file[key] = value
+                continue
+            if len(value) == 4:      # 2D: (x values, y values, x edges, y edges) -> TH2D
+                x, y, xedges, yedges = value
+                counts, _, _ = np.histogram2d(np.asarray(x, dtype=float), np.asarray(y, dtype=float),
+                                              bins=[np.asarray(xedges, dtype=float),
+                                                    np.asarray(yedges, dtype=float)])
+                root_file[key] = (counts, np.asarray(xedges, dtype=float), np.asarray(yedges, dtype=float))
+                continue
+            values, edges = value
+            counts, _ = np.histogram(np.asarray(values, dtype=float), bins=np.asarray(edges, dtype=float))
+            root_file[key] = (counts, np.asarray(edges, dtype=float))
+    return path
+
+
+# ============================================================================
+# PLOT 1, ANY VARIABLE, BY TRUTH CATEGORY -- draw_reco_selection_stack's bands
+# for an arbitrary per-entry quantity (e.g. the T_tagger BDT scores) on fixed
+# edges. The caller assigns the categories, so one entry per T_tagger candidate
+# can carry the category of the cluster it is credited to.
+# ============================================================================
+
+# Candidates whose truth category is unknown: T_tagger rows not credited to a
+# categorised beam-window cluster (out-of-scope clusters, or a cluster the truth
+# matching left out). Appended to SELECTION_COMPONENTS for the score stacks, so
+# the bands still partition every entry the uncategorised histogram counts.
+NO_TRUTH_CATEGORY_COMPONENT = {
+    'key': 'no_truth_category', 'label': 'Uncredited candidate (no truth category)',
+    'color': 'saddlebrown', 'legend_rank': 6, 'signal': False, 'hatch': '..'}
+
+
+def draw_variable_selection_stack(values_by_key, edges, output_dir, filename, xlabel, title,
+                                  components=None, y_scale='linear', x_tick=None,
+                                  ylabel='Number of Candidates', fill_style='mixed',
+                                  legend_loc='upper left', bands=None):
+    """
+    values_by_key = {component key: [values]}. Same band order, styling and
+    closure outline as draw_reco_selection_stack; values outside the edges are
+    counted in the legend but not drawn (printed, as in draw_selected_data_points).
+    bands = [(lo, hi, label), ...] shades x ranges behind the stack (e.g. the
+    beam window on a flash-time axis), as in draw_selected_data_points.
+    Returns {component key: counts} on the given edges.
+    """
+    components = components if components is not None else SELECTION_COMPONENTS
+    unclaimed = set(values_by_key) - {c['key'] for c in components}
+    if unclaimed:
+        raise ValueError(f"categories no component claims: {sorted(unclaimed)}")
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    edges = np.asarray(edges, dtype=float)
+    values_by_key = {c['key']: np.asarray(values_by_key.get(c['key'], []), dtype=float)
+                     for c in components}
+    all_values = np.concatenate(list(values_by_key.values()))
+    n_off_axis = int(np.sum((all_values < edges[0]) | (all_values > edges[-1])))
+    if n_off_axis:
+        print(f"    NOTE: {filename}: {n_off_axis} entr(y/ies) off the fixed axis, not drawn")
+
+    drawing_order = order_components_for_stack(components, values_by_key)
+    fig, ax = plt.subplots(figsize=(10, 7))
+    band_handles = [ax.axvspan(lo, hi, color='tab:orange', alpha=0.2, zorder=0)
+                    for lo, hi, _ in (bands or [])]
+    _, _, patch_groups = ax.hist([values_by_key[c['key']] for c in drawing_order], bins=edges,
+                                 stacked=True, histtype='stepfilled',
+                                 color=[c['color'] for c in drawing_order],
+                                 edgecolor='black', linewidth=1.0)
+    for component, group in zip(drawing_order, patch_groups):
+        if fill_style == 'solid' or component.get('signal') or component.get('solid_fill'):
+            continue
+        for patch in (group if hasattr(group, '__iter__') else [group]):
+            patch.set_facecolor('none')
+            patch.set_edgecolor(component['color'])
+            patch.set_linewidth(1.4)
+            if component.get('hatch'):
+                patch.set_hatch(component['hatch'])
+
+    total_counts, _ = np.histogram(all_values, bins=edges)
+    total_handle = ax.step(edges, np.append(total_counts, total_counts[-1]), where='post',
+                           **_SELECTED_TOTAL_STYLE)[0]
+    counts_by_key = {key: np.histogram(v, bins=edges)[0] for key, v in values_by_key.items()}
+    assert np.array_equal(np.sum(list(counts_by_key.values()), axis=0), total_counts), (
+        "stack and total disagree bin by bin")
+
+    ax.set_xlabel(xlabel, fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    ax.set_ylabel(ylabel, fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    set_fitted_title(ax, title, _TITLE_FONTSIZE, fontweight='bold')
+    ax.tick_params(axis='both', labelsize=_TICK_LABEL_FONTSIZE)
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.set_xlim(edges[0], edges[-1])
+    if x_tick is not None:
+        ax.xaxis.set_major_locator(MultipleLocator(x_tick))
+    ax.set_yscale(y_scale)
+    tallest = max(int(total_counts.max()) if len(total_counts) else 0, 1)
+    if y_scale == 'log':
+        ax.set_ylim(0.5, tallest * 25.0)
+    else:
+        ax.set_ylim(0, tallest * (1 + _Y_HEADROOM_LINEAR))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    handle_by_key = {c['key']: (group[0] if len(group) else None)
+                     for c, group in zip(drawing_order, patch_groups)}
+    keyed = [(handle_by_key[c['key']], f"{c['label']} ({len(values_by_key[c['key']])})")
+             for c in order_selection_components_for_legend(components, values_by_key)
+             if handle_by_key.get(c['key']) is not None and len(values_by_key[c['key']])]
+    keyed.append((total_handle, f"All ({len(all_values)})"))
+    keyed += [(h, label) for h, (_, _, label) in zip(band_handles, bands or [])]
+    ax.legend([h for h, _ in keyed], [l for _, l in keyed],
+              fontsize=_LEGEND_FONTSIZE, loc=legend_loc, framealpha=0.9)
+
+    scale_suffix = "_logy" if y_scale == 'log' else "_liny"
+    fill_tag = "" if fill_style == 'mixed' else f"_{fill_style}"
+    fig.savefig(output_dir / f"{filename}{fill_tag}{scale_suffix}.png",
+                dpi=150, bbox_inches='tight', pad_inches=0.3)
+    plt.close(fig)
+    return counts_by_key
 
 
 # ============================================================================
@@ -1237,13 +1459,32 @@ def count_signal_interactions_per_event(vertex_records, min_true_energy=MIN_TRUE
     return counts
 
 
+# The true energies an efficiency can be binned in (build_selection_efficiency's
+# energy_key), and the axis label each one gets.
+EFFICIENCY_ENERGY_LABELS = {
+    'precut_energy_MeV':   'True Deposited Cluster Energy',
+    'mc_total_energy_MeV': 'True Neutrino Energy',
+}
+
+
+def efficiency_energy_label(efficiency):
+    """'True Deposited Cluster Energy' or 'True Neutrino Energy' -- what the bins are in."""
+    return EFFICIENCY_ENERGY_LABELS[efficiency.get('energy_key', 'precut_energy_MeV')]
+
+
 def build_selection_efficiency(categorized_records, vertex_records, channel,
                                bin_width=ENERGY_BIN_WIDTH_MEV, threshold=HIGH_SIGNAL_THRESHOLD,
                                min_true_energy=MIN_TRUE_ENERGY_MEV,
-                               multiplicity_class='all'):
+                               multiplicity_class='all', energy_key='precut_energy_MeV'):
     """
     Numerators and denominator for one channel's efficiency, binned in TRUE
-    deposited energy.
+    deposited energy -- or, with energy_key='mc_total_energy_MeV', in the true
+    (incident) neutrino energy, mc.json's Etot. energy_key changes ONLY the
+    binning: which interactions are in the denominator and the numerators is
+    decided by the deposited energy exactly as below, so the two versions count
+    the same interactions and share their integrated efficiencies. An interaction
+    with no value for energy_key is left out of the histograms and counted in
+    'n_denominator_no_axis_energy' (0 for the deposited energy by construction).
 
     DENOMINATOR: every true interaction of this channel with its vertex in volume
     AND more than min_true_energy of deposited energy -- including the ones that
@@ -1295,8 +1536,18 @@ def build_selection_efficiency(categorized_records, vertex_records, channel,
     n_no_energy   = len(in_volume_vertices) - len(with_energy)
     n_below_energy = len(with_energy) - len(denominator_energies)
 
+    # The x value each counted interaction is binned at.
+    axis_of = ((lambda v: v.get('precut_energy_MeV')) if energy_key == 'precut_energy_MeV'
+               else (lambda v: v.get(energy_key)))
+    denominator_axis = [axis_of(v) for v in with_energy
+                        if v['precut_energy_MeV'] > min_true_energy]
+    n_no_axis_energy = sum(1 for x in denominator_axis if x is None)
+    denominator_axis = [x for x in denominator_axis if x is not None]
+
     precut_by_true = {(v['event'], v['cluster_id']): v.get('precut_energy_MeV')
                       for v in (vertex_records or []) if v.get('cluster_id') is not None}
+    axis_by_true = {(v['event'], v['cluster_id']): axis_of(v)
+                    for v in (vertex_records or []) if v.get('cluster_id') is not None}
 
     # {true cluster key: its pre-cut energy}, so each true cluster contributes once
     # however many reco clusters claimed it.
@@ -1316,6 +1567,9 @@ def build_selection_efficiency(categorized_records, vertex_records, channel,
         # cut, and the pre-cut sum can only be larger), but stating it here means the
         # two sets cannot drift apart if either cut changes.
         if not energy or energy <= min_true_energy:
+            continue
+        energy = axis_by_true.get(key)     # the binning value (== energy for the deposited one)
+        if energy is None:
             continue
         any_true[key] = energy
         true_pair_counts[key] = true_pair_counts.get(key, 0) + 1
@@ -1339,7 +1593,7 @@ def build_selection_efficiency(categorized_records, vertex_records, channel,
     high_energies = list(high_true.values())
     relaxed_energies = list(relaxed_true.values())
 
-    denominator, _ = np.histogram(denominator_energies, bins=edges)
+    denominator, _ = np.histogram(denominator_axis, bins=edges)
     numerator_high, _ = np.histogram(high_energies, bins=edges)
     numerator_any, _ = np.histogram(any_energies, bins=edges)
     numerator_relaxed, _ = np.histogram(relaxed_energies, bins=edges)
@@ -1348,13 +1602,15 @@ def build_selection_efficiency(categorized_records, vertex_records, channel,
         'channel':            channel,
         'multiplicity_class': multiplicity_class,
         'threshold':          threshold,
+        'energy_key':         energy_key,
         'edges':              edges,
         'denominator':        denominator,
         'numerator_high':     numerator_high,
         'numerator_relaxed':  numerator_relaxed,
         'numerator_any':      numerator_any,
-        'n_denominator':      len(denominator_energies),
+        'n_denominator':      len(denominator_axis),
         'n_denominator_no_energy': n_no_energy,
+        'n_denominator_no_axis_energy': n_no_axis_energy,
         'n_denominator_below_energy': n_below_energy,
         'min_true_energy':    min_true_energy,
         'n_high':             len(high_energies),
@@ -1671,7 +1927,7 @@ def draw_selection_efficiency(efficiency, output_dir, level_name, filename_prefi
 
     channel_label = {'numu_CC': r'$\nu_\mu$ CC', 'nue_CC': r'$\nu_e$ CC',
                      'NC': 'NC'}.get(efficiency['channel'], efficiency['channel'])
-    ax.set_xlabel('True Deposited Cluster Energy (MeV)',
+    ax.set_xlabel(f'{efficiency_energy_label(efficiency)} (MeV)',
                   fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     ax.set_ylabel('Selection Efficiency', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     set_fitted_title(ax, f'{channel_label} selection efficiency, vertex in volume '
@@ -1839,7 +2095,7 @@ def draw_efficiency_by_multiplicity(efficiencies_by_class, output_dir, level_nam
     curve_label = EFFICIENCY_CURVES[numerator_key]['label']
     if numerator_key == 'numerator_high':
         curve_label = f'Signal ({threshold_label(threshold)})'
-    ax.set_xlabel('True Deposited Cluster Energy (MeV)',
+    ax.set_xlabel(f'{efficiency_energy_label(next(iter(present.values())))} (MeV)',
                   fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     ax.set_ylabel('Selection Efficiency', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     set_fitted_title(ax, f'{channel_label}, {curve_label} -- by event multiplicity',
@@ -1942,7 +2198,7 @@ def draw_efficiency_threshold_comparison(efficiencies_by_threshold, output_dir, 
 
     channel_label = {'numu_CC': r'$\nu_\mu$ CC', 'nue_CC': r'$\nu_e$ CC',
                      'NC': 'NC'}.get(channel, channel)
-    ax.set_xlabel('True Deposited Cluster Energy (MeV)',
+    ax.set_xlabel(f'{efficiency_energy_label(any_efficiency)} (MeV)',
                   fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     ax.set_ylabel('Selection Efficiency', fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
     set_fitted_title(ax, f'{channel_label} selection efficiency vs quality threshold',
@@ -1973,8 +2229,14 @@ def write_selection_performance_info(by_key, categorized_records, efficiencies, 
                                      level_name, components=None,
                                      bin_width=ENERGY_BIN_WIDTH_MEV,
                                      reco_cuts_label='AfterBeamWindowCut',
-                                     filename=None):
-    """Category counts, the closure check, and each channel's efficiency table."""
+                                     filename=None, category_threshold=None):
+    """
+    Category counts, the closure check, and each channel's efficiency table.
+
+    category_threshold: the signal definition `by_key` was split at, stated in
+    the header. It need not be HIGH_SIGNAL_THRESHOLD -- the efficiency tables
+    still are -- so a caller passing any other split should say which.
+    """
     components = components if components is not None else SELECTION_COMPONENTS
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1989,6 +2251,10 @@ def write_selection_performance_info(by_key, categorized_records, efficiencies, 
     lines.append(f"Reco energy = {RECO_WORK_FUNCTION_EV} eV * charge / {RECO_RECOMBINATION_FACTOR}")
     lines.append(f"Match requires purity >= {MIN_MATCH_PURITY}; high signal requires "
                  f"completeness AND purity > {HIGH_SIGNAL_THRESHOLD}")
+    if category_threshold is not None:
+        lines.append(f"Category table below: Signal = {threshold_label(category_threshold)} "
+                     f"({threshold_dirname(category_threshold)}); the efficiency tables' "
+                     f"'high signal' stays completeness AND purity > {HIGH_SIGNAL_THRESHOLD}")
     lines.append("")
     lines.append("Categories of the selected reco clusters:")
     for component in order_selection_components_for_legend(components, by_key):
@@ -2097,6 +2363,8 @@ def write_efficiency_summary(efficiencies_by_width, output_dir, level_name,
         return None
     table_width  = min(efficiencies_by_width)
     efficiencies = efficiencies_by_width[table_width]
+    axis_label = (efficiency_energy_label(efficiencies[0]) if efficiencies
+                  else EFFICIENCY_ENERGY_LABELS['precut_energy_MeV']).lower()
 
     lines = []
     lines.append("=" * 92)
@@ -2137,6 +2405,9 @@ def write_efficiency_summary(efficiencies_by_width, output_dir, level_name,
         if efficiency['n_denominator_no_energy']:
             notes.append(f"{efficiency['n_denominator_no_energy']} interaction(s) had no pre-cut "
                          f"cluster energy and are NOT in the denominator")
+        if efficiency.get('n_denominator_no_axis_energy'):
+            notes.append(f"{efficiency['n_denominator_no_axis_energy']} interaction(s) had no "
+                         f"{axis_label} and are NOT in the histograms")
         if efficiency.get('n_denominator_below_energy'):
             notes.append(f"{efficiency['n_denominator_below_energy']} interaction(s) deposited "
                          f"<= {efficiency.get('min_true_energy', MIN_TRUE_ENERGY_MEV):.0f} MeV and are "
@@ -2163,7 +2434,7 @@ def write_efficiency_summary(efficiencies_by_width, output_dir, level_name,
     split = EFFICIENCY_SPLIT_MEV
     lines.append("")
     lines.append("-" * 92)
-    lines.append(f"AVERAGE EFFICIENCY -- integrated ratio, split at {split:.0f} MeV of true deposited energy")
+    lines.append(f"AVERAGE EFFICIENCY -- integrated ratio, split at {split:.0f} MeV of {axis_label}")
     lines.append("-" * 92)
     lines.append("The integrated ratio = sum(numerator bins) / sum(denominator bins), i.e. the")
     lines.append("denominator-weighted mean of the per-bin efficiencies. Each range shows")
@@ -2229,7 +2500,7 @@ def write_efficiency_summary(efficiencies_by_width, output_dir, level_name,
             continue
         lines.append("")
         lines.append("-" * 92)
-        lines.append(f"{efficiency['channel']} -- per {table_width:.0f} MeV bin of true deposited energy")
+        lines.append(f"{efficiency['channel']} -- per {table_width:.0f} MeV bin of {axis_label}")
         lines.append("-" * 92)
         lines.append(f"  {'energy bin [MeV]':<20s}{'denominator':>13s}{'high signal':>13s}{'eff high':>11s}"
                      f"{'good+bad':>11s}{'eff good+bad':>14s}")
@@ -2328,10 +2599,15 @@ def write_efficiency_by_threshold_summary(binned_by_threshold, output_dir, level
 def write_selection_performance_root(by_key, all_energies, efficiencies, output_dir,
                                      components=None, bin_width=ENERGY_BIN_WIDTH_MEV,
                                      reco_cuts_label='AfterBeamWindowCut',
-                                     filename='selection_performance_histograms.root'):
+                                     filename='selection_performance_histograms.root',
+                                     category_threshold=None):
     """
     The stack's bands, the selected total and each channel's efficiency inputs, as
     TH1Ds, so the figures can be restyled without re-running the job.
+
+    category_threshold: the signal definition `by_key` was split at; written
+    beside the bands as a TObjString, <stack dir>/signal_definition, so a reader
+    (e.g. the Data/MC overlays) can label them.
 
     Efficiency is stored as its NUMERATOR and DENOMINATOR histograms rather than
     as a ratio: a stored ratio cannot be rebinned (the ratio of sums is not the
@@ -2353,6 +2629,8 @@ def write_selection_performance_root(by_key, all_energies, efficiencies, output_
             root_file[f"{stack_dir}/{component['key']}"] = (counts, edges)
         total_counts, _ = np.histogram(all_energies or [], bins=edges)
         root_file[f"{stack_dir}/all_selected_reco"] = (total_counts, edges)
+        if category_threshold is not None:
+            root_file[f"{stack_dir}/signal_definition"] = threshold_label(category_threshold)
 
         for efficiency in efficiencies or []:
             eff_dir = f"efficiency_{efficiency['channel']}_{bin_width:.0f}MeV"
@@ -2360,3 +2638,33 @@ def write_selection_performance_root(by_key, all_energies, efficiencies, output_
             root_file[f"{eff_dir}/numerator_high"] = (efficiency['numerator_high'], efficiency['edges'])
             root_file[f"{eff_dir}/numerator_any"]  = (efficiency['numerator_any'], efficiency['edges'])
     return path
+
+
+def draw_2d_points(x, y, xedges, yedges, output_dir, filename, xlabel, ylabel, title, label=''):
+    """
+    A 2D histogram (counts, log colour scale) of per-point quantities, e.g. a
+    trajectory point's charge against its residual range. Entries outside the
+    edges are not drawn; the legend-free title states the number drawn.
+    Returns the counts.
+    """
+    from matplotlib.colors import LogNorm
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    counts, _, _ = np.histogram2d(x, y, bins=[xedges, yedges])
+    fig, ax = plt.subplots(figsize=(10, 7))
+    if counts.sum() > 0:
+        mesh = ax.pcolormesh(xedges, yedges, np.ma.masked_equal(counts.T, 0), cmap='viridis',
+                             norm=LogNorm(vmin=1, vmax=max(counts.max(), 1)))
+        fig.colorbar(mesh, ax=ax, label='Points')
+    ax.set_xlabel(xlabel, fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    ax.set_ylabel(ylabel, fontsize=_AXIS_LABEL_FONTSIZE, fontweight='bold')
+    set_fitted_title(ax, f"{title} -- {int(counts.sum())} {label or 'points'}", _TITLE_FONTSIZE,
+                     fontweight='bold')
+    ax.tick_params(axis='both', labelsize=_TICK_LABEL_FONTSIZE)
+    ax.set_xlim(xedges[0], xedges[-1])
+    ax.set_ylim(yedges[0], yedges[-1])
+    fig.savefig(output_dir / f"{filename}.png", dpi=150, bbox_inches='tight', pad_inches=0.3)
+    plt.close(fig)
+    return counts
